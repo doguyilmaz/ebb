@@ -9,6 +9,7 @@ type SliceNode struct {
 	Alloc    uint64       `json:"alloc"`
 	Unique   uint64       `json:"unique"`
 	Files    uint32       `json:"files"`
+	Modified int64        `json:"modified,omitempty"` // unix seconds, newest in subtree
 	Other    int          `json:"other,omitempty"`
 	Children []*SliceNode `json:"children,omitempty"`
 }
@@ -89,7 +90,7 @@ func (s *SliceNode) add(alloc, unique uint64, files uint32) {
 }
 
 func (t *Tree) sliceNode(id ID) *SliceNode {
-	return &SliceNode{ID: id, Name: string(t.name(id)), Kind: t.kind[id], Alloc: t.alloc[id], Unique: t.unique[id], Files: t.files[id]}
+	return &SliceNode{ID: id, Name: string(t.name(id)), Kind: t.kind[id], Alloc: t.alloc[id], Unique: t.unique[id], Files: t.files[id], Modified: t.maxMtime[id]}
 }
 
 func sortSlice(s []*SliceNode) {

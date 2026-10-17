@@ -104,7 +104,7 @@ export function useSetNote() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (n: { key: string; text: string }) => api.post("/notes", n),
-    onSuccess: () => ["findings", "children"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
+    onSuccess: () => ["findings", "children", "notes"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   });
 }
 
@@ -125,3 +125,5 @@ export function useSaveSettings() {
 }
 
 export const useReveal = () => useMutation({ mutationFn: (path: string) => api.post("/reveal", { path }) });
+
+export const useNotes = () => useQuery({ queryKey: ["notes"], queryFn: () => api.get<Record<string, string>>("/notes") });

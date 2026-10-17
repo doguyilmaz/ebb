@@ -37,3 +37,10 @@ sooner, so 8 stays the default. Detectors and persistence take ~2 s. The tree ho
 APFS clone groups. `Reclaimable` used to scan every shared group per call (36 s spent in the stale-project
 detector); it now reads a per-node cache computed once per write in O(groups × depth): 1.4 s → 0.9 ms per 1,000 calls.
 | `GOGC=50` instead of the fixed memory limit (scales with disk size) | 41.6 s | 43.4 s | 345 MB |
+
+## ui (Explore, real scan, 2834×1285 canvas at 2× DPR, sunburst of ~3,500 arcs)
+
+| Change | Hover to next frame, median / p95 |
+|---|---|
+| redraw all shapes on hover | 16.8 / 24.1 ms |
+| shapes on a base canvas, hover repaints only an overlay | 16.7 / 19.3 ms (median is the frame wait) |

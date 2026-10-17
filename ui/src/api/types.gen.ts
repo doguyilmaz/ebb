@@ -51,6 +51,7 @@ export interface SliceNode {
   alloc: number;
   unique: number;
   files: number;
+  modified?: number;
   other?: number;
   children?: SliceNode[] | null;
 }
