@@ -120,3 +120,30 @@ func TestSetFlags(t *testing.T) {
 		t.Fatal("flags")
 	}
 }
+
+func TestCloneGroupUniqueOnce(t *testing.T) {
+	tr := New("/r")
+	var a, b ID
+	tr.Write(func(w *Writer) {
+		a = w.AddDir(tr.Root(), []byte("a"), 1, 0)
+		b = w.AddDir(tr.Root(), []byte("b"), 1, 0)
+		if !w.Clone(77, 2, 8<<20, a) {
+			t.Fatal("first clone must count")
+		}
+		w.AddFile(a, []byte("orig"), KindFile, 8<<20, 8<<20, 8<<20, 1, FlagClone)
+		if w.Clone(77, 2, 8<<20, b) {
+			t.Fatal("second clone must not count")
+		}
+		w.AddFile(b, []byte("copy"), KindFile, 8<<20, 0, 8<<20, 1, FlagClone)
+	})
+	root := tr.Node(tr.Root())
+	if root.Alloc != 16<<20 || root.Unique != 8<<20 {
+		t.Fatalf("alloc counts both copies like du, unique only one: %+v", root)
+	}
+	if got := tr.Reclaimable(a); got != 0 {
+		t.Fatalf("deleting one clone frees nothing while its partner lives: %d", got)
+	}
+	if got := tr.Reclaimable(tr.Root()); got != 8<<20 {
+		t.Fatalf("both clones inside: %d", got)
+	}
+}

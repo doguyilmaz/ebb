@@ -71,13 +71,14 @@ type Tree struct {
 	maxMtime, ownMtime           []int64
 	names                        []byte
 
-	links map[uint64]*link
+	links  map[uint64]*link // hardlinked inodes
+	clones map[uint64]*link // APFS clone groups by clone ID
 }
 
 type Writer struct{ t *Tree }
 
 func New(rootPath string) *Tree {
-	t := &Tree{rootPath: rootPath, links: map[uint64]*link{}}
+	t := &Tree{rootPath: rootPath, links: map[uint64]*link{}, clones: map[uint64]*link{}}
 	t.add(None, []byte(rootPath), KindDir, 0)
 	return t
 }
@@ -167,11 +168,22 @@ func (w *Writer) SetFlags(id ID, f Flag) { w.t.flags[id] |= f }
 // inode is seen; the caller then counts its bytes, otherwise adds the file
 // with zero bytes and FlagShared.
 func (w *Writer) Link(ino uint64, nlink uint32, alloc uint64, dir ID) bool {
-	if l, ok := w.t.links[ino]; ok {
+	return register(w.t.links, ino, nlink, alloc, dir)
+}
+
+// Clone registers a file that is a pure APFS clone (refs files share one data
+// stream). It returns true the first time the clone ID is seen; later copies
+// keep their allocated bytes, as du counts them, but add no unique bytes.
+func (w *Writer) Clone(cloneID uint64, refs uint32, alloc uint64, dir ID) bool {
+	return register(w.t.clones, cloneID, refs, alloc, dir)
+}
+
+func register(m map[uint64]*link, key uint64, n uint32, alloc uint64, dir ID) bool {
+	if l, ok := m[key]; ok {
 		l.dirs = append(l.dirs, dir)
 		return false
 	}
-	w.t.links[ino] = &link{nlink: nlink, alloc: alloc, dirs: []ID{dir}}
+	m[key] = &link{nlink: n, alloc: alloc, dirs: []ID{dir}}
 	return true
 }
 
@@ -319,18 +331,21 @@ func (t *Tree) isAncestor(a, b ID) bool {
 	return false
 }
 
-// Reclaimable is what deleting id would free: its unique bytes, minus hardlinked
-// files counted inside id whose other links survive outside it.
+// Reclaimable is what deleting id would free: its unique bytes, minus shared
+// data (hardlinks, clone groups) counted inside id that another copy outside
+// it keeps alive.
 func (t *Tree) Reclaimable(id ID) uint64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	n := t.unique[id]
-	for _, l := range t.links {
-		if !t.isAncestor(id, l.dirs[0]) {
-			continue
-		}
-		if keep := uint32(len(l.dirs)) < l.nlink || slices.ContainsFunc(l.dirs[1:], func(d ID) bool { return !t.isAncestor(id, d) }); keep && n >= l.alloc {
-			n -= l.alloc
+	for _, m := range []map[uint64]*link{t.links, t.clones} {
+		for _, l := range m {
+			if !t.isAncestor(id, l.dirs[0]) {
+				continue
+			}
+			if keep := uint32(len(l.dirs)) < l.nlink || slices.ContainsFunc(l.dirs[1:], func(d ID) bool { return !t.isAncestor(id, d) }); keep && n >= l.alloc {
+				n -= l.alloc
+			}
 		}
 	}
 	return n

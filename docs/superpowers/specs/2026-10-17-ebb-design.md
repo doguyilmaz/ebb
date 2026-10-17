@@ -104,7 +104,7 @@ Default daemon port `47340`. Launchd label `dev.ebb.daemon`. Default hosted orig
 - Work queue of directories (mutex + cond, LIFO for locality), `N` workers, default `min(8, NumCPU)`, `--threads`.
 - Darwin worker: `open(O_RDONLY|O_DIRECTORY)`, `getattrlistbulk` loop into a reused 256 KB per-worker buffer.
   Attributes: `CMN_NAME|OBJTYPE|FILEID|FLAGS|MODTIME|ERROR|RETURNED_ATTRS`, `FILE_LINKCOUNT|TOTALSIZE|ALLOCSIZE`,
-  `DIR_MOUNTSTATUS`, extended `CMNEXT_EXT_FLAGS` (`FSOPT_ATTR_CMN_EXTENDED|FSOPT_PACK_INVAL_ATTRS`). Buffer parsing
+  `DIR_MOUNTSTATUS`, extended `CMNEXT_CLONEID|EXT_FLAGS|CLONE_REFCNT` (`FSOPT_ATTR_CMN_EXTENDED|FSOPT_PACK_INVAL_ATTRS`). Buffer parsing
   lives in C next to the SDK headers; Go receives a packed array of fixed-size records + a name blob per directory.
 - Never follows symlinks, never crosses mount points (`DIR_MNTSTATUS_MNTPOINT`), skips dataless (iCloud-evicted)
   bytes, records per-directory errors (EACCES, EPERM) with the byte-less path into an "inaccessible" list.
@@ -133,8 +133,12 @@ Struct-of-arrays, no pointers, so the GC never scans it: `parent, firstChild, ne
 
 - `nlink > 1`: a side table `inode → {nlink, alloc, nodes seen}` counts bytes once (first location) and marks the
   others shared. A target frees a hardlinked file only if all its links are inside the target.
-- `EF_MAY_SHARE_BLOCKS`: after the main pass, an accuracy pass calls `getattrlist(CMNEXT_PRIVATESIZE)` for those
-  files only (throttled, progressive) and fills `unique`. UI shows allocated vs unique; reclaimable = unique.
+- APFS clones (`EF_MAY_SHARE_BLOCKS`): the bulk pass also reads `ATTR_CMNEXT_CLONEID` and `ATTR_CMNEXT_CLONE_REFCNT`.
+  Pure clones share a clone ID, so a side table `cloneID → {refs, alloc, nodes seen}` counts their unique bytes once,
+  exactly like hardlinks; allocated bytes stay per copy (what `du` shows). A modified clone gets its own clone ID and
+  counts fully as unique — a known overestimate the report notes. UI shows allocated vs unique; reclaimable = unique
+  minus shared data that a copy outside the target keeps alive. (A `PRIVATESIZE` pass was measured and rejected:
+  2.7× slower per entry, kernel-serialized as a post-pass — see `docs/PERF.md`.)
 
 ### 4.4 Volume accounting
 
@@ -287,7 +291,7 @@ Homebrew upgrades may require re-granting; the UI detects and explains this.
 ```
 GET  /api/v1/status                         version, scan state, last scan, FDA status
 POST /api/v1/scans {root?, threads?}        start (one active scan); GET /api/v1/scans/current
-GET  /api/v1/events                         SSE: hello, scan.progress, scan.done, accuracy.progress,
+GET  /api/v1/events                         SSE: hello, scan.progress, scan.done,
                                             plan.progress, plan.done, findings.changed, history.changed
 GET  /api/v1/volume
 GET  /api/v1/tree?path&depth&minShare&maxNodes      LOD slice for charts

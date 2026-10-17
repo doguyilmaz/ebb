@@ -48,13 +48,15 @@ func (t *Tree) Save(w io.Writer) error {
 	if _, err := bw.Write(t.names); err != nil {
 		return err
 	}
-	if err := put(uint64(len(t.links))); err != nil {
-		return err
-	}
-	for ino, l := range t.links {
-		for _, v := range []any{ino, l.nlink, l.alloc, uint32(len(l.dirs)), l.dirs} {
-			if err := put(v); err != nil {
-				return err
+	for _, m := range []map[uint64]*link{t.links, t.clones} {
+		if err := put(uint64(len(m))); err != nil {
+			return err
+		}
+		for key, l := range m {
+			for _, v := range []any{key, l.nlink, l.alloc, uint32(len(l.dirs)), l.dirs} {
+				if err := put(v); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -90,7 +92,7 @@ func Load(r io.Reader) (*Tree, error) {
 	if err := get(&n); err != nil {
 		return nil, err
 	}
-	t := &Tree{rootPath: string(root), links: map[uint64]*link{},
+	t := &Tree{rootPath: string(root), links: map[uint64]*link{}, clones: map[uint64]*link{},
 		parent: make([]uint32, n), first: make([]uint32, n), next: make([]uint32, n), nameOff: make([]uint32, n),
 		nameLen: make([]uint16, n), kind: make([]Kind, n), flags: make([]Flag, n), alloc: make([]uint64, n),
 		unique: make([]uint64, n), logical: make([]uint64, n), smallAlloc: make([]uint64, n), files: make([]uint32, n),
@@ -108,29 +110,24 @@ func Load(r io.Reader) (*Tree, error) {
 	if _, err := io.ReadFull(br, t.names); err != nil {
 		return nil, err
 	}
-	if err := get(&n); err != nil {
-		return nil, err
-	}
-	for range n {
-		var ino, alloc uint64
-		var nlink, nd uint32
-		if err := get(&ino); err != nil {
+	for _, m := range []map[uint64]*link{t.links, t.clones} {
+		if err := get(&n); err != nil {
 			return nil, err
 		}
-		if err := get(&nlink); err != nil {
-			return nil, err
+		for range n {
+			var key, alloc uint64
+			var nlink, nd uint32
+			for _, v := range []any{&key, &nlink, &alloc, &nd} {
+				if err := get(v); err != nil {
+					return nil, err
+				}
+			}
+			dirs := make([]ID, nd)
+			if err := get(dirs); err != nil {
+				return nil, err
+			}
+			m[key] = &link{nlink: nlink, alloc: alloc, dirs: dirs}
 		}
-		if err := get(&alloc); err != nil {
-			return nil, err
-		}
-		if err := get(&nd); err != nil {
-			return nil, err
-		}
-		dirs := make([]ID, nd)
-		if err := get(dirs); err != nil {
-			return nil, err
-		}
-		t.links[ino] = &link{nlink: nlink, alloc: alloc, dirs: dirs}
 	}
 	return t, nil
 }

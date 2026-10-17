@@ -56,20 +56,20 @@ const (
 )
 
 type entry struct {
-	nameOff uint32
-	nameLen uint16
-	kind    tree.Kind
-	mount   bool
-	alloc   uint64
-	logical uint64
-	private uint64
-	hasPriv bool
-	mtime   int64
-	nlink   uint32
-	ino     uint64
-	flags   uint32
-	ext     uint32
-	err     syscall.Errno
+	nameOff   uint32
+	nameLen   uint16
+	kind      tree.Kind
+	mount     bool
+	alloc     uint64
+	logical   uint64
+	mtime     int64
+	nlink     uint32
+	ino       uint64
+	flags     uint32
+	ext       uint32
+	cloneID   uint64
+	cloneRefs uint32
+	err       syscall.Errno
 }
 
 type batch struct {
@@ -289,21 +289,22 @@ func (s *Session) apply(b *batch) {
 			if s.markers[string(name)] {
 				project = true
 			}
-			alloc, unique := e.alloc, e.alloc
+			alloc := e.alloc
 			var flags tree.Flag
-			if e.ext&efMayShareBlocks != 0 {
-				flags |= tree.FlagClone
-				if e.hasPriv {
-					unique = e.private
-				}
-			}
 			if e.flags&sfDataless != 0 {
-				alloc, unique = 0, 0
+				alloc = 0
 			}
 			big := e.alloc >= s.threshold
 			if e.nlink > 1 && e.kind == tree.KindFile && !w.Link(e.ino, e.nlink, alloc, b.dir) {
-				alloc, unique = 0, 0
+				alloc = 0
 				flags |= tree.FlagShared
+			}
+			unique := alloc
+			if e.ext&efMayShareBlocks != 0 && alloc > 0 {
+				flags |= tree.FlagClone
+				if e.cloneRefs > 1 && !w.Clone(e.cloneID, e.cloneRefs, alloc, b.dir) {
+					unique = 0
+				}
 			}
 			files++
 			bytes += alloc
