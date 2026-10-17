@@ -437,6 +437,14 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .chips li { display: flex; align-items: center; gap: 8px; }
 .pairing { padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--r-2); background: var(--surface-2); }
 
+/* ---------- ask ---------- */
+.ask { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface-2); }
+.md { display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.55; }
+.md ul, .md ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
+.md pre { margin: 0; padding: 8px 10px; border-radius: var(--r-1); background: var(--surface); overflow-x: auto; }
+.md pre code { background: none; border: 0; padding: 0; }
+.md-h { font-weight: 600; }
+
 /* ---------- first run ---------- */
 .loading { display: flex; align-items: center; gap: 10px; padding: 24px 0; animation: fade 300ms 150ms ease-out both; }
 .welcome { max-width: 860px; width: 100%; margin: 4vh auto 0; display: flex; flex-direction: column; gap: 28px; }

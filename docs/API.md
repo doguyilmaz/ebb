@@ -25,6 +25,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |
 | GET | `/report?format=json\|csv\|html\|text` | — | file | 400 `bad-format` |
 | POST | `/reveal` | `PathRequest` | 204 | 400 `outside-root` |
+| POST | `/ask` | `AskRequest {path \| findingId, question}` | `AskResponse {answer}` (Markdown from the person's own `claude -p`, one turn, no tools; only metadata is sent) | 409 `ask-unavailable`, 400 `outside-root` |
 | POST | `/choose-folder` | `ChooseRequest {purpose: scan\|protect}` | `ChooseResponse {path}` (empty when cancelled; shows the macOS chooser on this Mac) | 400, 409 `sandboxed` |
 | GET | `/history` | — | `HistoryResponse` | — |
 | GET | `/history/diff?from&to` | — | `DiffResponse` (`from` is null while there is no earlier scan of the same folder; empty IDs mean the newest and the one before) | 404 |

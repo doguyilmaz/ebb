@@ -48,6 +48,17 @@ func (s *Server) dataRoutes() {
 	s.api("GET /api/v1/findings", s.findings)
 	s.mux.HandleFunc("GET /api/v1/report", s.auth(s.report))
 	s.api("POST /api/v1/reveal", s.reveal)
+	s.api("POST /api/v1/ask", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		var req api.AskRequest
+		if err := decode(r, &req); err != nil {
+			return nil, err
+		}
+		out, err := s.app.Ask(r.Context(), req)
+		if errors.Is(err, app.ErrAskUnavailable) {
+			return nil, coded(http.StatusConflict, "ask-unavailable", err.Error())
+		}
+		return out, pathError(err)
+	})
 	s.api("POST /api/v1/choose-folder", func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		var req api.ChooseRequest
 		if err := decode(r, &req); err != nil {

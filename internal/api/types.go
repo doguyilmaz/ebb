@@ -105,6 +105,19 @@ type SmallFile struct {
 	Modified int64  `json:"modified"`
 }
 
+// AskRequest asks the person's own AI (claude) about a path or a finding.
+// Only metadata goes to it: paths, sizes, dates and what ebb's rules know.
+type AskRequest struct {
+	Path      string `json:"path,omitempty"`
+	FindingID string `json:"findingId,omitempty"`
+	Question  string `json:"question"`
+}
+
+// AskResponse is the answer as Markdown.
+type AskResponse struct {
+	Answer string `json:"answer"`
+}
+
 // Explain is everything ebb knows about one path: its sizes, the findings
 // covering it (with why and what removing costs) and what is biggest inside.
 type Explain struct {
@@ -245,7 +258,7 @@ const (
 
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
-	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
+	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }

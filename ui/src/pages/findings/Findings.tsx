@@ -6,6 +6,7 @@ import { bytes } from "#/lib/format.ts";
 import { categoryTitle } from "#/lib/glossary.ts";
 import { useSelection } from "#/lib/selection.ts";
 import { useSheet } from "#/lib/sheet.ts";
+import { AskPanel } from "#/app/AskPanel.tsx";
 import { Presets } from "#/pages/overview/Overview.tsx";
 import { CountUp } from "#/ui/CountUp.tsx";
 import { PageHead } from "#/ui/PageHead.tsx";
@@ -249,6 +250,7 @@ function Details({ f }: { f: FindingView }) {
           {targets.length > 50 && <li className="faint small-text">and {targets.length - 50} more</li>}
         </ul>
       )}
+      <AskPanel target={{ findingId: f.id }} />
       <div className="row details-foot">
         <Note id={f.id} initial={f.userNote ?? ""} />
         <span className="grow" />

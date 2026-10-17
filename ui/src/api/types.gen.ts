@@ -84,6 +84,16 @@ export interface AgesResponse {
   buckets: AgeBucket[] | null;
 }
 
+export interface AskRequest {
+  path?: string;
+  findingId?: string;
+  question: string;
+}
+
+export interface AskResponse {
+  answer: string;
+}
+
 export interface Item {
   path: string;
   name: string;

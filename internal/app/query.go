@@ -148,7 +148,7 @@ func (a *App) Files(path string, minSize uint64, olderThanDays, limit int) (api.
 // Status is what the UI and agents see first: version, scan state, the last scan and what changed since.
 func (a *App) Status(version string) api.Status {
 	st := api.Status{Version: version, Scan: a.ScanState(), DefaultRoot: a.Links.Display(a.DefaultRoot()),
-		FullDiskAccess: volume.HasFullDiskAccess(a.Env.Home()), Sandboxed: sys.Sandboxed(a.Env), Changes: a.Changes()}
+		FullDiskAccess: volume.HasFullDiskAccess(a.Env.Home()), Sandboxed: sys.Sandboxed(a.Env), Changes: a.Changes(), AskAvailable: a.AskAvailable()}
 	if last, err := a.Last(); err == nil {
 		m := last.Meta
 		st.Last = &m

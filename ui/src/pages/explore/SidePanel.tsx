@@ -6,6 +6,7 @@ import type { SliceNode } from "#/api/types.gen.ts";
 import { ageColor, oldShare } from "#/lib/ages.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useSelection } from "#/lib/selection.ts";
+import { AskPanel } from "#/app/AskPanel.tsx";
 import { Safety } from "#/ui/Safety.tsx";
 import { Info } from "#/ui/Tip.tsx";
 import { childKey, childPath, colorLevel, type Metric } from "./canvas/layout.ts";
@@ -45,6 +46,7 @@ export function SidePanel({ root, base, metric, picked, hoverKey, onHover, onOpe
       {focus.node.kind === 0 && <AgeBar path={focus.path} />}
       <Related path={focus.path} />
       <Actions focus={focus} isFolder={!picked} onOpen={onOpen} />
+      {focus.path && <AskPanel key={focus.path} target={{ path: focus.path }} />}
       {focus.path && <NoteEditor path={focus.path} />}
     </aside>
   );
