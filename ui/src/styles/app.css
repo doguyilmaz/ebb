@@ -63,7 +63,7 @@ kbd { border: 1px solid var(--line-strong); border-bottom-width: 2px; border-rad
 .disk-meter[data-low] .meter > i { background: var(--warning); }
 .disk-meter .low { color: var(--warning); font-weight: 500; }
 
-.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .topbar { position: relative; z-index: 3; display: flex; align-items: center; gap: 12px; height: 56px; flex: none; padding: 0 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.4) blur(10px); }
 /* A fixed slot: page names differ in width, and the scan pill beside them must not move. */
 .topbar-title { flex: none; width: 84px; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -81,7 +81,7 @@ kbd { border: 1px solid var(--line-strong); border-bottom-width: 2px; border-rad
 .pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tide); animation: pulse 1.6s var(--ease-out) infinite; }
 /* The scrollbar's room is kept whether or not the page scrolls, so nothing shifts sideways when content grows or the tray opens. */
 .content { flex: 1; overflow: auto; min-height: 0; scrollbar-gutter: stable; }
-.page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 56px; display: flex; flex-direction: column; gap: 28px; view-transition-name: page; }
+.page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 104px; display: flex; flex-direction: column; gap: 28px; view-transition-name: page; }
 @supports not (view-transition-name: none) { .page { animation: fade 180ms ease-out; } }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 ::view-transition-old(page) { animation: fade-out 110ms ease-out both; }
@@ -352,7 +352,9 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .result-line { font-size: 16px; }
 
 /* ---------- selection tray ---------- */
-.tray { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 12px; justify-content: flex-end; padding: 10px 28px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06); animation: rise 220ms var(--ease-out); }
+/* Floats over the page instead of taking room, so picking something never resizes or scrolls anything. */
+.tray { position: absolute; z-index: 4; left: 50%; bottom: 18px; translate: -50% 0; width: min(760px, calc(100% - 56px)); display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 18px; border: 1px solid var(--line-strong); border-radius: 14px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(12px); box-shadow: var(--shadow-3); animation: tray-in 240ms var(--ease-out) both; }
+@keyframes tray-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
 .tray > span { margin-right: auto; }
 .tray-bytes { display: inline-block; min-width: 8ch; font-weight: 500; color: var(--text); }
 
