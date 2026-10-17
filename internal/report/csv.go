@@ -26,9 +26,22 @@ func WriteCSV(w io.Writer, r *Report) error {
 	for _, f := range r.TopFiles {
 		rows = append(rows, []string{"file", f.Path, f.Name, "", "", u(f.Unique), u(f.Alloc), ""})
 	}
+	for _, r := range rows {
+		for i, cell := range r {
+			r[i] = csvSafe(cell)
+		}
+	}
 	if err := cw.WriteAll(rows); err != nil {
 		return err
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+// csvSafe keeps spreadsheet apps from evaluating a file name as a formula.
+func csvSafe(s string) string {
+	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return "'" + s
+	}
+	return s
 }

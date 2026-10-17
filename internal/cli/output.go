@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/doguyilmaz/ebb/internal/units"
 )
 
 func emitJSON(w io.Writer, v any) error {
@@ -16,6 +18,11 @@ func emitJSON(w io.Writer, v any) error {
 }
 
 func printTable(w io.Writer, header []string, rows [][]string) {
+	for _, r := range rows {
+		for i := range r {
+			r[i] = units.Printable(r[i])
+		}
+	}
 	widths := make([]int, len(header))
 	for i, h := range header {
 		widths[i] = utf8.RuneCountInString(h)

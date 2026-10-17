@@ -119,3 +119,32 @@ func TestTextFitsWidth(t *testing.T) {
 		t.Fatal(buf.String())
 	}
 }
+
+func hostile() *app.ScanResult {
+	r := result()
+	r.Findings[0].Targets[0].Path = "/h/=HYPERLINK(\"http://evil\")"
+	r.Findings[0].Title = "+cmd|' /C calc'!A0"
+	r.Findings[0].Why = "evil \x1b]0;pwned\x07 \x1b[2J name"
+	return r
+}
+
+func TestCSVNeutralizesFormulas(t *testing.T) {
+	var buf bytes.Buffer
+	WriteCSV(&buf, Build(hostile(), volume.Firmlinks{}, "test"))
+	rows, _ := csv.NewReader(&buf).ReadAll()
+	for _, r := range rows {
+		for _, cell := range r {
+			if cell != "" && strings.ContainsRune("=+-@\t\r", rune(cell[0])) {
+				t.Fatalf("cell starts with a formula trigger: %q", cell)
+			}
+		}
+	}
+}
+
+func TestTextStripsTerminalEscapes(t *testing.T) {
+	var buf bytes.Buffer
+	WriteText(&buf, Build(hostile(), volume.Firmlinks{}, "test"), 200)
+	if strings.ContainsAny(buf.String(), "\x1b\x07") {
+		t.Fatalf("control characters reached the terminal: %q", buf.String())
+	}
+}

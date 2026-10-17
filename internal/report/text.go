@@ -11,7 +11,9 @@ import (
 // WriteText prints a terminal report no wider than width columns.
 func WriteText(w io.Writer, r *Report, width int) error {
 	var b strings.Builder
-	line := func(format string, args ...any) { b.WriteString(fit(fmt.Sprintf(format, args...), width) + "\n") }
+	line := func(format string, args ...any) {
+		b.WriteString(fit(units.Printable(fmt.Sprintf(format, args...)), width) + "\n")
+	}
 	v := r.Volume
 	line("ebb  %s  ·  scanned %s  ·  %d files in %s", r.Meta.Root, r.Meta.Time.Local().Format("2006-01-02 15:04"), r.Meta.Files, r.Meta.Elapsed.Round(1e8))
 	line("Disk  %s total · %s used · %s free", units.Bytes(v.Capacity), units.Bytes(v.Used), units.Bytes(v.Free))

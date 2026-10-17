@@ -1,7 +1,11 @@
 // Package units formats byte counts the way Finder does (decimal units).
 package units
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+	"unicode"
+)
 
 func Bytes(n uint64) string {
 	if n < 1000 {
@@ -19,4 +23,18 @@ func Bytes(n uint64) string {
 		s = s[:len(s)-2]
 	}
 	return s + " " + units[i]
+}
+
+// Printable replaces control characters (ANSI escapes, newlines, bells) so
+// file names cannot rewrite or spoof a terminal.
+func Printable(s string) string {
+	if !strings.ContainsFunc(s, unicode.IsControl) {
+		return s
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return '?'
+		}
+		return r
+	}, s)
 }

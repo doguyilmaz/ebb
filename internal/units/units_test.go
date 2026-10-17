@@ -9,3 +9,12 @@ func TestBytes(t *testing.T) {
 		}
 	}
 }
+
+func TestPrintable(t *testing.T) {
+	if got := Printable("a\x1b[31mb\nc\u009bd"); got != "a?[31mb?c?d" {
+		t.Fatalf("%q", got)
+	}
+	if got := Printable("plain/é"); got != "plain/é" {
+		t.Fatal(got)
+	}
+}
