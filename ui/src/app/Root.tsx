@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from "@tanstack/react-router";
+import { TipHost } from "#/ui/Tip.tsx";
 import { Connect } from "./Connect.tsx";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { Palette } from "./Palette.tsx";
@@ -16,6 +17,7 @@ export function Root() {
       </Shell>
       <Palette />
       <SheetHost />
+      <TipHost />
     </Connect>
   );
 }

@@ -1,205 +1,310 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { SliceNode } from "#/api/types.gen.ts";
-import { bytes, percent } from "#/lib/format.ts";
-import { fill, readPalette, type Palette } from "./colors.ts";
-import { CENTER, hitArc, hitRect, icicle, sunburst, treemap, type Arc, type Metric, type Rect } from "./layout.ts";
+import { ago, bytes, count, percent } from "#/lib/format.ts";
+import { easeInOut, easeOut, reducedMotion } from "#/lib/motion.ts";
+import { readPalette, type Palette } from "./colors.ts";
+import { drawArcLabels, drawArcs, drawCenter, drawRectLabels, drawRects, type Emphasis } from "./draw.ts";
+import {
+  arcZoom,
+  CENTER,
+  hitArc,
+  hitRect,
+  icicle,
+  icicleZoom,
+  lerpArc,
+  lerpRect,
+  lineage,
+  sunburst,
+  treemap,
+  treemapZoom,
+  type Arc,
+  type Metric,
+  type Rect,
+  type Shape,
+} from "./layout.ts";
+import { frame, plan, type Frame, type Transition } from "./morph.ts";
 
 export type ChartView = "sunburst" | "treemap" | "icicle";
-
-export interface Focus {
-  node: SliceNode;
-  path: string;
-}
+type Any = Arc | Rect;
 
 interface Props {
   view: ChartView;
   root: SliceNode;
   base: string;
   metric: Metric;
-  onHover: (f: Focus | null) => void;
+  /** Name of the folder above, when the middle can go back up. */
+  upLabel?: string;
+  disk?: number;
+  hoverKey: string | null;
+  stale: boolean;
+  onHover: (s: Shape | null) => void;
   onOpen: (path: string) => void;
-  onSelect: (f: Focus) => void;
+  onPick: (s: Shape) => void;
   onUp: () => void;
+  onPrefetch: (path: string) => void;
 }
 
-/** Draws the current folder on a canvas; SVG would not survive thousands of shapes. */
-export function Chart({ view, root, base, metric, onHover, onOpen, onSelect, onUp }: Props) {
+const isArc = (s: Any): s is Arc => "a0" in s;
+const lerpAny = (a: Any, b: Any, t: number): Any => (isArc(b) ? lerpArc(a as Arc, b, t) : lerpRect(a as Rect, b, t));
+const within = (p: string, root: string) => p.startsWith(root.endsWith("/") ? root : root + "/");
+const LABEL_FADE = 180;
+
+interface Anim {
+  tr: Transition<Any>;
+  start: number;
+  ms: number;
+  ease: (t: number) => number;
+  lerp: (a: Any, b: Any, t: number) => Any;
+}
+
+/**
+ * Draws the current folder on a canvas (SVG would not survive thousands of
+ * shapes). Every change of folder, metric or view morphs from what is on
+ * screen to the new layout; at rest it adds labels and hover emphasis.
+ */
+export function Chart(props: Props) {
+  const { view, root, base, metric, hoverKey, stale } = props;
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const overlay = useRef<HTMLCanvasElement>(null);
+  const tipEl = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [hover, setHover] = useState<Arc | Rect | null>(null);
+  const [tip, setTip] = useState<Shape | null>(null);
+  const [center, setCenter] = useState(false);
   const [scheme, setScheme] = useState(0);
+  const cb = useRef(props);
+  cb.current = props;
 
   useEffect(() => {
-    const el = wrap.current;
-    if (!el) return;
+    const el = wrap.current!;
     const ro = new ResizeObserver(([e]) => setSize({ w: Math.floor(e.contentRect.width), h: Math.floor(e.contentRect.height) }));
     ro.observe(el);
     const mq = matchMedia("(prefers-color-scheme: dark)");
     const bump = () => setScheme((n) => n + 1);
     mq.addEventListener("change", bump);
+    const mo = new MutationObserver(bump);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return () => {
       ro.disconnect();
       mq.removeEventListener("change", bump);
+      mo.disconnect();
     };
   }, []);
 
-  const radius = Math.max(10, Math.min(size.w, size.h) / 2 - 8);
-  const shapes = useMemo(() => {
+  const radius = Math.max(10, Math.min(size.w, size.h) / 2 - 10);
+  const rc = radius * CENTER;
+  const target = useMemo<Any[]>(() => {
     if (!size.w || !size.h) return [];
     if (view === "sunburst") return sunburst(root, radius, metric, base);
     if (view === "treemap") return treemap(root, size.w, size.h, metric, base);
     return icicle(root, size.w, size.h, metric, base);
   }, [view, root, metric, base, size, radius]);
 
-  // The shapes are drawn once per layout; hovering only repaints the thin
-  // overlay above them, so pointer movement stays cheap on large canvases.
-  useEffect(() => {
+  const st = useRef({
+    shown: [] as Any[],
+    base: "",
+    view: "" as ChartView | "",
+    size: "",
+    anim: null as Anim | null,
+    rest: 0,
+    raf: 0,
+    palette: null as Palette | null,
+  });
+
+  const emphasis = (): Emphasis => {
+    const shapes = st.current.shown;
+    const i = hoverKey ? shapes.findIndex((s) => s.key === hoverKey) : -1;
+    if (i < 0) return { keys: null, hover: null };
+    return { keys: new Set([...lineage(shapes, i)].map((j) => shapes[j].key)), hover: hoverKey };
+  };
+
+  const paint = (now: number) => {
+    const s = st.current;
     const c = canvas.current;
     if (!c || !size.w) return;
-    const ctx = setup(c, size.w, size.h);
-    const p = readPalette();
-    if (view === "sunburst") drawSunburst(ctx, shapes as Arc[], size.w / 2, size.h / 2, p);
-    else drawRects(ctx, shapes as Rect[], p, view === "treemap");
-  }, [shapes, size, view, scheme]);
+    const ctx = c.getContext("2d")!;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size.w, size.h);
+    const p = (s.palette ??= readPalette());
+    let frames: Frame<Any>[];
+    let moving = false;
+    if (s.anim) {
+      const t = Math.min(1, (now - s.anim.start) / s.anim.ms);
+      frames = frame(s.anim.tr, s.anim.ease(t), s.anim.lerp);
+      if (t >= 1) {
+        s.anim = null;
+        s.rest = now;
+      } else moving = true;
+    } else frames = s.shown.map((shape) => ({ shape, alpha: 1 }));
+    const em = moving ? { keys: null, hover: null } : emphasis();
+    const cx = size.w / 2;
+    const cy = size.h / 2;
+    const arcs = frames.filter((f) => isArc(f.shape)) as Frame<Arc>[];
+    const rects = frames.filter((f) => !isArc(f.shape)) as Frame<Rect>[];
+    if (rects.length) drawRects(ctx, rects, p, em, s.view === "treemap" || view === "treemap", size.w, size.h);
+    if (arcs.length) drawArcs(ctx, arcs, cx, cy, p, em);
+    const labels = moving ? 0 : Math.min(1, (now - s.rest) / LABEL_FADE);
+    if (labels > 0) {
+      if (view === "sunburst") drawArcLabels(ctx, s.shown as Arc[], cx, cy, p, em, labels);
+      else drawRectLabels(ctx, s.shown as Rect[], p, em, view === "treemap", labels);
+    }
+    if (view === "sunburst") {
+      const n = root[metric];
+      drawCenter(ctx, cx, cy, rc, p, root.name, bytes(n), `${count(root.files)} files`, center && props.upLabel ? props.upLabel : null);
+    }
+    if (moving || labels < 1) s.raf = requestAnimationFrame(paint);
+  };
+
+  const kick = () => {
+    cancelAnimationFrame(st.current.raf);
+    st.current.raf = requestAnimationFrame(paint);
+  };
+
+  useLayoutEffect(() => {
+    const c = canvas.current;
+    if (!c || !size.w) return;
+    const dpr = window.devicePixelRatio || 1;
+    c.width = size.w * dpr;
+    c.height = size.h * dpr;
+  }, [size]);
 
   useEffect(() => {
-    const c = overlay.current;
-    if (!c || !size.w) return;
-    const ctx = setup(c, size.w, size.h);
-    const p = readPalette();
-    if (view === "sunburst") drawCenter(ctx, size.w / 2, size.h / 2, radius, root, hover as Arc | null, p, metric);
-    else if (hover) outlineRect(ctx, hover as Rect, p);
-  }, [hover, size, view, radius, root, metric, scheme]);
+    st.current.palette = null;
+    kick();
+  }, [scheme]);
 
-  const locate = (e: React.PointerEvent | React.MouseEvent) => {
-    const b = overlay.current!.getBoundingClientRect();
+  useEffect(() => {
+    const s = st.current;
+    const sizeKey = `${size.w}x${size.h}`;
+    const now = performance.now();
+    if (!target.length) return;
+    const first = s.shown.length === 0 && !s.anim;
+    if (s.size !== sizeKey && !first) {
+      s.shown = target;
+      s.anim = null;
+      s.size = sizeKey;
+      s.base = base;
+      s.view = view;
+      s.rest = now - LABEL_FADE;
+      kick();
+      return;
+    }
+    const reduce = reducedMotion();
+    const prev: Any[] = s.anim ? s.anim.tr.moves.filter((m) => m[3] === 1).map((m) => s.anim!.lerp(m[0], m[1], s.anim!.ease(Math.min(1, (now - s.anim!.start) / s.anim!.ms)))) : s.shown;
+    const same = s.view === view;
+    const id = (x: Any) => x;
+    let ghostIn: (x: Any) => Any = id;
+    let ghostOut: (x: Any) => Any = id;
+    let ms = 380;
+    let ease = easeInOut;
+    if (first) {
+      ghostIn = (x) => (isArc(x) ? { ...x, a0: 0, a1: 0 } : view === "icicle" ? { ...x, x1: x.x0 } : shrink(x));
+      ms = 700;
+      ease = easeOut;
+    } else if (same && base !== s.base) {
+      const zoomIn = within(base, s.base);
+      const f = zoomIn ? prev.find((x) => x.key === base) : within(s.base, base) ? target.find((x) => x.key === s.base) : undefined;
+      if (f) {
+        const cam = isArc(f) ? (arcZoom(f, rc) as (x: Any) => Any) : view === "treemap" ? (treemapZoom(f, size.w, size.h) as (x: Any) => Any) : (icicleZoom(f, size.h) as (x: Any) => Any);
+        if (zoomIn) {
+          ghostOut = cam;
+          ghostIn = (x) => (isArc(x) ? { ...x, r1: x.r0 } : view === "icicle" ? { ...x, x1: x.x0 } : x);
+        } else ghostIn = cam;
+        ms = 520;
+      }
+    } else if (!same) ms = 280;
+    const tr = plan(same ? prev : [], target, reduce ? id : ghostIn, reduce ? id : ghostOut);
+    if (!same) for (const x of prev) tr.moves.push([x, x, 1, 0]);
+    s.anim = { tr, start: now, ms: reduce ? 180 : ms, ease, lerp: reduce ? (_a, b) => b : lerpAny };
+    s.shown = target;
+    s.size = sizeKey;
+    s.base = base;
+    s.view = view;
+    kick();
+  }, [target]);
+
+  useEffect(kick, [hoverKey, center, props.upLabel]);
+  useEffect(() => () => cancelAnimationFrame(st.current.raf), []);
+
+  const locate = (e: React.PointerEvent | React.MouseEvent): Any | "center" | null => {
+    if (st.current.anim) return null;
+    const b = canvas.current!.getBoundingClientRect();
     const x = e.clientX - b.left;
     const y = e.clientY - b.top;
+    const shapes = st.current.shown;
     if (view === "sunburst") return hitArc(shapes as Arc[], x - size.w / 2, y - size.h / 2, radius);
     return hitRect(shapes as Rect[], x, y);
   };
 
+  const prefetch = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const move = (e: React.PointerEvent) => {
+    const hit = locate(e);
+    const s = hit && hit !== "center" ? hit : null;
+    setCenter(hit === "center");
+    if ((s?.key ?? null) !== hoverKey) {
+      cb.current.onHover(s);
+      setTip(s);
+      clearTimeout(prefetch.current);
+      if (s?.path && s.node.kind === 0) prefetch.current = setTimeout(() => cb.current.onPrefetch(s.path), 120);
+    }
+    const el = tipEl.current;
+    if (el && s) {
+      const b = wrap.current!.getBoundingClientRect();
+      const x = e.clientX - b.left;
+      const y = e.clientY - b.top;
+      const tw = el.offsetWidth;
+      const th = el.offsetHeight;
+      const left = x + 16 + tw > size.w ? x - 16 - tw : x + 16;
+      const top = y + 16 + th > size.h ? y - 12 - th : y + 16;
+      el.style.transform = `translate(${Math.max(4, left)}px, ${Math.max(4, top)}px)`;
+    }
+  };
+
+  const total = Math.max(1, root[metric]);
+  const label = `${view} of ${root.name}: ${(root.children ?? []).slice(0, 8).map((c) => `${c.name} ${bytes(c[metric])}`).join(", ")}`;
   return (
-    <div className="chart" ref={wrap}>
-      <canvas ref={canvas} style={{ width: size.w, height: size.h }} aria-hidden />
+    <div className={`chart${stale ? " stale" : ""}`} ref={wrap} data-tour="chart">
       <canvas
-        ref={overlay}
-        className="overlay"
-        style={{ width: size.w, height: size.h }}
+        ref={canvas}
+        style={{ width: size.w, height: size.h, cursor: center && props.upLabel ? "pointer" : tip ? "pointer" : "default" }}
         role="img"
-        aria-label={`${view} of ${root.name}: ${(root.children ?? []).slice(0, 8).map((c) => `${c.name} ${bytes(c[metric])}`).join(", ")}`}
-        onPointerMove={(e) => {
-          const s = locate(e);
-          const next = s && s !== "center" ? s : null;
-          if (next !== hover) {
-            setHover(next);
-            onHover(next ? { node: next.node, path: next.path } : null);
-          }
-        }}
+        aria-label={label}
+        onPointerMove={move}
         onPointerLeave={() => {
-          setHover(null);
-          onHover(null);
+          setCenter(false);
+          setTip(null);
+          clearTimeout(prefetch.current);
+          cb.current.onHover(null);
         }}
         onClick={(e) => {
-          const s = locate(e);
-          if (s === "center") return onUp();
-          if (!s || !s.path) return;
-          if (s.node.kind === 0) onOpen(s.path);
-          else onSelect({ node: s.node, path: s.path });
+          const hit = locate(e);
+          if (hit === "center") return props.upLabel && props.onUp();
+          if (!hit?.path) return;
+          if (hit.node.kind === 0) props.onOpen(hit.path);
+          else props.onPick(hit);
         }}
       />
+      <div ref={tipEl} className={`chart-tip${tip ? " on" : ""}`} aria-hidden>
+        {tip && (
+          <>
+            <strong className="num">{bytes(tip.node[metric])}</strong>
+            <span className="ellipsis">{tip.node.other ? `${tip.node.other} smaller items` : tip.node.name}</span>
+            <span className="faint num">
+              {percent(tip.node[metric] / total)} of this folder
+              {props.disk ? ` · ${percent(tip.node[metric] / props.disk)} of the disk` : ""}
+            </span>
+            {tip.node.files > 1 && <span className="faint num">{count(tip.node.files)} files{tip.node.modified ? ` · changed ${ago(tip.node.modified)}` : ""}</span>}
+            <span className="chart-tip-hint">{tip.node.kind === 0 && tip.path ? "Click to open" : tip.path ? "Click for details" : "Open the List to see these"}</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-function setup(c: HTMLCanvasElement, w: number, h: number) {
-  const dpr = window.devicePixelRatio || 1;
-  c.width = w * dpr;
-  c.height = h * dpr;
-  const ctx = c.getContext("2d")!;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  return ctx;
-}
-
-function arcPath(ctx: CanvasRenderingContext2D, a: Arc, cx: number, cy: number) {
-  ctx.beginPath();
-  ctx.arc(cx, cy, a.r1, a.a0 - Math.PI / 2, a.a1 - Math.PI / 2);
-  ctx.arc(cx, cy, a.r0, a.a1 - Math.PI / 2, a.a0 - Math.PI / 2, true);
-  ctx.closePath();
-}
-
-function drawSunburst(ctx: CanvasRenderingContext2D, arcs: Arc[], cx: number, cy: number, p: Palette) {
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = p.surface;
-  for (const a of arcs) {
-    if (a.a1 - a.a0 < 0.002) continue;
-    arcPath(ctx, a, cx, cy);
-    ctx.fillStyle = fill(p, a.top, a.depth, a.node.kind, a.node.other);
-    ctx.fill();
-    ctx.stroke();
-  }
-}
-
-/** The middle disc names what the pointer is on, or the folder itself. */
-function drawCenter(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, root: SliceNode, hover: Arc | null, p: Palette, metric: Metric) {
-  if (hover) {
-    arcPath(ctx, hover, cx, cy);
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = p.text;
-    ctx.stroke();
-  }
-  const rc = radius * CENTER;
-  ctx.beginPath();
-  ctx.arc(cx, cy, rc - 2, 0, Math.PI * 2);
-  ctx.fillStyle = p.surface;
-  ctx.fill();
-  const n = hover?.node ?? root;
-  ctx.textAlign = "center";
-  ctx.fillStyle = p.text;
-  ctx.font = "600 17px Plex, system-ui, sans-serif";
-  ctx.fillText(bytes(n[metric]), cx, cy + 2);
-  ctx.font = "12.5px Plex, system-ui, sans-serif";
-  ctx.fillStyle = p.text2;
-  ctx.fillText(fitText(ctx, n.name, rc * 1.7), cx, cy - 18);
-  if (hover) ctx.fillText(percent(n[metric] / Math.max(1, root[metric])), cx, cy + 20);
-}
-
-function drawRects(ctx: CanvasRenderingContext2D, rects: Rect[], p: Palette, nested: boolean) {
-  ctx.textBaseline = "top";
-  for (const r of rects) {
-    const w = r.x1 - r.x0;
-    const h = r.y1 - r.y0;
-    if (w < 1 || h < 1) continue;
-    ctx.fillStyle = fill(p, r.top, nested ? r.depth : 1, r.node.kind, r.node.other);
-    ctx.beginPath();
-    ctx.roundRect(r.x0, r.y0, Math.max(0, w - (nested ? 0 : 1.5)), Math.max(0, h - (nested ? 0 : 1.5)), nested && r.depth === 1 ? 5 : 3);
-    ctx.fill();
-    const label = nested ? r.depth === 1 || !r.node.children?.length : true;
-    if (label && w > 56 && h > 17) {
-      ctx.fillStyle = r.depth === 1 ? "#fff" : p.text;
-      ctx.font = `${r.depth === 1 ? 600 : 400} 12px Plex, system-ui, sans-serif`;
-      ctx.fillText(fitText(ctx, r.node.name, w - 10), r.x0 + 6, r.y0 + 3);
-      if (h > 34 && (!nested || !r.node.children?.length)) {
-        ctx.fillStyle = r.depth === 1 ? "rgba(255,255,255,.85)" : p.text2;
-        ctx.font = "11px Plex, system-ui, sans-serif";
-        ctx.fillText(bytes(r.node.alloc), r.x0 + 6, r.y0 + 18);
-      }
-    }
-  }
-}
-
-function outlineRect(ctx: CanvasRenderingContext2D, r: Rect, p: Palette) {
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = p.text;
-  ctx.strokeRect(r.x0 + 1, r.y0 + 1, r.x1 - r.x0 - 2, r.y1 - r.y0 - 2);
-}
-
-function fitText(ctx: CanvasRenderingContext2D, text: string, max: number): string {
-  if (ctx.measureText(text).width <= max) return text;
-  let s = text;
-  while (s.length > 1 && ctx.measureText(s + "…").width > max) s = s.slice(0, -1);
-  return s + "…";
+function shrink(r: Rect): Rect {
+  const cx = (r.x0 + r.x1) / 2;
+  const cy = (r.y0 + r.y1) / 2;
+  const k = 0.9;
+  return { ...r, x0: cx + (r.x0 - cx) * k, x1: cx + (r.x1 - cx) * k, y0: cy + (r.y0 - cy) * k, y1: cy + (r.y1 - cy) * k };
 }

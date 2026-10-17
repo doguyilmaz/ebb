@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SliceNode } from "#/api/types.gen.ts";
-import { hitArc, hitRect, icicle, sunburst, treemap } from "./layout.ts";
+import { arcZoom, CENTER, colorLevel, hitArc, hitRect, icicle, lineage, sunburst, treemap } from "./layout.ts";
 
 const leaf = (name: string, alloc: number, kind = 1): SliceNode => ({ id: 1, name, kind, alloc, unique: alloc, files: 1, children: null });
 const root: SliceNode = {
@@ -51,5 +51,40 @@ describe("layout", () => {
     const rects = treemap(root, 400, 300, "alloc");
     const b = rects.find((x) => x.node.name === "b")!;
     expect(hitRect(rects, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2)?.node.name).toBe("b");
+  });
+
+  test("keys survive a zoom, so shapes can morph between levels", () => {
+    const outer = sunburst(root, 200, "alloc", "/r");
+    const inner = sunburst(root.children![0], 200, "alloc", "/r/a");
+    const key = (arcs: typeof outer, n: string) => arcs.find((x) => x.node.name === n)!.key;
+    expect(key(inner, "a1")).toBe(key(outer, "a1"));
+    expect(key(outer, "other")).not.toBe("/r/other");
+  });
+
+  test("zooming into an arc gives its children the whole circle", () => {
+    const arcs = sunburst(root, 200, "alloc", "/r");
+    const a = arcs.find((x) => x.node.name === "a")!;
+    const zoom = arcZoom(a, 200 * CENTER);
+    const kids = arcs.filter((x) => x.parent === arcs.indexOf(a)).map(zoom);
+    expect(kids.reduce((n, k) => n + (k.a1 - k.a0), 0)).toBeCloseTo(Math.PI * 2, 5);
+    expect(kids[0].r0).toBeCloseTo(200 * CENTER, 5);
+    expect(zoom(arcs.find((x) => x.node.name === "b")!).a1 - zoom(arcs.find((x) => x.node.name === "b")!).a0).toBe(0);
+  });
+
+  test("lineage covers ancestors and descendants only", () => {
+    const arcs = sunburst(root, 200, "alloc", "/r");
+    const i = arcs.findIndex((x) => x.node.name === "a1");
+    const names = [...lineage(arcs, i)].map((j) => arcs[j].node.name).sort();
+    expect(names).toEqual(["a", "a1"]);
+  });
+
+  test("a folder that is nearly all one subfolder passes its colours down", () => {
+    const home: SliceNode = { id: 5, name: "home", kind: 0, alloc: 100, unique: 100, files: 3, children: root.children };
+    const users: SliceNode = { id: 4, name: "Users", kind: 0, alloc: 100, unique: 100, files: 3, children: [home] };
+    expect(colorLevel(users, "alloc").map((n) => n.name)).toEqual(["home"]);
+    const arcs = sunburst(users, 200, "alloc", "/Users");
+    const tops = arcs.filter((a) => a.depth === 2).map((a) => a.top);
+    expect(new Set(tops).size).toBe(tops.length);
+    expect(colorLevel(root, "alloc")).toEqual([]);
   });
 });

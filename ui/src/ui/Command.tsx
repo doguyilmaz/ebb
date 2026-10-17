@@ -1,0 +1,30 @@
+import { Check, Copy } from "lucide-react";
+import { useState } from "react";
+
+/** A command to run in Terminal, with a copy button. */
+export function Command({ value }: { value: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <div className="cmd">
+      <span className="cmd-prompt" aria-hidden>$</span>
+      <code title={value}>{value}</code>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label={done ? "Copied" : `Copy ${value}`}
+        data-tip={done ? undefined : "Copy"}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(value);
+            setDone(true);
+            setTimeout(() => setDone(false), 1400);
+          } catch {
+            setDone(false);
+          }
+        }}
+      >
+        {done ? <Check size={15} /> : <Copy size={15} />}
+      </button>
+    </div>
+  );
+}

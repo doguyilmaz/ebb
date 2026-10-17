@@ -17,7 +17,7 @@ export function listen(qc: QueryClient): () => void {
         resultKeys.forEach((k) => qc.invalidateQueries({ queryKey: k }));
         break;
       case "findings.changed":
-        ["findings", "presets", "volume", "tree", "children"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+        ["findings", "presets", "volume", "tree", "ages", "children"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
         break;
       case "history.changed":
         qc.invalidateQueries({ queryKey: ["history"] });

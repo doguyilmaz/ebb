@@ -6,7 +6,7 @@ import type { Item } from "#/api/types.gen.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useSelection } from "#/lib/selection.ts";
 import { Loading, Problem } from "#/ui/states.tsx";
-import type { Focus } from "./canvas/Chart.tsx";
+import type { Focus } from "./SidePanel.tsx";
 
 type Sort = "size" | "name" | "files" | "modified";
 

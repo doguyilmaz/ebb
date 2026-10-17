@@ -1,6 +1,7 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client.ts";
 import type {
+  AgesResponse,
   Breakdown,
   ChildrenResponse,
   DiffResponse,
@@ -28,10 +29,21 @@ export const useVolume = () => useQuery({ queryKey: ["volume"], queryFn: () => a
 export const useFindings = (ignored = false) =>
   useQuery({ queryKey: ["findings", ignored], queryFn: () => api.get<FindingsResponse>(`/findings${ignored ? "?ignored=1" : ""}`), retry: false });
 
-export const useSlice = (path: string | undefined, depth: number, maxNodes: number) =>
-  useQuery({
+export const sliceQuery = (path: string | undefined, depth: number, maxNodes: number) =>
+  queryOptions({
     queryKey: ["tree", path ?? "", depth, maxNodes],
     queryFn: () => api.get<SliceResponse>(`/tree?depth=${depth}&maxNodes=${maxNodes}&minShare=0.003${path ? `&path=${q(path)}` : ""}`),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+export const useSlice = (path: string | undefined, depth: number, maxNodes: number) =>
+  useQuery({ ...sliceQuery(path, depth, maxNodes), placeholderData: keepPreviousData });
+
+export const useAges = (path?: string) =>
+  useQuery({
+    queryKey: ["ages", path ?? ""],
+    queryFn: () => api.get<AgesResponse>(`/ages${path ? `?path=${q(path)}` : ""}`),
     placeholderData: keepPreviousData,
     retry: false,
   });
@@ -56,7 +68,7 @@ export const useDiff = (from: string, to: string) =>
   useQuery({ queryKey: ["diff", from, to], queryFn: () => api.get<DiffResponse>(`/history/diff?from=${q(from)}&to=${q(to)}`), enabled: !!from && !!to, retry: false });
 
 /** Everything that shows scan results; refreshed after a scan or a cleanup. */
-export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["children"], ["search"], ["presets"], ["history"]];
+export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"]];
 
 export function useRefreshResults() {
   const qc = useQueryClient();
