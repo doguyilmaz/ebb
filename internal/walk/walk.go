@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -81,7 +82,8 @@ type batch struct {
 	err     error
 	// fd stays open after reading so subfolders open relative to it; the
 	// builder hands it to their jobs.
-	fd *dirFD
+	fd            *dirFD
+	refresh, deep bool
 }
 
 // dirFD is an open directory shared by the jobs of its subfolders. Opening a
@@ -118,6 +120,9 @@ type job struct {
 	path   string
 	dir    tree.ID
 	parent *dirFD // open parent directory, or nil to open by path
+	// refresh lists a folder already in the tree again; deep also lists
+	// everything below it again.
+	refresh, deep bool
 }
 
 type queue struct {
@@ -175,6 +180,7 @@ type Session struct {
 	current                       atomic.Pointer[string]
 
 	root, ioRoot string
+	removed      bool // a refresh took nodes out; the arena needs compacting
 	openFDs      atomic.Int64
 	fdBudget     int64
 	pending      int
@@ -202,6 +208,12 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 	if !st.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", root)
 	}
+	s := newSession(ctx, opt, tree.New(root), root, ioRoot)
+	s.run([]job{{path: ioRoot, dir: s.t.Root()}})
+	return s, nil
+}
+
+func newSession(ctx context.Context, opt Options, t *tree.Tree, root, ioRoot string) *Session {
 	if opt.Threads <= 0 {
 		opt.Threads = min(8, runtime.NumCPU())
 	}
@@ -209,30 +221,37 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 		opt.SmallThreshold = 1 << 20
 	}
 	s := &Session{
-		ctx: ctx, opt: opt, t: tree.New(root), q: newQueue(), batches: make(chan *batch, 256),
-		threshold: opt.SmallThreshold, start: time.Now(), done: make(chan struct{}),
+		ctx: ctx, opt: opt, t: t, q: newQueue(), batches: make(chan *batch, 256),
+		threshold: opt.SmallThreshold, start: time.Now(), done: make(chan struct{}), root: root, ioRoot: ioRoot,
 	}
 	s.pool.New = func() any { return &batch{} }
 	s.fdBudget = opt.maxOpen
 	if s.fdBudget == 0 {
 		s.fdBudget = fdBudget()
 	}
-	setIOPolicy(opt.Gentle)
-	r := newReader(opt.Reader)
+	return s
+}
 
+// run queues the first jobs, then starts the readers and the builder.
+func (s *Session) run(jobs []job) {
+	setIOPolicy(s.opt.Gentle)
+	r := newReader(s.opt.Reader)
+	s.pending = len(jobs)
+	for _, j := range jobs {
+		s.q.push(j)
+	}
+	if len(jobs) == 0 {
+		s.q.close()
+	}
 	var workers sync.WaitGroup
-	for range opt.Threads {
+	for range s.opt.Threads {
 		workers.Go(func() { s.work(r) })
 	}
 	go func() {
 		workers.Wait()
 		close(s.batches)
 	}()
-	s.pending = 1
-	s.root, s.ioRoot = root, ioRoot
-	s.q.push(job{ioRoot, s.t.Root(), nil})
 	go s.build()
-	return s, nil
 }
 
 func (s *Session) work(r reader) {
@@ -243,6 +262,7 @@ func (s *Session) work(r reader) {
 		}
 		b := s.pool.Get().(*batch)
 		b.dir, b.path, b.entries, b.names, b.err, b.fd = j.dir, j.path, b.entries[:0], b.names[:0], nil, nil
+		b.refresh, b.deep = j.refresh, j.deep
 		if err := s.ctx.Err(); err != nil {
 			b.err = err
 		} else {
@@ -319,6 +339,11 @@ func (s *Session) apply(b *batch) {
 		if errors.Is(b.err, context.Canceled) || errors.Is(b.err, context.DeadlineExceeded) {
 			return
 		}
+		if b.refresh && errors.Is(b.err, fs.ErrNotExist) {
+			s.t.Write(func(w *tree.Writer) { w.Remove(b.dir) })
+			s.removed = true
+			return
+		}
 		s.problem(b.path, b.err)
 		s.t.Write(func(w *tree.Writer) { w.SetFlags(b.dir, tree.FlagDenied) })
 		return
@@ -334,6 +359,44 @@ func (s *Session) apply(b *batch) {
 		var smallAlloc, smallUnique, smallLogical uint64
 		var smallMtime int64
 		var markers uint16
+		// A refresh lists a known folder again: its files are cleared and
+		// added back, its subfolders stay unless they are gone. Copies of
+		// shared data first counted here are this folder's own.
+		var keep map[string]tree.ID
+		var own func(tree.ID) bool
+		if b.refresh {
+			keep = map[string]tree.ID{}
+			for _, c := range w.Children(b.dir) {
+				if n := w.Node(c); n.Kind == tree.KindDir {
+					keep[n.Name] = c
+				}
+			}
+			mine := map[tree.ID]bool{b.dir: true}
+			for _, id := range w.ClearOwn(b.dir) {
+				mine[id] = true
+			}
+			own = func(id tree.ID) bool { return mine[id] }
+		}
+		shared := func(link bool, key uint64) bool {
+			switch {
+			case own != nil:
+				return w.SharedElsewhere(link, key, own)
+			case link:
+				return w.Linked(key)
+			default:
+				return w.Cloned(key)
+			}
+		}
+		join := func(link bool, key uint64, n uint32, alloc uint64, at tree.ID) {
+			switch {
+			case own != nil:
+				w.Rejoin(link, key, n, alloc, at, own)
+			case link:
+				w.Link(key, n, alloc, at)
+			default:
+				w.Clone(key, n, alloc, at)
+			}
+		}
 		for i := range b.entries {
 			e := &b.entries[i]
 			name := b.name(e)
@@ -342,12 +405,19 @@ func (s *Session) apply(b *batch) {
 				continue
 			}
 			if e.kind == tree.KindDir {
+				if n := string(name); strings.HasSuffix(n, ".xcodeproj") || strings.HasSuffix(n, ".xcworkspace") {
+					markers |= tree.MarkerXcode
+				}
+				if id, ok := keep[string(name)]; ok {
+					delete(keep, string(name))
+					if b.deep && !e.mount && e.flags&sfDataless == 0 {
+						s.push(b, name, id, true)
+					}
+					continue
+				}
 				if e.mount {
 					w.AddDir(b.dir, name, e.mtime, tree.FlagMount)
 					continue
-				}
-				if n := string(name); strings.HasSuffix(n, ".xcodeproj") || strings.HasSuffix(n, ".xcworkspace") {
-					markers |= tree.MarkerXcode
 				}
 				if e.flags&sfDataless != 0 {
 					// An iCloud folder whose contents are not on this Mac:
@@ -355,13 +425,7 @@ func (s *Session) apply(b *batch) {
 					w.AddDir(b.dir, name, e.mtime, 0)
 					continue
 				}
-				id := w.AddDir(b.dir, name, e.mtime, 0)
-				s.pending++
-				s.dirs.Add(1)
-				if b.fd != nil {
-					b.fd.refs.Add(1)
-				}
-				s.q.push(job{childPath(b.path, name), id, b.fd})
+				s.push(b, name, w.AddDir(b.dir, name, e.mtime, 0), false)
 				continue
 			}
 			markers |= tree.MarkerBit(string(name))
@@ -372,7 +436,7 @@ func (s *Session) apply(b *batch) {
 			}
 			big := e.alloc >= s.threshold
 			linked := e.nlink > 1 && e.kind == tree.KindFile
-			if linked && w.Linked(e.ino) {
+			if linked && shared(true, e.ino) {
 				alloc = 0
 				flags |= tree.FlagShared
 			}
@@ -381,7 +445,7 @@ func (s *Session) apply(b *batch) {
 			if e.ext&efMayShareBlocks != 0 && alloc > 0 {
 				flags |= tree.FlagClone
 			}
-			if cloned && w.Cloned(e.cloneID) {
+			if cloned && shared(false, e.cloneID) {
 				unique = 0
 			}
 			files++
@@ -393,10 +457,10 @@ func (s *Session) apply(b *batch) {
 				at = w.AddFile(b.dir, name, e.kind, alloc, unique, e.logical, e.mtime, flags)
 			}
 			if linked {
-				w.Link(e.ino, e.nlink, e.alloc, at)
+				join(true, e.ino, e.nlink, e.alloc, at)
 			}
 			if cloned {
-				w.Clone(e.cloneID, e.cloneRefs, e.alloc, at)
+				join(false, e.cloneID, e.cloneRefs, e.alloc, at)
 			}
 			if big {
 				continue
@@ -413,9 +477,23 @@ func (s *Session) apply(b *batch) {
 		if markers != 0 {
 			w.SetMarkers(b.dir, markers)
 		}
+		for _, id := range keep {
+			w.Remove(id)
+			s.removed = true
+		}
 	})
 	s.files.Add(files)
 	s.bytes.Add(bytes)
+}
+
+// push queues a subfolder of b's folder; refresh lists one already in the tree again, with everything below.
+func (s *Session) push(b *batch, name []byte, id tree.ID, refresh bool) {
+	s.pending++
+	s.dirs.Add(1)
+	if b.fd != nil {
+		b.fd.refs.Add(1)
+	}
+	s.q.push(job{path: childPath(b.path, name), dir: id, parent: b.fd, refresh: refresh, deep: refresh})
 }
 
 func (s *Session) Tree() *tree.Tree { return s.t }

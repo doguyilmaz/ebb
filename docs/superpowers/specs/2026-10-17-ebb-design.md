@@ -278,7 +278,7 @@ per week beyond. `diff(a, b)` matches by path and returns growth/shrink lists; t
 and "what grew since <date>".
 
 Daemon (`ebb daemon install|uninstall|status|run`): launchd agent running the server on the default port, a daily
-gentle scan when on power and idle, FSEvents (cgo, CoreServices) to rescan only changed directories while the
+gentle scan when on power and idle, FSEvents (cgo, CoreServices) to rescan only changed directories — each scan stores the FSEvents event ID, the server replays history since then and stays live, so "scan again" re-reads only changed folders; while the
 server is up, and a notification (`osascript display notification`) when free space drops below 10 GB (configurable).
 Known limitation: macOS TCC grants Full Disk Access per binary, so the daemon binary needs its own grant and
 Homebrew upgrades may require re-granting; the UI detects and explains this.
