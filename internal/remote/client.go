@@ -74,3 +74,25 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any) error
 	}
 	return json.Unmarshal(raw, out)
 }
+
+// Raw fetches /api/v1<path> and returns the body as is (reports).
+func (c *Client) Raw(ctx context.Context, path string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.Base+"/api/v1"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("ebb server: %s", resp.Status)
+	}
+	return raw, nil
+}

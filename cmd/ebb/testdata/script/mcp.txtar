@@ -1,0 +1,29 @@
+# ebb mcp speaks JSON-RPC on stdio: list the tools, scan, look at the overview.
+fill 3145728 $HOME/w/pkgs/blob
+mkdir $HOME/.config/ebb/rules
+cp rules.toml $HOME/.config/ebb/rules/t.toml
+stdin session.jsonl
+exec ebb mcp
+stdout '"protocolVersion":"2025-06-18"'
+stdout '"name":"ebb_cleanup_plan"'
+stdout 'reclaimable'
+! stdout '"isError":true'
+
+-- rules.toml --
+[[rule]]
+id = "t.cache"
+title = "Test cache"
+category = "package-cache"
+paths = ["~/w/pkgs"]
+safety = "regenerable"
+why = "w"
+impact = "i"
+min_size = "1MB"
+min_target = "1MB"
+action = { kind = "delete" }
+-- session.jsonl --
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ebb_scan","arguments":{}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ebb_overview","arguments":{}}}
