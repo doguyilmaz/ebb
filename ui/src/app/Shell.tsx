@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
+import { Activity, ChartLine, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
@@ -14,6 +14,7 @@ const nav = [
   { to: "/", label: "Overview", icon: Gauge },
   { to: "/explore", label: "Explore", icon: Compass },
   { to: "/findings", label: "Findings", icon: ListChecks },
+  { to: "/history", label: "History", icon: ChartLine },
   { to: "/activity", label: "Activity", icon: Activity },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;

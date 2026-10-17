@@ -30,6 +30,11 @@ const findingsRoute = createRoute({
   path: "/findings",
   component: lazyRouteComponent(() => import("./pages/findings/Findings.tsx")),
 });
+const historyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/history",
+  component: lazyRouteComponent(() => import("./pages/history/HistoryPage.tsx")),
+});
 const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/activity",
@@ -41,7 +46,7 @@ const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/settings/Settings.tsx")),
 });
 
-const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, activityRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, historyRoute, activityRoute, settingsRoute]);
 
 export const router = createRouter({
   routeTree,

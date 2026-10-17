@@ -416,6 +416,21 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
   .easy { margin-left: 0; }
 }
 
+/* ---------- history ---------- */
+.timeline { position: relative; }
+.timeline svg { display: block; cursor: crosshair; }
+.tl-grid { stroke: var(--line); stroke-width: 1; }
+.tl-tick { fill: var(--text-3); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.tl-area { fill: color-mix(in srgb, var(--s1) 10%, transparent); }
+.tl-line { fill: none; stroke: var(--s1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.tl-line.enter { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 900ms var(--ease-out) forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.tl-point { fill: var(--s1); stroke: var(--surface); stroke-width: 2; transition: r 150ms var(--ease-out); }
+.tl-point[data-on] { fill: var(--text); }
+.tl-cross { stroke: var(--text-3); stroke-width: 1; }
+.tl-tip { position: absolute; }
+.history-change { grid-template-columns: minmax(180px, 1fr) minmax(0, 1.2fr) 96px; }
+
 /* ---------- activity ---------- */
 .ops { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); }
 .ops li { display: grid; grid-template-columns: 110px 180px 90px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 16px; }
