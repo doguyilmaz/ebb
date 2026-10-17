@@ -1,0 +1,7 @@
+# A dry run says where the skill would go (through lockstep when it is on PATH) and writes nothing.
+exec ebb assistant install --dry-run
+stdout 'write .*/skills/ebb/SKILL.md'
+! exists $HOME/.claude/skills/ebb/SKILL.md
+! exists $HOME/.config/ebb/skills/ebb/SKILL.md
+exec ebb assistant skill
+stdout '^name: ebb$'

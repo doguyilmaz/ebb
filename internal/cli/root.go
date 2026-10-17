@@ -63,6 +63,7 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 		newReportCmd(g),
 		newHistoryCmd(g),
 		newMCPCmd(g),
+		newAssistantCmd(g),
 		newDiffCmd(g),
 		newServeCmd(g),
 		newWebCmd(g),
