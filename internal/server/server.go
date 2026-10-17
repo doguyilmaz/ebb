@@ -83,6 +83,7 @@ func (s *Server) routes() {
 	s.local("POST /api/v1/web/allow", s.webAllow)
 	s.local("POST /api/v1/web/deny", s.webDeny)
 	s.mux.HandleFunc("GET /api/v1/events", s.auth(s.handleEvents))
+	s.dataRoutes()
 	s.mux.HandleFunc("/api/", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such endpoint"})
 	}))

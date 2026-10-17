@@ -34,19 +34,19 @@ const keepProblems = 1000
 // Scan walks root, accounts for the volume, runs every detector and saves
 // the result as the last scan and as a history snapshot.
 func (a *App) Scan(ctx context.Context, opt ScanOptions, progress func(walk.Progress)) (*ScanResult, error) {
-	a.mu.Lock()
-	if a.running {
-		a.mu.Unlock()
-		return nil, ErrScanRunning
+	root := opt.Root
+	if root == "" {
+		root = a.DefaultRoot()
 	}
-	a.running = true
-	a.mu.Unlock()
-	defer func() {
-		a.mu.Lock()
-		a.running = false
-		a.mu.Unlock()
-	}()
+	if err := a.begin(a.Links.Display(root)); err != nil {
+		return nil, err
+	}
+	res, err := a.scan(ctx, opt, progress)
+	a.end(err)
+	return res, err
+}
 
+func (a *App) scan(ctx context.Context, opt ScanOptions, progress func(walk.Progress)) (*ScanResult, error) {
 	root := opt.Root
 	if root == "" {
 		root = a.DefaultRoot()

@@ -1,0 +1,196 @@
+package app
+
+import (
+	"cmp"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/doguyilmaz/ebb/internal/api"
+	"github.com/doguyilmaz/ebb/internal/finding"
+	"github.com/doguyilmaz/ebb/internal/history"
+	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/tree"
+	"github.com/doguyilmaz/ebb/internal/volume"
+)
+
+var (
+	ErrOutsideRoot = errors.New("path is outside the scanned folder")
+	ErrNotInScan   = errors.New("path is not in the last scan")
+)
+
+func within(p, root string) bool {
+	return p == root || strings.HasPrefix(p, strings.TrimSuffix(root, "/")+"/")
+}
+
+// Resolve checks a path from a client (display or real form) against the last
+// scan and returns its node. Anything not absolute, carrying a NUL or lying
+// outside the scanned root is refused before the tree is consulted.
+func (a *App) Resolve(path string) (*ScanResult, tree.ID, error) {
+	last, err := a.Last()
+	if err != nil {
+		return nil, 0, err
+	}
+	if path == "" {
+		return last, last.Tree.Root(), nil
+	}
+	if strings.ContainsRune(path, 0) || !filepath.IsAbs(path) {
+		return nil, 0, ErrOutsideRoot
+	}
+	real := a.Links.Real(filepath.Clean(path))
+	if !within(real, last.Tree.RootPath()) {
+		return nil, 0, ErrOutsideRoot
+	}
+	id, ok := last.Tree.Lookup(real)
+	if !ok {
+		return nil, 0, ErrNotInScan
+	}
+	return last, id, nil
+}
+
+func kindName(k tree.Kind) string {
+	return [...]string{"dir", "file", "link", "other", "small"}[k]
+}
+
+func (a *App) item(r *ScanResult, id tree.ID) api.Item {
+	t := r.Tree
+	n := t.Node(id)
+	path := a.Links.Display(t.Path(id))
+	it := api.Item{Path: path, Name: n.Name, Kind: kindName(n.Kind), Alloc: n.Alloc, Bytes: t.Reclaimable(id), Files: n.Files, Modified: n.MaxMtime}
+	for _, f := range r.Findings {
+		if slices.ContainsFunc(f.Targets, func(tg finding.Target) bool { return within(tg.Path, path) }) {
+			it.Findings = append(it.Findings, f.ID)
+		}
+	}
+	return it
+}
+
+func (a *App) Slice(path string, depth int, minShare float64, maxNodes int) (api.SliceResponse, error) {
+	r, id, err := a.Resolve(path)
+	if err != nil {
+		return api.SliceResponse{}, err
+	}
+	return api.SliceResponse{Path: a.Links.Display(r.Tree.Path(id)), Root: r.Tree.Slice(id, depth, minShare, maxNodes)}, nil
+}
+
+// Children lists a folder's stored children and, when asked, the small files
+// folded into it, read live from disk because the scan does not keep them.
+func (a *App) Children(path string, limit int, small bool) (api.ChildrenResponse, error) {
+	r, id, err := a.Resolve(path)
+	if err != nil {
+		return api.ChildrenResponse{}, err
+	}
+	t := r.Tree
+	out := api.ChildrenResponse{Path: a.Links.Display(t.Path(id)), Items: []api.Item{}}
+	stored := map[string]bool{}
+	for _, c := range t.Children(id) {
+		stored[t.Node(c).Name] = true
+		if len(out.Items) < limit {
+			out.Items = append(out.Items, a.item(r, c))
+		}
+	}
+	if small && t.Node(id).Kind == tree.KindDir {
+		des, _ := os.ReadDir(t.Path(id))
+		for _, de := range des {
+			if de.IsDir() || stored[de.Name()] {
+				continue
+			}
+			info, err := de.Info()
+			if err != nil {
+				continue
+			}
+			out.Small = append(out.Small, api.SmallFile{Name: de.Name(), Size: uint64(info.Size()), Modified: info.ModTime().Unix()})
+		}
+		slices.SortFunc(out.Small, func(x, y api.SmallFile) int { return cmp.Compare(y.Size, x.Size) })
+		out.Small = out.Small[:min(len(out.Small), limit)]
+	}
+	return out, nil
+}
+
+func (a *App) Search(q string, limit int) (api.SearchResponse, error) {
+	r, err := a.Last()
+	if err != nil {
+		return api.SearchResponse{}, err
+	}
+	out := api.SearchResponse{Items: []api.Item{}}
+	ids := r.Tree.Find(q, 100000)
+	slices.SortFunc(ids, func(x, y tree.ID) int { return cmp.Compare(r.Tree.Node(y).Alloc, r.Tree.Node(x).Alloc) })
+	for _, id := range ids[:min(limit, len(ids))] {
+		out.Items = append(out.Items, a.item(r, id))
+	}
+	return out, nil
+}
+
+func (a *App) Findings(category string, minBytes uint64) (api.FindingsResponse, error) {
+	r, err := a.Last()
+	if err != nil {
+		return api.FindingsResponse{}, err
+	}
+	out := api.FindingsResponse{Findings: []api.FindingView{}}
+	for _, f := range r.Findings {
+		if (category != "" && f.Category != category) || f.Bytes < minBytes {
+			continue
+		}
+		out.Findings = append(out.Findings, api.FindingView{Finding: f})
+		if f.Actionable() {
+			out.Reclaimable += f.Bytes
+		}
+	}
+	return out, nil
+}
+
+func (a *App) Volume() (volume.Breakdown, error) {
+	r, err := a.Last()
+	if err != nil {
+		return volume.Breakdown{}, err
+	}
+	return r.Volume, nil
+}
+
+// Reveal shows a scanned path in Finder.
+func (a *App) Reveal(path string) error {
+	r, id, err := a.Resolve(path)
+	if err != nil {
+		return err
+	}
+	if sys.Sandboxed(a.Env) {
+		return nil
+	}
+	return exec.Command("open", "-R", r.Tree.Path(id)).Run()
+}
+
+// Diff compares two snapshots; empty IDs mean the newest one and the scan of
+// the same folder before it.
+func (a *App) Diff(fromID, toID string, minDelta uint64) (api.DiffResponse, error) {
+	metas, err := a.History.List()
+	if err != nil {
+		return api.DiffResponse{}, err
+	}
+	if len(metas) == 0 {
+		return api.DiffResponse{}, ErrNeverScanned
+	}
+	if toID == "" {
+		toID = metas[0].ID
+	}
+	to, err := a.History.Load(toID)
+	if err != nil {
+		return api.DiffResponse{}, ErrNotInScan
+	}
+	var from *history.Snapshot
+	if fromID != "" {
+		from, err = a.History.Load(fromID)
+	} else {
+		from, err = a.History.Previous(to.Meta.Root, to.Meta.Time)
+	}
+	if err != nil {
+		return api.DiffResponse{}, errors.New("no earlier scan of " + to.Meta.Root + " to compare with")
+	}
+	changes := history.Explaining(history.Diff(from, to, minDelta))
+	if changes == nil {
+		changes = []history.Change{}
+	}
+	return api.DiffResponse{From: from.Meta, To: to.Meta, Changes: changes}, nil
+}

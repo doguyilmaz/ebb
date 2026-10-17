@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/doguyilmaz/ebb"
+	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/config"
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
@@ -31,9 +32,12 @@ type App struct {
 	History *history.Store
 	Links   volume.Firmlinks
 
-	mu      sync.Mutex
-	running bool
-	cur     *ScanResult
+	mu       sync.Mutex
+	running  bool
+	scanRoot string
+	scanErr  string
+	progress *api.Progress
+	cur      *ScanResult
 }
 
 func New(env sys.Env) (*App, error) {

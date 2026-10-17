@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -57,39 +56,23 @@ func newDiffCmd(g *globals) *cobra.Command {
 			if err := minSize.UnmarshalText([]byte(minDelta)); err != nil {
 				return err
 			}
-			metas, err := a.History.List()
-			if err != nil {
-				return err
-			}
-			if len(metas) == 0 {
-				return errors.New("no scans yet — run: ebb scan")
-			}
-			toID := metas[0].ID
-			if len(args) == 2 {
-				toID = args[1]
-			}
-			to, err := a.History.Load(toID)
-			if err != nil {
-				return err
-			}
-			var from *history.Snapshot
+			from, to := "", ""
 			if len(args) >= 1 {
-				from, err = a.History.Load(args[0])
-			} else {
-				from, err = a.History.Previous(to.Meta.Root, to.Meta.Time)
+				from = args[0]
 			}
+			if len(args) == 2 {
+				to = args[1]
+			}
+			d, err := a.Diff(from, to, uint64(minSize))
 			if err != nil {
-				return fmt.Errorf("no earlier scan of %s to compare with", to.Meta.Root)
+				return err
 			}
-			changes := history.Explaining(history.Diff(from, to, uint64(minSize)))
-			changes = changes[:min(n, len(changes))]
+			changes := d.Changes[:min(n, len(d.Changes))]
 			if g.json {
-				if changes == nil {
-					changes = []history.Change{}
-				}
-				return emitJSON(cmd.OutOrStdout(), map[string]any{"from": from.Meta, "to": to.Meta, "changes": changes})
+				d.Changes = changes
+				return emitJSON(cmd.OutOrStdout(), d)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s → %s\n", from.Meta.Time.Local().Format("2006-01-02 15:04"), to.Meta.Time.Local().Format("2006-01-02 15:04"))
+			fmt.Fprintf(cmd.OutOrStdout(), "%s → %s\n", d.From.Time.Local().Format("2006-01-02 15:04"), d.To.Time.Local().Format("2006-01-02 15:04"))
 			var rows [][]string
 			for _, c := range changes {
 				sign := "+"
