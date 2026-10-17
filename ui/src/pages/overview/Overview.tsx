@@ -1,11 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { useFindings, useMakePlan, usePresets, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
+import { useFindings, usePresets, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
 import type { PresetView } from "#/api/types.gen.ts";
-import { CleanupSheet } from "#/app/CleanupSheet.tsx";
 import { ago, bytes, count } from "#/lib/format.ts";
 import { Safety } from "#/ui/Safety.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
-import { useState } from "react";
+import { useSheet } from "#/lib/sheet.ts";
 import { VolumeBar } from "./VolumeBar.tsx";
 
 export default function Overview() {
@@ -78,26 +77,19 @@ export default function Overview() {
   );
 }
 
-function Presets() {
+export function Presets() {
   const presets = usePresets();
-  const make = useMakePlan();
-  const [planId, setPlanId] = useState<string | null>(null);
+  const open = useSheet((s) => s.open);
   const useful = (presets.data ?? []).filter((p: PresetView) => p.bytes > 0);
   if (useful.length === 0) return null;
   return (
     <div className="presets">
       {useful.map((p) => (
-        <button
-          key={p.id}
-          className="btn"
-          disabled={make.isPending}
-          onClick={() => make.mutate({ preset: p.id, source: "ui" }, { onSuccess: (plan) => setPlanId(plan.id) })}
-        >
+        <button key={p.id} className="btn" onClick={() => open({ preset: p.id })}>
           {p.title}
           <span className="num muted">{bytes(p.bytes)}</span>
         </button>
       ))}
-      {planId && <CleanupSheet planId={planId} plan={make.data} onClose={() => setPlanId(null)} />}
     </div>
   );
 }

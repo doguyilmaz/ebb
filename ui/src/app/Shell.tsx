@@ -78,6 +78,7 @@ function TopBar() {
           <span className="muted">Nothing scanned yet</span>
         )}
       </div>
+      <kbd className="faint kbd" title="Command palette">⌘K</kbd>
       <button className="btn primary" disabled={running} onClick={() => start.mutate({})}>
         <RefreshCw size={15} aria-hidden />
         {status.data?.last ? "Scan again" : "Scan this Mac"}
