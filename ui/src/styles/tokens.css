@@ -1,0 +1,84 @@
+@font-face { font-family: "Plex"; src: url("/fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Plex"; src: url("/fonts/ibm-plex-sans-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Plex"; src: url("/fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Plex Mono"; src: url("/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Plex Mono"; src: url("/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+
+/*
+ * Low tide: sea mist by day, deep water by night, one tide-teal accent.
+ * Components use only these names.
+ */
+:root {
+  --font: "Plex", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --bg: #eef2f4;
+  --surface: #ffffff;
+  --surface-2: #f5f8f9;
+  --surface-3: #e6ecef;
+  --line: #d9e1e6;
+  --line-strong: #c3cfd6;
+  --text: #10202b;
+  --text-2: #475a66;
+  --text-3: #66788a;
+  --accent: #0b7a83;
+  --accent-strong: #075e66;
+  --accent-soft: #ddf0f1;
+  --on-accent: #ffffff;
+
+  /* status: safety of an item; always paired with an icon and a word */
+  --good: #0ca30c;
+  --warning: #b77800;
+  --serious: #c9592c;
+  --critical: #d03b3b;
+  --good-soft: #e4f4e4;
+  --warning-soft: #fbf0d8;
+  --serious-soft: #fbe8de;
+  --critical-soft: #f9e2e2;
+
+  /* chart series, fixed order (validated palette) */
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #b9c3c9;
+
+  --shadow-1: 0 1px 2px rgba(16, 32, 43, 0.06);
+  --shadow-2: 0 10px 34px rgba(16, 32, 43, 0.12), 0 2px 6px rgba(16, 32, 43, 0.06);
+
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 16px;
+  --sidebar: 220px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #08131b; --surface: #0e1c26; --surface-2: #132532; --surface-3: #1a2f3e;
+    --line: #1d3241; --line-strong: #2a4456;
+    --text: #e4edf1; --text-2: #9fb3be; --text-3: #8399a5;
+    --accent: #3cc4cd; --accent-strong: #6ed8df; --accent-soft: #0f3036; --on-accent: #04161a;
+    --good: #2fbf2f; --warning: #fab219; --serious: #ec835a; --critical: #e46565;
+    --good-soft: #10291a; --warning-soft: #2e2410; --serious-soft: #321c13; --critical-soft: #331616;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #3b5363;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #08131b; --surface: #0e1c26; --surface-2: #132532; --surface-3: #1a2f3e;
+  --line: #1d3241; --line-strong: #2a4456;
+  --text: #e4edf1; --text-2: #9fb3be; --text-3: #8399a5;
+  --accent: #3cc4cd; --accent-strong: #6ed8df; --accent-soft: #0f3036; --on-accent: #04161a;
+  --good: #2fbf2f; --warning: #fab219; --serious: #ec835a; --critical: #e46565;
+  --good-soft: #10291a; --warning-soft: #2e2410; --serious-soft: #321c13; --critical-soft: #331616;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #3b5363;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}

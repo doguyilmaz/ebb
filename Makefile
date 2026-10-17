@@ -1,7 +1,10 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/doguyilmaz/ebb/internal/cli.Version=$(VERSION)
 
-build:
+ui:
+	cd ui && bun install --frozen-lockfile && bun run build
+
+build: ui
 	go build -ldflags "$(LDFLAGS)" -o bin/ebb ./cmd/ebb
 
 test:
@@ -11,8 +14,9 @@ check:
 	go vet ./...
 	go test ./...
 	@out=$$(gofmt -l $$(find . -name '*.go' -not -path './ui/*')); test -z "$$out" || (echo "$$out"; exit 1)
+	cd ui && bun run typecheck && bun test
 
 bench:
 	go test -run '^$$' -bench . -benchmem ./internal/walk ./internal/tree
 
-.PHONY: build test check bench
+.PHONY: ui build test check bench

@@ -5,6 +5,8 @@ package api
 //go:generate go run ./tsgen -out ../../ui/src/api/types.gen.ts
 
 import (
+	"reflect"
+
 	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/history"
@@ -193,6 +195,16 @@ var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
+}
+
+// Names gives types from other packages their API name in TypeScript.
+var Names = map[reflect.Type]string{
+	reflect.TypeFor[clean.Request](): "PlanRequest",
+	reflect.TypeFor[clean.Plan]():    "Plan",
+	reflect.TypeFor[clean.Item]():    "PlanItem",
+	reflect.TypeFor[clean.Event]():   "PlanEvent",
+	reflect.TypeFor[clean.Result]():  "PlanResult",
+	reflect.TypeFor[clean.Op]():      "Op",
 }
 
 var Events = []string{EventHello, EventScanProgress, EventScanDone, EventFindingsChanged, EventPlanProgress, EventPlanDone, EventHistoryChanged}

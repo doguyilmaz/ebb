@@ -83,6 +83,9 @@ func (g *gen) iface(t reflect.Type) string {
 		return name
 	}
 	name := t.Name()
+	if n, ok := Names[t]; ok {
+		name = n
+	}
 	if other, taken := g.names[name]; taken && other != t {
 		parts := strings.Split(t.PkgPath(), "/")
 		pkg := parts[len(parts)-1]

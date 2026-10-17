@@ -232,7 +232,7 @@ export interface Breakdown {
   fullDiskAccess: boolean;
 }
 
-export interface Request {
+export interface PlanRequest {
   findingIds?: string[] | null;
   paths?: string[] | null;
   preset?: string;
@@ -240,7 +240,7 @@ export interface Request {
   source?: string;
 }
 
-export interface CleanItem {
+export interface PlanItem {
   path: string;
   title?: string;
   bytes: number;
@@ -257,13 +257,13 @@ export interface Plan {
   created: string;
   expires: string;
   source: string;
-  items: CleanItem[] | null;
+  items: PlanItem[] | null;
   bytes: number;
   needsApproval: boolean;
   approved: boolean;
 }
 
-export interface Event {
+export interface PlanEvent {
   item: number;
   path: string;
   state: string;
@@ -283,7 +283,7 @@ export interface Op {
   trashUrl?: string;
 }
 
-export interface Result {
+export interface PlanResult {
   planId: string;
   freed: number;
   done: number;
