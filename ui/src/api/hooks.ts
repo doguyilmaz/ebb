@@ -66,11 +66,13 @@ export const useOps = () => useQuery({ queryKey: ["ops"], queryFn: () => api.get
 export const useSettings = () => useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
 export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web") });
 export const useHistory = () => useQuery({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
+/** The newest scan against the one before it of the same folder; fails while there is only one. */
+export const useLatestDiff = () => useQuery({ queryKey: ["diff", "latest"], queryFn: () => api.get<DiffResponse>("/history/diff"), retry: false });
 export const useDiff = (from: string, to: string) =>
   useQuery({ queryKey: ["diff", from, to], queryFn: () => api.get<DiffResponse>(`/history/diff?from=${q(from)}&to=${q(to)}`), enabled: !!from && !!to, retry: false });
 
 /** Everything that shows scan results; refreshed after a scan or a cleanup. */
-export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"]];
+export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"]];
 
 export function useRefreshResults() {
   const qc = useQueryClient();

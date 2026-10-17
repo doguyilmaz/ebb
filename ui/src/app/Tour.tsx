@@ -24,6 +24,7 @@ export function Tour() {
   const { pathname } = useLocation();
   const [box, setBox] = useState<Box | null>(null);
   const [card, setCard] = useState({ top: 0, left: 0 });
+  const [moving, setMoving] = useState(false);
   const cardEl = useRef<HTMLDivElement>(null);
   const nextBtn = useRef<HTMLButtonElement>(null);
   const s = step === null ? null : steps[step];
@@ -35,7 +36,8 @@ export function Tour() {
   // Follow the target while it loads, scrolls or resizes; give up on it after a few seconds.
   useEffect(() => {
     if (!s) return;
-    setBox(null);
+    setMoving(true);
+    const settle = setTimeout(() => setMoving(false), 450);
     let raf = 0;
     let scrolled = false;
     const started = performance.now();
@@ -52,7 +54,10 @@ export function Tour() {
       raf = requestAnimationFrame(track);
     };
     raf = requestAnimationFrame(track);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(settle);
+    };
   }, [s]);
 
   useLayoutEffect(() => {
@@ -72,9 +77,13 @@ export function Tour() {
     setCard({ top, left });
   }, [box]);
 
+  const ready = !!box;
+  useEffect(() => {
+    if (ready) nextBtn.current?.focus({ preventScroll: true });
+  }, [ready, step]);
+
   useEffect(() => {
     if (step === null) return;
-    nextBtn.current?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") stop();
       else if (e.key === "ArrowRight") next();
@@ -89,10 +98,11 @@ export function Tour() {
   if (!s || step === null) return null;
   const last = step === steps.length - 1;
   return (
-    <div className="tour" role="presentation">
+    <div className="tour" role="presentation" onClick={(e) => e.target === e.currentTarget && stop()}>
       {box && (
         <div
           className="tour-spot"
+          data-moving={moving || undefined}
           style={{ top: box.top - PAD, left: box.left - PAD, width: box.width + PAD * 2, height: box.height + PAD * 2, opacity: box.width ? 1 : 0 }}
           aria-hidden
         />

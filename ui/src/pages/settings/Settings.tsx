@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { FolderOpen, Plus, X } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "#/api/client.ts";
 import { useFindings, useIgnore, useSaveSettings, useSettings, useStatus, useWebAccess } from "#/api/hooks.ts";
-import type { Settings as S } from "#/api/types.gen.ts";
+import type { ChooseResponse, Settings as S } from "#/api/types.gen.ts";
 import type { TermId } from "#/lib/glossary.ts";
 import { PageHead } from "#/ui/PageHead.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
@@ -31,9 +32,34 @@ export default function Settings() {
   );
 }
 
+function useChooseFolder() {
+  const [error, setError] = useState<string | null>(null);
+  const choose = async (purpose: "scan" | "protect"): Promise<string> => {
+    setError(null);
+    try {
+      return (await api.post<ChooseResponse>("/choose-folder", { purpose })).path;
+    } catch (e) {
+      setError((e as Error).message);
+      return "";
+    }
+  };
+  return { choose, error };
+}
+
+function Field({ label, help, children }: { label: string; help: string; children: ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+      <span className="field-help">{help}</span>
+    </label>
+  );
+}
+
 function Scan() {
   const settings = useSettings();
   const save = useSaveSettings();
+  const picker = useChooseFolder();
   const [draft, setDraft] = useState<S | null>(null);
   useEffect(() => setDraft(settings.data ?? null), [settings.data]);
   if (settings.error) return <Problem error={settings.error} />;
@@ -42,23 +68,36 @@ function Scan() {
   return (
     <section className="card setting">
       <Head title="Scanning" />
-      <label>
-        Folder to scan <span className="faint">(empty: the whole disk)</span>
-        <input className="input" value={draft.root} placeholder="/System/Volumes/Data" onChange={(e) => set("root", e.target.value)} />
-      </label>
+      <Field label="Folder to scan" help="Empty scans the whole disk. Type a path or pick one.">
+        <span className="row">
+          <input className="input grow" value={draft.root} placeholder="/System/Volumes/Data" onChange={(e) => set("root", e.target.value)} />
+          <button
+            type="button"
+            className="btn"
+            onClick={async (e) => {
+              e.preventDefault();
+              const p = await picker.choose("scan");
+              if (p) set("root", p);
+            }}
+          >
+            <FolderOpen size={14} aria-hidden /> Browse…
+          </button>
+        </span>
+      </Field>
+      {picker.error && <p className="error small-text">{picker.error}</p>}
       <div className="fields">
-        <label>
-          Parallel readers <span className="faint">(0: automatic)</span>
-          <input className="input" type="number" min={0} max={64} value={draft.threads} onChange={(e) => set("threads", Number(e.target.value))} />
-        </label>
-        <label>
-          Untouched after (days)
-          <input className="input" type="number" min={1} max={3650} value={draft.staleDays} onChange={(e) => set("staleDays", Number(e.target.value))} />
-        </label>
-        <label>
-          Large file from
+        <Field label="Parallel readers" help="Folders read at once. Empty picks what suits this Mac.">
+          <input className="input" type="number" min={0} max={64} placeholder="Automatic" value={draft.threads || ""} onChange={(e) => set("threads", Number(e.target.value) || 0)} />
+        </Field>
+        <Field label="Untouched after" help="Days without changes before a project counts as untouched.">
+          <span className="input-unit">
+            <input className="input" type="number" min={1} max={3650} value={draft.staleDays} onChange={(e) => set("staleDays", Number(e.target.value))} />
+            <span className="faint">days</span>
+          </span>
+        </Field>
+        <Field label="Large file from" help="Files at least this big are listed, like 500 MB or 2 GB.">
           <input className="input" value={draft.largeFile} onChange={(e) => set("largeFile", e.target.value)} />
-        </label>
+        </Field>
       </div>
       <div className="row">
         <button className="btn primary" disabled={save.isPending} onClick={() => save.mutate(draft)}>Save</button>
@@ -69,34 +108,72 @@ function Scan() {
   );
 }
 
+const suggestions = [
+  { glob: "~/Documents/**", label: "Documents" },
+  { glob: "~/Desktop/**", label: "Desktop" },
+  { glob: "~/Pictures/**", label: "Pictures" },
+  { glob: "~/Movies/**", label: "Movies" },
+  { glob: "~/Music/**", label: "Music" },
+];
+
 function Protect() {
   const settings = useSettings();
   const save = useSaveSettings();
+  const picker = useChooseFolder();
   const [glob, setGlob] = useState("");
   const list = settings.data?.protect ?? [];
+  const add = (g: string) => g && !list.includes(g) && save.mutate({ protect: [...list, g] }, { onSuccess: () => setGlob("") });
+  const offered = suggestions.filter((sg) => !list.includes(sg.glob));
   return (
     <section className="card setting">
       <Head title="Never touch" term="protect" />
-      <p className="muted">Folders and patterns ebb never offers or removes, on top of system folders, Keychains and cloud-synced folders. Use ~ for your home and ** for any depth.</p>
-      <ul className="chips">
-        {list.map((p) => (
-          <li key={p}>
-            <code>{p}</code>
-            <button className="icon-btn" aria-label={`Remove ${p}`} onClick={() => save.mutate({ protect: list.filter((x) => x !== p) })}>×</button>
-          </li>
-        ))}
-      </ul>
+      <p className="muted">
+        Folders ebb never offers or removes, on top of system folders, Keychains and cloud-synced folders. Use ~ for your home and ** for everything
+        inside.
+      </p>
+      {list.length > 0 && (
+        <ul className="chips">
+          {list.map((p) => (
+            <li key={p}>
+              <code>{p}</code>
+              <button className="icon-btn" aria-label={`Stop protecting ${p}`} data-tip="Stop protecting" onClick={() => save.mutate({ protect: list.filter((x) => x !== p) })}>
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <form
         className="row"
         onSubmit={(e) => {
           e.preventDefault();
-          if (glob.trim()) save.mutate({ protect: [...list, glob.trim()] }, { onSuccess: () => setGlob("") });
+          add(glob.trim());
         }}
       >
-        <input className="input" value={glob} placeholder="~/Work/**" onChange={(e) => setGlob(e.target.value)} aria-label="Folder or pattern to protect" />
-        <button className="btn">Protect</button>
+        <input className="input grow" value={glob} placeholder="~/Work/**" onChange={(e) => setGlob(e.target.value)} aria-label="Folder or pattern to protect" />
+        <button
+          type="button"
+          className="btn"
+          onClick={async () => {
+            const p = await picker.choose("protect");
+            if (p) setGlob(`${p}/**`);
+          }}
+        >
+          <FolderOpen size={14} aria-hidden /> Browse…
+        </button>
+        <button className="btn primary" disabled={!glob.trim()}>Protect</button>
       </form>
-      {save.error && <p className="error">{(save.error as Error).message}</p>}
+      {offered.length > 0 && (
+        <div className="suggest">
+          <span className="faint small-text">Suggestions</span>
+          {offered.map((sg) => (
+            <button key={sg.glob} className="btn small" onClick={() => add(sg.glob)} data-tip={`Protects everything in ${sg.glob.replace("/**", "")}`}>
+              <Plus size={13} aria-hidden /> {sg.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {(save.error || picker.error) && <p className="error">{((save.error as Error) ?? null)?.message ?? picker.error}</p>}
     </section>
   );
 }

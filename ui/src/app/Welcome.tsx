@@ -104,9 +104,9 @@ export function ScanProgress() {
         <code className="faint ellipsis readout-path">{live?.path || "Starting…"}</code>
       </div>
       {t && (
-        <div className="welcome-tip" key={tip}>
-          <span className="panel-label">While you wait · {t.title}</span>
-          <p className="muted">{t.body}</p>
+        <div className="welcome-tip">
+          <span className="panel-label" key={`h${tip}`}>While you wait · {t.title}</span>
+          <p className="muted" key={`b${tip}`}>{t.body}</p>
         </div>
       )}
       <div>

@@ -6,6 +6,8 @@ interface Selection {
   paths: Set<string>;
   toggleFinding: (id: string) => void;
   togglePath: (p: string) => void;
+  /** Adds or removes several findings at once (a group, or everything that rebuilds itself). */
+  setFindings: (ids: string[], on: boolean) => void;
   clear: () => void;
 }
 
@@ -20,5 +22,11 @@ export const useSelection = create<Selection>((set) => ({
   paths: new Set(),
   toggleFinding: (id) => set((s) => ({ findings: toggled(s.findings, id) })),
   togglePath: (p) => set((s) => ({ paths: toggled(s.paths, p) })),
+  setFindings: (ids, on) =>
+    set((s) => {
+      const next = new Set(s.findings);
+      for (const id of ids) on ? next.add(id) : next.delete(id);
+      return { findings: next };
+    }),
   clear: () => set({ findings: new Set(), paths: new Set() }),
 }));

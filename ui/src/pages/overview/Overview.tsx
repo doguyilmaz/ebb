@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CircleAlert, Lightbulb } from "lucide-react";
-import { useFindings, usePresets, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
+import { useFindings, useLatestDiff, usePresets, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
 import type { PresetView } from "#/api/types.gen.ts";
 import { bytes, percent } from "#/lib/format.ts";
 import { useSheet } from "#/lib/sheet.ts";
@@ -10,6 +10,8 @@ import { Loading, Problem } from "#/ui/states.tsx";
 import { Info } from "#/ui/Tip.tsx";
 import { AgeChart } from "./AgeChart.tsx";
 import { CategoryBars } from "./CategoryBars.tsx";
+import { Changes } from "./Changes.tsx";
+import { Kpis } from "./Kpis.tsx";
 import { VolumeBar } from "./VolumeBar.tsx";
 
 export default function Overview() {
@@ -17,6 +19,7 @@ export default function Overview() {
   const volume = useVolume();
   const findings = useFindings();
   const slice = useSlice(undefined, 1, 60);
+  const diff = useLatestDiff();
   if (volume.error) return <Problem error={volume.error} />;
   if (!volume.data || !status.data || !findings.data) return <Loading label="Reading the last scan…" />;
   const v = volume.data;
@@ -55,11 +58,15 @@ export default function Overview() {
         </div>
         <div className="hero-cta">
           <Link to="/findings" className="btn primary big">
-            Review {bytes(reclaimable)} you can clean <ArrowRight size={16} aria-hidden />
+            {reclaimable > 0 ? `Review ${bytes(reclaimable)} you can clean` : "See what ebb found"} <ArrowRight size={16} aria-hidden />
           </Link>
-          <span className="faint small-text">{actionable} findings, each with why it is large and what removing it costs</span>
+          <span className="faint small-text">
+            {actionable > 0 ? `${actionable} findings, each with why it is large and what removing it costs` : "Nothing stands out to clean right now"}
+          </span>
         </div>
       </section>
+
+      <Kpis volume={v} reclaimable={reclaimable} last={status.data.last} diff={diff.data} />
 
       <VolumeBar volume={v} apps={apps} reclaimable={reclaimable} />
 
@@ -70,7 +77,8 @@ export default function Overview() {
 
       <Presets />
 
-      {all.length > 0 && (
+      <div className="grid-2">
+        <Changes />
         <section className="card">
           <div className="card-head">
             <h2>Largest findings</h2>
@@ -79,20 +87,23 @@ export default function Overview() {
               All findings <ArrowRight size={13} aria-hidden />
             </Link>
           </div>
-          <ul className="toplist">
-            {all.slice(0, 6).map((f) => (
-              <li key={f.id}>
-                <Link to="/findings" hash={f.id} className="toprow">
-                  <span className="num size">{bytes(f.bytes)}</span>
-                  <span className="ellipsis">{f.title}</span>
-                  <Safety level={f.safety} />
-                  <span className="muted why">{f.why}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {all.length === 0 ? (
+            <p className="muted">Nothing stands out on this disk.</p>
+          ) : (
+            <ul className="toplist">
+              {all.slice(0, 6).map((f) => (
+                <li key={f.id}>
+                  <Link to="/findings" hash={f.id} className="toprow" data-tip={f.why}>
+                    <span className="num size">{bytes(f.bytes)}</span>
+                    <span className="ellipsis">{f.title}</span>
+                    <Safety level={f.safety} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
-      )}
+      </div>
 
       {notes.length > 0 && (
         <section className="stack">

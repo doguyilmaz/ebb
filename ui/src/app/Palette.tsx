@@ -71,7 +71,14 @@ export function Palette() {
 
   return (
     <>
-      <dialog ref={dialog} className="palette" onClose={() => setOpen(false)} aria-label="Command palette">
+      <dialog
+        ref={dialog}
+        className="palette"
+        onClose={() => setOpen(false)}
+        onCancel={(e) => (e.preventDefault(), setOpen(false))}
+        onClick={(e) => e.target === e.currentTarget && setOpen(false)}
+        aria-label="Command palette"
+      >
         <input
           autoFocus
           className="palette-input"
@@ -82,6 +89,7 @@ export function Palette() {
             if (e.key === "ArrowDown") (e.preventDefault(), setActive((a) => Math.min(commands.length - 1, a + 1)));
             if (e.key === "ArrowUp") (e.preventDefault(), setActive((a) => Math.max(0, a - 1)));
             if (e.key === "Enter") commands[active]?.run();
+            if (e.key === "Escape") (e.preventDefault(), setOpen(false));
           }}
           aria-activedescendant={commands[active] ? `cmd-${active}` : undefined}
         />

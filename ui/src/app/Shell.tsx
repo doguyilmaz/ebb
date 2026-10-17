@@ -23,20 +23,21 @@ export function Shell({ children }: { children: ReactNode }) {
   const wide = pathname.startsWith("/explore");
   const hasScan = !!useStatus().data?.last;
   const startTour = useTour((s) => s.start);
-  // The tour starts by itself once, as soon as there is a scan to show.
+  // The tour starts by itself once, on the overview, as soon as there is a scan to show; it never pulls
+  // someone away from the page they opened.
   useEffect(() => {
-    if (hasScan && !offered && !tourSeen()) {
+    if (hasScan && pathname === "/" && !offered && !tourSeen()) {
       offered = true;
       startTour();
     }
-  }, [hasScan, startTour]);
+  }, [hasScan, pathname, startTour]);
   return (
     <div className="shell">
       <aside className="side">
-        <div className="brand">
+        <Link to="/" className="brand" aria-label="ebb, go to the overview">
           <img src="/favicon.svg" width={26} height={26} alt="" />
           ebb
-        </div>
+        </Link>
         <nav className="stack" style={{ gap: 2 }} aria-label="Pages">
           {nav.map(({ to, label, icon: Icon }) => (
             <Link key={to} to={to} className="nav" activeOptions={{ exact: to === "/" }}>
@@ -98,14 +99,17 @@ function TopBar({ title }: { title: string }) {
     <header className="topbar">
       <span className="topbar-title">{title}</span>
       {running ? (
-        <span className="scan-pill" data-state="running" style={share !== null ? { ["--share" as string]: `${share * 100}%` } : undefined} role="status">
+        <span className="scan-pill" data-state="running" role="status" aria-label={live ? `Scanning, ${count(live.files)} files read` : "Scanning"}>
           <span className="pulse" aria-hidden />
-          <span className="num">
-            Scanning{live ? ` · ${count(live.files)} files` : "…"}
-            {share !== null && <span className="faint"> · about {Math.round(share * 100)}%</span>}
+          <span>Scanning</span>
+          <span className="pill-count num">{count(live?.files ?? 0)}</span>
+          <span className="faint">files</span>
+          <span className={`pill-track${share === null ? "" : " known"}`} aria-hidden>
+            <i style={share === null ? undefined : { transform: `scaleX(${share})` }} />
           </span>
+          <span className="pill-pct num faint">{share === null ? "" : `${Math.round(share * 100)}%`}</span>
           <button className="btn small ghost" disabled={stop.isPending} onClick={() => stop.mutate()} data-tip="Stops reading. Your last scan stays as it was.">
-            <Square size={11} aria-hidden fill="currentColor" /> Stop
+            <Square size={10} aria-hidden fill="currentColor" /> Stop
           </button>
         </span>
       ) : last ? (
