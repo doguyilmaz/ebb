@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ebb report</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2; --surface-1: #fcfcfb; --border: #e3e2dc;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #b9b7ae;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --border: #2e2e2b;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #55544f;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211; --surface-1: #1a1a19; --border: #2e2e2b;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #55544f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface-0); color: var(--text-primary); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 32px 0 12px; }
+.muted { color: var(--text-secondary); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--text-secondary); font-size: 12px; }
+#map { position: relative; height: 420px; padding: 0; overflow: hidden; }
+#map canvas { width: 100%; height: 100%; display: block; }
+#tip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; display: none; box-shadow: 0 4px 16px rgb(0 0 0 / .15); max-width: 320px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.finding { margin-bottom: 10px; }
+.finding header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.finding header b { font-size: 15px; }
+.size { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 80px; }
+.badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); }
+.badge.regenerable::before { content: "● "; color: var(--good); }
+.badge.caution::before { content: "▲ "; color: var(--warning); }
+.badge.user-data::before { content: "■ "; color: var(--serious); }
+.badge.system::before { content: "◆ "; color: var(--critical); }
+.finding p { margin: 6px 0 0; }
+.finding ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.notes li { margin-bottom: 6px; }
+@media (max-width: 600px) { #map { height: 300px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Where the space went</h1>
+  <div class="muted">{{.R.Meta.Root}} · scanned {{.R.Meta.Time.Format "2006-01-02 15:04"}} · {{.R.Meta.Files}} files · ebb {{.R.Version}}</div>
+
+  <div class="stats">
+    <div class="card stat"><b>{{bytes .R.Volume.Capacity}}</b><span>disk capacity</span></div>
+    <div class="card stat"><b>{{bytes .R.Volume.Used}}</b><span>used</span></div>
+    <div class="card stat"><b>{{bytes .R.Volume.Free}}</b><span>free</span></div>
+    <div class="card stat"><b>{{bytes .R.Reclaimable}}</b><span>reclaimable with ebb</span></div>
+    {{if .R.Volume.NotVisible}}<div class="card stat"><b>{{bytes .R.Volume.NotVisible}}</b><span>not visible to this scan</span></div>{{end}}
+  </div>
+
+  <h2>Breakdown</h2>
+  <div class="card" id="map"><canvas aria-label="Treemap of the largest folders"></canvas><div id="tip"></div></div>
+  <div class="legend" id="legend"></div>
+
+  <h2>Findings</h2>
+  {{range .R.Findings}}
+  <div class="card finding">
+    <header><span class="size">{{bytes .Bytes}}</span><b>{{.Title}}</b><span class="badge {{.Safety}}">{{.Safety}}</span>{{if .Owner}}<span class="muted">{{.Owner}}</span>{{end}}</header>
+    <p>{{.Why}}</p>
+    <p class="muted">{{.Impact}}</p>
+    {{if .Evidence}}<ul>{{range .Evidence}}<li>{{.}}</li>{{end}}</ul>{{end}}
+    <ul>{{range .Targets}}<li><code>{{.Path}}</code> — {{bytes .Bytes}}</li>{{end}}</ul>
+    {{range .Actions}}{{if .Hint}}<p class="muted">Run: <code>{{.Hint}}</code></p>{{end}}{{end}}
+  </div>
+  {{else}}<p class="muted">Nothing stands out.</p>{{end}}
+
+  <h2>Largest folders</h2>
+  <div class="card"><table>
+    <tr><th>Folder</th><th class="num">Size</th><th class="num">Share</th><th class="num">Files</th></tr>
+    {{range .R.Breakdown}}{{if .Depth}}<tr><td style="padding-left:{{indent .Depth}}px"><code>{{.Path}}</code>{{if ne .Path .Name}} <span class="muted">{{.Name}}</span>{{end}}</td><td class="num">{{bytes .Alloc}}</td><td class="num">{{pct .Share}}</td><td class="num">{{.Files}}</td></tr>{{end}}{{end}}
+  </table></div>
+
+  <h2>Largest files</h2>
+  <div class="card"><table>
+    <tr><th>File</th><th class="num">Size</th></tr>
+    {{range .R.TopFiles}}<tr><td><code>{{.Path}}</code></td><td class="num">{{bytes .Alloc}}</td></tr>{{end}}
+  </table></div>
+
+  {{if .R.Notes}}<h2>Notes</h2><ul class="notes">{{range .R.Notes}}<li>{{.}}</li>{{end}}</ul>{{end}}
+</main>
+<script type="application/json" id="ebb-data">{{.Data}}</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById("ebb-data").textContent);
+  const root = data.tree;
+  const box = document.getElementById("map"), canvas = box.querySelector("canvas"), tip = document.getElementById("tip");
+  if (!root || !root.children) { box.style.display = "none"; return; }
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const fmt = (n) => { const u = ["B", "kB", "MB", "GB", "TB"]; let i = 0; while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; } return (i ? n.toFixed(1).replace(/\.0$/, "") : n) + " " + u[i]; };
+  const tops = root.children.filter((c) => c.alloc > 0);
+  const slot = (i, node) => node.kind === 3 || i >= 8 ? "--other" : "--s" + (i + 1);
+
+  // Squarified treemap: lay rows along the shorter side, keeping aspect ratios near 1.
+  function squarify(items, x, y, w, h, out) {
+    const total = items.reduce((s, c) => s + c.alloc, 0);
+    if (!total || w <= 0 || h <= 0) return;
+    const scale = (w * h) / total;
+    let rest = items.slice(), rx = x, ry = y, rw = w, rh = h;
+    while (rest.length) {
+      const side = Math.min(rw, rh);
+      let row = [], best = Infinity;
+      for (const it of rest) {
+        const trial = row.concat(it), sum = trial.reduce((s, c) => s + c.alloc * scale, 0);
+        const worst = Math.max(...trial.map((c) => { const a = c.alloc * scale, l = sum / side; return Math.max(l * l / a, a / (l * l)); }));
+        if (worst > best) break;
+        best = worst; row = trial;
+      }
+      const sum = row.reduce((s, c) => s + c.alloc * scale, 0), thick = sum / side;
+      let off = 0;
+      for (const c of row) {
+        const len = (c.alloc * scale) / thick;
+        if (rw >= rh) out.push({ node: c, x: rx, y: ry + off, w: thick, h: len });
+        else out.push({ node: c, x: rx + off, y: ry, w: len, h: thick });
+        off += len;
+      }
+      if (rw >= rh) { rx += thick; rw -= thick; } else { ry += thick; rh -= thick; }
+      rest = rest.slice(row.length);
+    }
+  }
+
+  let shapes = [];
+  function draw() {
+    const dpr = window.devicePixelRatio || 1, W = box.clientWidth, H = box.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = css("--surface-1"); ctx.fillRect(0, 0, W, H);
+    const top = [];
+    squarify(tops, 0, 0, W, H, top);
+    shapes = [];
+    top.forEach((r, i) => {
+      const color = css(slot(tops.indexOf(r.node), r.node));
+      ctx.fillStyle = color; ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.roundRect(r.x + 1, r.y + 1, Math.max(0, r.w - 2), Math.max(0, r.h - 2), 4); ctx.fill();
+      shapes.push({ ...r, path: r.node.name, depth: 1 });
+      const kids = (r.node.children || []).filter((c) => c.alloc > 0);
+      if (kids.length && r.w > 60 && r.h > 50) {
+        const inner = [];
+        squarify(kids, r.x + 4, r.y + 22, r.w - 8, r.h - 26, inner);
+        for (const k of inner) {
+          ctx.globalAlpha = 0.35; ctx.fillStyle = css("--surface-1");
+          ctx.beginPath(); ctx.roundRect(k.x + 1, k.y + 1, Math.max(0, k.w - 2), Math.max(0, k.h - 2), 3); ctx.fill();
+          shapes.push({ ...k, path: r.node.name + "/" + k.node.name, depth: 2 });
+          if (k.w > 70 && k.h > 18) { ctx.globalAlpha = 1; ctx.fillStyle = css("--text-primary"); ctx.font = "11px -apple-system, sans-serif"; ctx.fillText(k.node.name.slice(0, Math.floor(k.w / 7)), k.x + 6, k.y + 14, k.w - 10); }
+        }
+      }
+      ctx.globalAlpha = 1;
+      if (r.w > 60 && r.h > 18) { ctx.fillStyle = "#fff"; ctx.font = "600 12px -apple-system, sans-serif"; ctx.fillText(r.node.name.slice(0, Math.floor(r.w / 7.5)), r.x + 8, r.y + 16, r.w - 14); }
+    });
+    const legend = document.getElementById("legend");
+    legend.textContent = "";
+    tops.slice(0, 9).forEach((n, i) => {
+      const s = document.createElement("span"), sw = document.createElement("i");
+      sw.style.background = css(slot(i, n)); s.append(sw, `${n.name} · ${fmt(n.alloc)}`); legend.append(s);
+    });
+  }
+  canvas.addEventListener("mousemove", (e) => {
+    const b = canvas.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    const hit = shapes.filter((s) => x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h).pop();
+    if (!hit) { tip.style.display = "none"; return; }
+    tip.textContent = `${hit.path} — ${fmt(hit.node.alloc)} · ${(100 * hit.node.alloc / root.alloc).toFixed(1)}% · ${hit.node.files} files`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(x + 14, b.width - tip.offsetWidth - 8) + "px";
+    tip.style.top = Math.min(y + 14, b.height - tip.offsetHeight - 8) + "px";
+  });
+  canvas.addEventListener("mouseleave", () => (tip.style.display = "none"));
+  addEventListener("resize", draw);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  draw();
+})();
+</script>
+</body>
+</html>
