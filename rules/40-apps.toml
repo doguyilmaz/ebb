@@ -1,0 +1,19 @@
+# Web caches of Electron and Chromium apps (VS Code, Slack, Chrome, Discord, …).
+
+[[rule]]
+id = "app.webcaches"
+title = "App web caches"
+category = "app-cache"
+paths = [
+  "~/Library/Application Support/*/Cache",
+  "~/Library/Application Support/*/CachedData",
+  "~/Library/Application Support/*/Code Cache",
+  "~/Library/Application Support/*/GPUCache",
+  "~/Library/Application Support/*/Service Worker/CacheStorage",
+  "~/Library/Application Support/Google/Chrome/*/Cache",
+  "~/Library/Application Support/Google/Chrome/*/Service Worker/CacheStorage",
+]
+safety = "regenerable"
+why = "Electron and Chromium apps cache web content, compiled scripts and GPU shaders, and rarely trim them."
+impact = "Apps load a little slower until their caches warm up again. Quit the app first for the cleanest result."
+action = { kind = "delete" }

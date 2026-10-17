@@ -1,0 +1,44 @@
+[[rule]]
+id = "logs.user"
+title = "Logs and crash reports"
+category = "logs"
+paths = ["~/Library/Logs/*"]
+safety = "regenerable"
+why = "Apps and simulators write logs and crash reports here; macOS does not rotate most of them."
+impact = "Old logs and crash reports are gone; apps start new ones."
+min_size = "50MB"
+min_target = "1MB"
+action = { kind = "delete" }
+
+[[rule]]
+id = "trash"
+title = "Trash"
+category = "trash"
+paths = ["~/.Trash"]
+safety = "caution"
+why = "Items moved to the Trash still use disk space until it is emptied."
+impact = "Everything in the Trash is deleted permanently."
+min_size = "10MB"
+action = { kind = "empty-trash" }
+
+[[rule]]
+id = "installers"
+title = "Installers and disk images"
+category = "installer"
+paths = ["~/Downloads/**/*.{dmg,pkg,xip,iso}"]
+safety = "caution"
+why = "Installers stay in Downloads after the app is installed."
+impact = "You would need to download an installer again to reinstall."
+min_size = "50MB"
+min_target = "5MB"
+action = { kind = "trash" }
+
+[[rule]]
+id = "dotcache"
+title = "Tool caches in ~/.cache"
+category = "app-cache"
+paths = ["~/.cache/*"]
+safety = "caution"
+why = "Command-line tools (Hugging Face models, pre-commit, Playwright and others) download data here."
+impact = "Tools download it again when needed, which can be large (machine learning models)."
+action = { kind = "trash" }

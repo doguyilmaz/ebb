@@ -1,0 +1,46 @@
+# The person's own data: reported so the space is explained, never offered for deletion.
+
+[[rule]]
+id = "userdata.iosbackups"
+title = "iPhone and iPad backups"
+category = "user-data"
+paths = ["~/Library/Application Support/MobileSync/Backup"]
+safety = "user-data"
+why = "Finder keeps a full local backup of each device you back up to this Mac."
+impact = "Manage them in Finder → your device → Manage Backups; deleting one loses that backup."
+
+[[rule]]
+id = "userdata.photos"
+title = "Photos libraries"
+category = "user-data"
+paths = ["~/Pictures/*.photoslibrary"]
+safety = "user-data"
+why = "Photos keeps originals here unless Optimize Mac Storage is on."
+impact = "Turn on Photos → Settings → iCloud → Optimize Mac Storage to keep only smaller versions locally."
+
+[[rule]]
+id = "userdata.messages"
+title = "Messages attachments"
+category = "user-data"
+paths = ["~/Library/Messages/Attachments"]
+safety = "user-data"
+why = "Every photo, video and file received in Messages is stored here."
+impact = "Review large attachments in Messages → Settings → General → Keep Messages, or System Settings → General → Storage."
+
+[[rule]]
+id = "userdata.mail"
+title = "Mail data"
+category = "user-data"
+paths = ["~/Library/Mail"]
+safety = "user-data"
+why = "Mail keeps local copies of messages and attachments for every account."
+impact = "Remove accounts you no longer use in Mail, or let Mail download attachments only on demand."
+
+[[rule]]
+id = "userdata.icloud"
+title = "iCloud Drive (downloaded files)"
+category = "user-data"
+paths = ["~/Library/Mobile Documents"]
+safety = "user-data"
+why = "Files from iCloud Drive that are downloaded to this Mac use local space."
+impact = "Right-click → Remove Download keeps them in iCloud but frees the space. Deleting removes them from every device."

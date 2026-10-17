@@ -1,0 +1,12 @@
+# Catch-all for app caches; specific rules in earlier files claim their folders first.
+
+[[rule]]
+id = "app.caches"
+title = "App caches"
+category = "app-cache"
+paths = ["~/Library/Caches/*"]
+safety = "regenerable"
+why = "Apps keep downloaded and computed data in ~/Library/Caches; macOS only trims it under severe pressure."
+impact = "Apps rebuild their caches as needed and may be slower the first time."
+min_target = "50MB"
+action = { kind = "delete" }

@@ -1,0 +1,35 @@
+[[preset]]
+id = "dev-caches"
+title = "Developer caches"
+categories = ["package-cache", "build-artifact"]
+max_safety = "regenerable"
+
+[[preset]]
+id = "simulators"
+title = "Unused simulators and old runtimes"
+categories = ["simulator"]
+max_safety = "caution"
+
+[[preset]]
+id = "stale-projects"
+title = "Build folders of untouched projects"
+categories = ["stale-project"]
+max_safety = "regenerable"
+
+[[preset]]
+id = "logs"
+title = "Logs and crash reports"
+categories = ["logs"]
+max_safety = "regenerable"
+
+[[preset]]
+id = "installers"
+title = "Installers in Downloads"
+categories = ["installer"]
+max_safety = "caution"
+
+[[preset]]
+id = "all-regenerable"
+title = "Everything tools can rebuild"
+categories = ["package-cache", "build-artifact", "sdk", "app-cache", "logs", "simulator", "stale-project"]
+max_safety = "regenerable"

@@ -1,0 +1,35 @@
+# Xcode and simulator data that Xcode recreates.
+
+[[rule]]
+id = "xcode.previews"
+title = "SwiftUI preview data"
+owner = "Xcode"
+category = "build-artifact"
+paths = ["~/Library/Developer/Xcode/UserData/Previews"]
+safety = "regenerable"
+why = "Every SwiftUI preview builds a separate simulator environment that stays behind."
+impact = "Previews rebuild the first time you open them again."
+action = { kind = "delete", quit = ["Xcode"] }
+
+[[rule]]
+id = "coresimulator.caches"
+title = "Simulator caches"
+owner = "Xcode"
+category = "build-artifact"
+paths = ["~/Library/Developer/CoreSimulator/Caches"]
+safety = "regenerable"
+why = "The simulator caches dyld shared caches per runtime, including runtimes you no longer use."
+impact = "The next simulator boot rebuilds its cache and takes a little longer."
+action = { kind = "delete", quit = ["Simulator"] }
+
+[[rule]]
+id = "xcode.devicesupport"
+title = "Device support files"
+owner = "Xcode"
+category = "build-artifact"
+paths = ["~/Library/Developer/Xcode/*DeviceSupport/*"]
+safety = "regenerable"
+why = "Xcode copies debug symbols from every iOS, watchOS and tvOS version of every device you ever connected."
+impact = "Xcode copies the symbols again when a device with that OS version connects."
+min_target = "1MB"
+action = { kind = "delete", quit = ["Xcode"] }

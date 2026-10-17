@@ -1,0 +1,145 @@
+# Package manager and toolchain caches. Every one is rebuilt or re-downloaded on demand.
+
+[[rule]]
+id = "bun.cache"
+title = "Bun install cache"
+owner = "Bun"
+category = "package-cache"
+paths = ["~/.bun/install/cache"]
+safety = "regenerable"
+why = "Bun keeps every version of every package it has ever installed and never evicts old ones."
+impact = "The next install downloads the packages it needs again. Existing node_modules folders keep working."
+min_size = "500MB"
+action = { kind = "command", argv = ["bun", "pm", "cache", "rm"], requires = "bun", fallback = "delete" }
+
+[[rule]]
+id = "npm.cache"
+title = "npm cache"
+owner = "npm"
+category = "package-cache"
+paths = ["~/.npm/_cacache"]
+safety = "regenerable"
+why = "npm stores a content-addressed copy of every tarball it has fetched; it only grows."
+impact = "npm re-downloads packages on the next install. Installed projects are not affected."
+action = { kind = "command", argv = ["npm", "cache", "clean", "--force"], requires = "npm", fallback = "delete" }
+
+[[rule]]
+id = "npm.npx"
+title = "npx downloads"
+owner = "npm"
+category = "package-cache"
+paths = ["~/.npm/_npx"]
+safety = "regenerable"
+why = "Each package run with npx is installed into its own folder here and left behind."
+impact = "The next npx run of a tool downloads it again."
+action = { kind = "delete" }
+
+[[rule]]
+id = "pnpm.store"
+title = "pnpm store"
+owner = "pnpm"
+category = "package-cache"
+paths = ["~/Library/pnpm/store"]
+safety = "regenerable"
+why = "pnpm keeps one copy of every package version any project used, including projects you deleted."
+impact = "Pruning removes versions no project references; deleting it makes the next install re-download."
+action = { kind = "command", argv = ["pnpm", "store", "prune"], requires = "pnpm", fallback = "delete" }
+
+[[rule]]
+id = "yarn.cache"
+title = "Yarn cache"
+owner = "Yarn"
+category = "package-cache"
+paths = ["~/Library/Caches/Yarn"]
+safety = "regenerable"
+why = "Yarn caches every package archive it downloads, across all versions."
+impact = "Yarn downloads packages again on the next install."
+action = { kind = "command", argv = ["yarn", "cache", "clean"], requires = "yarn", fallback = "delete" }
+
+[[rule]]
+id = "gradle.caches"
+title = "Gradle caches"
+owner = "Gradle"
+category = "package-cache"
+paths = ["~/.gradle/caches"]
+safety = "regenerable"
+why = "Gradle keeps downloaded dependencies, transformed artifacts and build caches for every version it has used."
+impact = "The next Android or JVM build downloads and rebuilds what it needs, which takes longer once. Stop Gradle daemons first (./gradlew --stop)."
+action = { kind = "delete" }
+
+[[rule]]
+id = "gradle.wrapper"
+title = "Gradle wrapper distributions"
+owner = "Gradle"
+category = "package-cache"
+paths = ["~/.gradle/wrapper/dists"]
+safety = "regenerable"
+why = "Every Gradle version a project's wrapper asked for is downloaded here (100–200 MB each) and kept."
+impact = "Projects download their Gradle version again on the next build."
+action = { kind = "delete" }
+
+[[rule]]
+id = "go.build"
+title = "Go build cache"
+owner = "Go"
+category = "build-artifact"
+paths = ["~/Library/Caches/go-build"]
+safety = "regenerable"
+why = "Go caches compiled packages and test results for every build configuration."
+impact = "The next builds and tests recompile from source once."
+action = { kind = "command", argv = ["go", "clean", "-cache"], requires = "go", fallback = "delete" }
+
+[[rule]]
+id = "go.modcache"
+title = "Go module cache"
+owner = "Go"
+category = "package-cache"
+paths = ["~/go/pkg/mod"]
+safety = "caution"
+why = "Every module version any Go project downloaded is kept here, read-only."
+impact = "Builds re-download modules; offline builds stop working until they do."
+action = { kind = "command", argv = ["go", "clean", "-modcache"], requires = "go", fallback = "delete" }
+
+[[rule]]
+id = "cargo.registry"
+title = "Cargo registry cache"
+owner = "Rust"
+category = "package-cache"
+paths = ["~/.cargo/registry"]
+safety = "regenerable"
+why = "Cargo keeps the index and the source of every crate version it has fetched."
+impact = "Cargo downloads crates again on the next build."
+action = { kind = "delete" }
+
+[[rule]]
+id = "pip.cache"
+title = "pip cache"
+owner = "Python"
+category = "package-cache"
+paths = ["~/Library/Caches/pip"]
+safety = "regenerable"
+why = "pip keeps downloaded wheels and built packages."
+impact = "pip downloads or builds packages again on the next install."
+action = { kind = "command", argv = ["pip3", "cache", "purge"], requires = "pip3", fallback = "delete" }
+
+[[rule]]
+id = "cocoapods.cache"
+title = "CocoaPods cache"
+owner = "CocoaPods"
+category = "package-cache"
+paths = ["~/Library/Caches/CocoaPods"]
+safety = "regenerable"
+why = "CocoaPods keeps every pod version it has downloaded."
+impact = "The next pod install downloads pods again."
+action = { kind = "command", argv = ["pod", "cache", "clean", "--all"], requires = "pod", fallback = "delete" }
+
+[[rule]]
+id = "homebrew.cache"
+title = "Homebrew downloads"
+owner = "Homebrew"
+category = "package-cache"
+paths = ["~/Library/Caches/Homebrew"]
+safety = "regenerable"
+why = "Homebrew keeps downloaded bottles and source archives of installed and upgraded formulae."
+impact = "Reinstalling an old version downloads it again."
+action = { kind = "command", argv = ["brew", "cleanup", "--prune=all"], requires = "brew", fallback = "delete" }

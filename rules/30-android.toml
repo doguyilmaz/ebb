@@ -1,0 +1,22 @@
+[[rule]]
+id = "android.snapshots"
+title = "Emulator quick-boot snapshots"
+owner = "Android Studio"
+category = "sdk"
+paths = ["~/.android/avd/*.avd/snapshots"]
+safety = "regenerable"
+why = "Each emulator saves a full memory and disk snapshot so it can boot quickly."
+impact = "The emulator cold-boots once and saves a new snapshot."
+min_target = "1MB"
+action = { kind = "delete", quit = ["qemu-system-aarch64", "qemu-system-x86_64"] }
+
+[[rule]]
+id = "android.cache"
+title = "Android tools cache"
+owner = "Android Studio"
+category = "package-cache"
+paths = ["~/.android/cache"]
+safety = "regenerable"
+why = "Android tools cache downloaded SDK metadata and build artifacts here."
+impact = "The tools download what they need again."
+action = { kind = "delete" }
