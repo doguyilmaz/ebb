@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { SliceNode } from "#/api/types.gen.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { easeInOut, easeOut, reducedMotion } from "#/lib/motion.ts";
-import { readPalette, type Palette } from "./colors.ts";
-import { drawArcLabels, drawArcs, drawCenter, drawRectLabels, drawRects, type Emphasis } from "./draw.ts";
+import { useSchemeVersion } from "#/lib/theme.ts";
+import { readPalette, type ColorMode, type Palette } from "./colors.ts";
+import { colorer, drawArcLabels, drawArcs, drawCenter, drawIcicleLabels, drawRects, drawTreemapLabels, type Emphasis } from "./draw.ts";
 import {
   arcZoom,
   CENTER,
@@ -35,6 +36,10 @@ interface Props {
   /** Name of the folder above, when the middle can go back up. */
   upLabel?: string;
   disk?: number;
+  color: ColorMode;
+  /** Scan time and age bucket bounds in days, for colouring by age. */
+  now: number;
+  cuts: number[];
   hoverKey: string | null;
   stale: boolean;
   onHover: (s: Shape | null) => void;
@@ -70,24 +75,14 @@ export function Chart(props: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [tip, setTip] = useState<Shape | null>(null);
   const [center, setCenter] = useState(false);
-  const [scheme, setScheme] = useState(0);
+  const scheme = useSchemeVersion();
   const cb = useRef(props);
   cb.current = props;
 
   useEffect(() => {
-    const el = wrap.current!;
     const ro = new ResizeObserver(([e]) => setSize({ w: Math.floor(e.contentRect.width), h: Math.floor(e.contentRect.height) }));
-    ro.observe(el);
-    const mq = matchMedia("(prefers-color-scheme: dark)");
-    const bump = () => setScheme((n) => n + 1);
-    mq.addEventListener("change", bump);
-    const mo = new MutationObserver(bump);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => {
-      ro.disconnect();
-      mq.removeEventListener("change", bump);
-      mo.disconnect();
-    };
+    ro.observe(wrap.current!);
+    return () => ro.disconnect();
   }, []);
 
   const radius = Math.max(10, Math.min(size.w, size.h) / 2 - 10);
@@ -139,14 +134,16 @@ export function Chart(props: Props) {
     const em = moving ? { keys: null, hover: null } : emphasis();
     const cx = size.w / 2;
     const cy = size.h / 2;
+    const color = colorer(p, props.color, view, props.now, props.cuts);
     const arcs = frames.filter((f) => isArc(f.shape)) as Frame<Arc>[];
     const rects = frames.filter((f) => !isArc(f.shape)) as Frame<Rect>[];
-    if (rects.length) drawRects(ctx, rects, p, em, s.view === "treemap" || view === "treemap", size.w, size.h);
-    if (arcs.length) drawArcs(ctx, arcs, cx, cy, p, em);
+    if (rects.length) drawRects(ctx, rects, p, em, color, size.w, size.h, view === "icicle" ? 1 : 0);
+    if (arcs.length) drawArcs(ctx, arcs, cx, cy, p, em, color);
     const labels = moving ? 0 : Math.min(1, (now - s.rest) / LABEL_FADE);
     if (labels > 0) {
-      if (view === "sunburst") drawArcLabels(ctx, s.shown as Arc[], cx, cy, p, em, labels);
-      else drawRectLabels(ctx, s.shown as Rect[], p, em, view === "treemap", labels);
+      if (view === "sunburst") drawArcLabels(ctx, s.shown as Arc[], cx, cy, em, color, labels);
+      else if (view === "treemap") drawTreemapLabels(ctx, s.shown as Rect[], em, color, labels);
+      else drawIcicleLabels(ctx, s.shown as Rect[], em, color, labels);
     }
     if (view === "sunburst") {
       const n = root[metric];
@@ -223,7 +220,7 @@ export function Chart(props: Props) {
     kick();
   }, [target]);
 
-  useEffect(kick, [hoverKey, center, props.upLabel]);
+  useEffect(kick, [hoverKey, center, props.upLabel, props.color, props.now, props.cuts]);
   useEffect(() => () => cancelAnimationFrame(st.current.raf), []);
 
   const locate = (e: React.PointerEvent | React.MouseEvent): Any | "center" | null => {
@@ -289,6 +286,7 @@ export function Chart(props: Props) {
           <>
             <strong className="num">{bytes(tip.node[metric])}</strong>
             <span className="ellipsis">{tip.node.other ? `${tip.node.other} smaller items` : tip.node.name}</span>
+            {tip.depth > 1 && <span className="faint ellipsis chart-tip-trail">{trail(tip.key, base)}</span>}
             <span className="faint num">
               {percent(tip.node[metric] / total)} of this folder
               {props.disk ? ` · ${percent(tip.node[metric] / props.disk)} of the disk` : ""}
@@ -300,6 +298,12 @@ export function Chart(props: Props) {
       </div>
     </div>
   );
+}
+
+/** Where a shape sits below the folder on screen, as "a › b › c". */
+function trail(key: string, base: string): string {
+  const rel = key.slice(base.length).replace(/^\//, "").split("\u0000")[0];
+  return rel.split("/").slice(0, -1).join(" › ") || "";
 }
 
 function shrink(r: Rect): Rect {

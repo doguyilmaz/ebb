@@ -11,10 +11,11 @@ const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({ c
 export const exploreRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/explore",
-  validateSearch: (s: Record<string, unknown>): { path?: string; view: View; unique?: boolean } => ({
+  validateSearch: (s: Record<string, unknown>): { path?: string; view: View; unique?: boolean; color?: "age" } => ({
     path: typeof s.path === "string" ? s.path : undefined,
     view: views.includes(s.view as View) ? (s.view as View) : "sunburst",
     unique: s.unique === true || s.unique === "true" ? true : undefined,
+    color: s.color === "age" ? "age" : undefined,
   }),
   component: lazyRouteComponent(() => import("./pages/explore/Explore.tsx")),
 });

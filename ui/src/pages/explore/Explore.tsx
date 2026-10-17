@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ChartPie, LayoutGrid, List, Rows3 } from "lucide-react";
-import { useState } from "react";
-import { sliceQuery, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
+import { useMemo, useState } from "react";
+import { sliceQuery, useAges, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
+import { ageColor } from "#/lib/ages.ts";
 import { baseName } from "#/lib/format.ts";
 import { exploreRoute, type View } from "#/router.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
@@ -20,19 +21,22 @@ const views: { id: View; label: string; icon: typeof ChartPie; hint: string }[] 
   { id: "list", label: "List", icon: List, hint: "" },
 ];
 
-const depthFor = (v: View) => (v === "treemap" ? 3 : 5);
-const budgetFor = (v: View) => (v === "treemap" ? 2500 : 3500);
+const depthFor = (v: View) => (v === "sunburst" ? 5 : 6);
+const budgetFor = (v: View) => (v === "treemap" ? 6000 : v === "icicle" ? 4000 : 3500);
 
 export default function Explore() {
-  const { path, view, unique } = exploreRoute.useSearch();
+  const { path, view, unique, color } = exploreRoute.useSearch();
   const navigate = useNavigate({ from: "/explore" });
   const qc = useQueryClient();
   const status = useStatus();
   const volume = useVolume();
   const slice = useSlice(path, depthFor(view), budgetFor(view));
+  const ages = useAges(slice.data?.path);
+  const buckets = ages.data?.buckets;
+  const cuts = useMemo(() => (buckets ?? []).filter((b) => b.days > 0).map((b) => b.days), [buckets]);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [picked, setPicked] = useState<Focus | null>(null);
-  const go = (next: { path?: string; view?: View; unique?: boolean }) =>
+  const go = (next: { path?: string; view?: View; unique?: boolean; color?: "age" }) =>
     navigate({ search: (s) => ({ ...s, ...next }), replace: next.path === undefined && next.view !== undefined });
   const open = (p: string | undefined) => {
     setPicked(null);
@@ -63,6 +67,14 @@ export default function Explore() {
           </div>
           <Info term={unique ? "unique" : "allocated"} />
         </div>
+        {view !== "list" && (
+          <div className="row" style={{ gap: 4 }}>
+            <div className="seg" role="group" aria-label="Colour">
+              <button aria-pressed={!color} onClick={() => go({ color: undefined })} data-term="color.folder">Folders</button>
+              <button aria-pressed={color === "age"} onClick={() => go({ color: "age" })} data-term="color.age">Age</button>
+            </div>
+          </div>
+        )}
         <div className="row" style={{ gap: 4 }} data-tour="views">
           <div className="seg" role="group" aria-label="View">
             {views.map(({ id, label, icon: Icon }) => (
@@ -86,6 +98,9 @@ export default function Explore() {
               metric={metric}
               upLabel={atTop ? undefined : baseName(parent) || parent}
               disk={volume.data?.capacity}
+              color={color ?? "folder"}
+              now={status.data?.last ? Math.floor(new Date(status.data.last.time).getTime() / 1000) : Math.floor(Date.now() / 1000)}
+              cuts={cuts}
               hoverKey={hoverKey}
               stale={slice.isPlaceholderData}
               onHover={(s) => setHoverKey(s?.key ?? null)}
@@ -94,10 +109,19 @@ export default function Explore() {
               onUp={up}
               onPrefetch={prefetch}
             />
-            <p className="chart-hint faint">
+            <div className="chart-hint faint">
               {current.hint}
               <Info term={`view.${view}` as "view.sunburst"} />
-            </p>
+              {color === "age" && buckets && (
+                <span className="age-key" aria-label="Colour key">
+                  Changed
+                  {buckets.map((b, i) => (
+                    <i key={b.label} style={{ background: ageColor(i, buckets.length) }} data-tip={b.label} />
+                  ))}
+                  long ago
+                </span>
+              )}
+            </div>
           </div>
         )}
         <SidePanel

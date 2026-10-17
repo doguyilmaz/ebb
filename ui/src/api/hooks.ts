@@ -83,6 +83,14 @@ export function useStartScan() {
   });
 }
 
+export function useStopScan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.del<ScanState>("/scans/current"),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["status"] }),
+  });
+}
+
 export const useMakePlan = () => useMutation({ mutationFn: (req: PlanRequest) => api.post<Plan>("/plans", req) });
 
 export function useRunPlan() {

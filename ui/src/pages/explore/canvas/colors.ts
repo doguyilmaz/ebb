@@ -8,6 +8,7 @@ export interface Palette {
   text2: string;
   text3: string;
   accent: string;
+  accentRGB: RGB;
 }
 
 export type RGB = [number, number, number];
@@ -24,6 +25,7 @@ export function readPalette(): Palette {
     text2: v("--text-2"),
     text3: v("--text-3"),
     accent: v("--accent"),
+    accentRGB: rgb(v("--accent")),
   };
 }
 
@@ -40,10 +42,29 @@ export function mix(a: RGB, b: RGB, t: number): RGB {
   return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
 }
 
-/** Colour follows the top-level item (fixed slot order), never the rank of a deeper one. */
-export function fill(p: Palette, top: number, depth: number, kind: number, other?: number): RGB {
+/**
+ * Hue follows the coloured ancestor (fixed slot order), never a rank. Deeper
+ * levels fade toward the surface and smaller siblings a little more, so
+ * neighbours stay apart without new hues.
+ */
+export function fill(p: Palette, top: number, tone: number, kind: number, other = 0, rank = 0): RGB {
   const base = kind >= 3 || other || top < 0 || top >= p.slots.length ? p.other : p.slots[top];
-  return mix(base, p.surface, Math.min(0.6, (depth - 1) * 0.16));
+  return mix(base, p.surface, Math.min(0.66, (tone - 1) * 0.15 + rank * 0.2));
+}
+
+const BLACK: RGB = [0, 0, 0];
+/** A folder's frame: its own colour, darker, so the boxes inside read as one group. */
+export const frame = (c: RGB): RGB => mix(c, BLACK, 0.24);
+
+export type ColorMode = "folder" | "age";
+
+/** One hue from the surface to the accent: older data is darker. cuts are bucket bounds in days, ascending. */
+export function ageFill(p: Palette, modified: number | undefined, now: number, cuts: number[]): RGB {
+  if (!modified) return p.other;
+  const days = (now - modified) / 86400;
+  let i = 0;
+  while (i < cuts.length && days >= cuts[i]) i++;
+  return mix(p.surface, p.accentRGB, 0.22 + (0.78 * i) / Math.max(1, cuts.length));
 }
 
 const lum = ([r, g, b]: RGB) => {

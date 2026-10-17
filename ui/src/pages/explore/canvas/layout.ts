@@ -16,6 +16,8 @@ export interface Shape {
   top: number;
   /** 1 at the coloured level, growing with depth so deeper shapes fade. */
   tone: number;
+  /** Position among its siblings by size, 0 for the biggest to 1 for the smallest. */
+  rank: number;
 }
 export interface Arc extends Shape {
   a0: number;
@@ -33,7 +35,11 @@ export interface Rect extends Shape {
 /** Fraction of the radius the centre (current folder) takes. */
 export const CENTER = 0.24;
 /** Height of a treemap folder's name band. */
-export const HEADER = 18;
+export const HEADER = 17;
+
+const framedBox = (depth: number, folder: boolean, w: number, h: number) => depth >= 1 && folder && w > 40 && h > HEADER + 14;
+/** A treemap folder big enough for a frame and a name band; smaller ones spend their area on their contents. */
+export const isFramed = (r: Rect) => framedBox(r.depth, !!r.node.children?.length, r.x1 - r.x0, r.y1 - r.y0);
 
 const navigable = (n: SliceNode) => (n.kind === 0 || n.kind === 1 || n.kind === 2) && !n.other;
 const join = (base: string, name: string) => (base.endsWith("/") ? base + name : `${base}/${name}`);
@@ -82,7 +88,9 @@ function shapes<S extends Shape>(h: HierarchyNode<SliceNode>, base: string, metr
       top = (c.parent!.data.children ?? []).indexOf(c.data);
       tone = d.depth - level + 1;
     }
-    return { node: d.data, path, key, parent: up === h ? -1 : index.get(up)!, depth: d.depth, top, tone, ...geometry(d) } as S;
+    const sib = up.children!;
+    const rank = sib.length > 1 ? sib.indexOf(d) / (sib.length - 1) : 0;
+    return { node: d.data, path, key, parent: up === h ? -1 : index.get(up)!, depth: d.depth, top, tone, rank, ...geometry(d) } as S;
   });
 }
 
@@ -100,12 +108,16 @@ export function sunburst(root: SliceNode, radius: number, metric: Metric, base =
 
 export function treemap(root: SliceNode, w: number, h: number, metric: Metric, base = root.name): Rect[] {
   const hr = build(root, metric).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  const framed = (d: HierarchyNode<SliceNode>) => {
+    const r = d as unknown as { x0: number; y0: number; x1: number; y1: number };
+    return framedBox(d.depth, !!d.children, r.x1 - r.x0, r.y1 - r.y0);
+  };
   d3treemap<SliceNode>()
-    .tile(treemapSquarify.ratio(1.2))
+    .tile(treemapSquarify.ratio(1.15))
     .size([w, h])
-    .paddingInner(2)
-    .paddingOuter((d) => (d.depth >= 1 ? 2 : 0))
-    .paddingTop((d) => (d.depth >= 1 && d.children ? HEADER : 0))
+    .paddingInner((d) => (d.depth === 0 ? 3 : 1))
+    .paddingOuter((d) => (framed(d) ? 2 : 0))
+    .paddingTop((d) => (framed(d) ? HEADER : 0))
     .round(true)(hr);
   return shapes<Rect>(hr, base, metric, (d) => {
     const r = d as unknown as { x0: number; y0: number; x1: number; y1: number };
@@ -115,8 +127,8 @@ export function treemap(root: SliceNode, w: number, h: number, metric: Metric, b
 
 /** Columns by depth, left to right; each column splits its parent's height. */
 export function icicle(root: SliceNode, w: number, h: number, metric: Metric, base = root.name): Rect[] {
-  const hr = build(root, metric);
-  partition<SliceNode>().size([h, 1])(hr);
+  const hr = build(root, metric).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  partition<SliceNode>().size([h, 1]).padding(0)(hr);
   const col = w / Math.max(1, hr.height);
   return shapes<Rect>(hr, base, metric, (d) => {
     const p = d as unknown as { x0: number; x1: number };
@@ -138,7 +150,7 @@ export function arcZoom(f: Arc, rc: number): (s: Arc) => Arc {
 
 /** Where a treemap rect goes when the chart zooms into f: f's contents fill the canvas. */
 export function treemapZoom(f: Rect, w: number, h: number): (s: Rect) => Rect {
-  const top = f.y0 + (f.node.children?.length ? HEADER : 0);
+  const top = f.y0 + (isFramed(f) ? HEADER : 0);
   const sx = w / Math.max(1, f.x1 - f.x0);
   const sy = h / Math.max(1, f.y1 - top);
   return (s) => ({ ...s, x0: (s.x0 - f.x0) * sx, x1: (s.x1 - f.x0) * sx, y0: (s.y0 - top) * sy, y1: (s.y1 - top) * sy });

@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, MessageSquareText, RefreshCw, ScanSearch, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { listen } from "#/api/events.ts";
-import { apiPort, connect, isRemote, onAuthRejected, pair, setApiPort, token } from "#/api/client.ts";
+import { apiPort, connect, isRemote, onAuthRejected, pair, setApiPort, token, wasEmbedded } from "#/api/client.ts";
 import { detectOS, isSafari } from "#/lib/os.ts";
 import { Command } from "#/ui/Command.tsx";
 
@@ -17,7 +17,6 @@ type State =
 const RETRY_MS = 2500;
 const RELEASES = "https://github.com/doguyilmaz/ebb/releases/latest";
 const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
-const loopback = () => ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
 
 /**
  * Finds ebb on this Mac and holds the app back until it may talk to it. Every
@@ -72,9 +71,13 @@ export function Connect({ children }: { children: ReactNode }) {
     await attempt();
     setBusy(false);
   };
-  const local = loopback();
   const where = `127.0.0.1:${port}`;
-  const footer = <Footer port={local ? null : port} setPort={setPort} onRetry={retry} busy={busy} />;
+  const serve = port === 47340 ? "ebb serve" : `ebb serve --port ${port}`;
+  const pickPort = (p: number) => {
+    setPort(p);
+    if (p > 0 && p < 65536) setApiPort(p);
+  };
+  const footer = <Footer port={port} setPort={pickPort} onRetry={retry} busy={busy} />;
 
   switch (state.kind) {
     case "connecting":
@@ -114,17 +117,17 @@ export function Connect({ children }: { children: ReactNode }) {
         </Gate>
       );
     default:
-      if (local)
+      if (wasEmbedded())
         return (
-          <Gate title="ebb stopped" sub="This window belongs to ebb on this Mac, and ebb is not running right now. Start it again; this page reconnects by itself.">
-            <Command value="ebb serve" />
-            <Waiting where={location.host} text="Reconnects on its own" />
+          <Gate title="ebb stopped" sub="This window was talking to ebb on this Mac, and ebb is not running right now. Start it again; this page reconnects by itself.">
+            <Command value={serve} />
+            <Waiting where={where} text="Reconnects on its own" />
             {footer}
           </Gate>
         );
       return detectOS() === "mac" ? (
         <Gate title="Start ebb on this Mac" sub="This page works with ebb running on your own Mac. Your files and what ebb finds about them never leave it." intro>
-          <InstallGuide />
+          <InstallGuide serve={serve} />
           <Waiting where={where} text="Connects on its own" />
           {footer}
         </Gate>
@@ -134,7 +137,7 @@ export function Connect({ children }: { children: ReactNode }) {
   }
 }
 
-function InstallGuide() {
+function InstallGuide({ serve }: { serve: string }) {
   return (
     <>
       <ol className="steps">
@@ -148,8 +151,8 @@ function InstallGuide() {
           </p>
         </Step>
         <Step n={2} title="Start it">
-          <Command value="ebb serve --open" />
-          <p className="faint small-text">It runs in that Terminal window. Until you approve a cleanup, ebb only reads.</p>
+          <Command value={serve} />
+          <p className="faint small-text">It runs in that Terminal window and this page connects to it. Until you approve a cleanup, ebb only reads.</p>
         </Step>
         <Step n={3} title="Let it see everything" optional>
           <p className="muted small-text">
@@ -235,8 +238,8 @@ function Gate({ title, sub, intro, children }: { title: string; sub?: string; in
   );
 }
 
-/** Check now, and for a hosted page the port ebb listens on (ebb serve --port) and its own window. */
-function Footer({ port, setPort, onRetry, busy }: { port: number | null; setPort: (p: number) => void; onRetry: () => void; busy: boolean }) {
+/** Check now, the port ebb listens on (ebb serve --port), and ebb's own window. */
+function Footer({ port, setPort, onRetry, busy }: { port: number; setPort: (p: number) => void; onRetry: () => void; busy: boolean }) {
   return (
     <div className="gate-foot">
       <button className="btn small" onClick={onRetry} disabled={busy}>
@@ -244,17 +247,13 @@ function Footer({ port, setPort, onRetry, busy }: { port: number | null; setPort
       </button>
       <span className="faint small-text">Checks every few seconds</span>
       <span className="grow" />
-      {port !== null && (
-        <>
-          <label className="faint small-text" htmlFor="port" data-tip="The port ebb listens on. Change it if you started ebb with --port.">
-            Port
-          </label>
-          <input id="port" className="input mono" type="number" value={port} onChange={(e) => setPort(Number(e.target.value) || 0)} onKeyDown={(e) => e.key === "Enter" && onRetry()} style={{ width: 92 }} />
-          <a className="small-text row" style={{ gap: 4 }} href={`http://127.0.0.1:${port}/`} target="_blank" rel="noreferrer">
-            Local window <ExternalLink size={12} aria-hidden />
-          </a>
-        </>
-      )}
+      <label className="faint small-text" htmlFor="port" data-tip="The port ebb listens on. Change it if you started ebb with --port.">
+        Port
+      </label>
+      <input id="port" className="input mono" type="number" value={port} onChange={(e) => setPort(Number(e.target.value) || 0)} onKeyDown={(e) => e.key === "Enter" && onRetry()} style={{ width: 92 }} />
+      <a className="small-text row" style={{ gap: 4 }} href={`http://127.0.0.1:${port}/`} target="_blank" rel="noreferrer">
+        Local window <ExternalLink size={12} aria-hidden />
+      </a>
     </div>
   );
 }

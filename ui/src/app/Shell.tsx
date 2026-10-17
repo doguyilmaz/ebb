@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { Activity, Compass, Gauge, ListChecks, RefreshCw, Settings } from "lucide-react";
+import { Activity, Compass, Gauge, ListChecks, RefreshCw, Settings, Square } from "lucide-react";
 import type { ReactNode } from "react";
-import { useStartScan, useStatus } from "#/api/hooks.ts";
+import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { SelectionTray } from "./SelectionTray.tsx";
@@ -58,18 +58,23 @@ function SideFoot() {
 function TopBar() {
   const status = useStatus();
   const start = useStartScan();
+  const stop = useStopScan();
   const live = useLive((s) => s.scan);
   const running = status.data?.scan.running || start.isPending || !!live;
+  const last = status.data?.last;
+  // A rescan reads about as many files as the last one did; that is the best estimate there is.
+  const share = live && last?.files ? Math.min(0.99, live.files / last.files) : null;
   return (
     <header className="topbar">
       <div className="grow">
         {running ? (
           <div className="stack" style={{ gap: 6 }}>
             <span className="muted num">
-              Scanning {live ? `${count(live.files)} files · ${bytes(live.bytes)}` : "…"}
+              Scanning {live ? `${count(live.files)} files · ${bytes(live.bytes)} · ${Math.round(live.elapsedMs / 1000)} s` : "…"}
+              {share !== null && <span className="faint"> · about {Math.round(share * 100)}%</span>}
             </span>
-            <div className="progress">
-              <i />
+            <div className={`progress${share !== null ? " known" : ""}`} role="progressbar" aria-valuenow={share !== null ? Math.round(share * 100) : undefined}>
+              <i style={share !== null ? { transform: `scaleX(${share})` } : undefined} />
             </div>
           </div>
         ) : status.data?.last ? (
@@ -79,10 +84,17 @@ function TopBar() {
         )}
       </div>
       <kbd className="faint kbd" title="Command palette">⌘K</kbd>
-      <button className="btn primary" disabled={running} onClick={() => start.mutate({})}>
-        <RefreshCw size={15} aria-hidden />
-        {status.data?.last ? "Scan again" : "Scan this Mac"}
-      </button>
+      {running ? (
+        <button className="btn" disabled={stop.isPending} onClick={() => stop.mutate()} data-tip="Stops reading. Your last scan stays as it was.">
+          <Square size={13} aria-hidden fill="currentColor" />
+          Stop
+        </button>
+      ) : (
+        <button className="btn primary" onClick={() => start.mutate({})}>
+          <RefreshCw size={15} aria-hidden />
+          {status.data?.last ? "Scan again" : "Scan this Mac"}
+        </button>
+      )}
     </header>
   );
 }

@@ -56,6 +56,7 @@ export interface Health {
   version?: string;
   allowed: boolean;
   device?: string;
+  port?: number;
 }
 
 async function healthAt(at: string): Promise<Health | null> {
@@ -74,12 +75,25 @@ export interface Connection {
   health: Health;
 }
 
-/** Finds ebb: same origin when it serves this page, else on loopback. */
+const EMBEDDED_KEY = "ebb.embedded";
+
+/** True when ebb itself served this page earlier in this tab, so a failed check means it stopped. */
+export const wasEmbedded = () => store("session")?.getItem(EMBEDDED_KEY) === "1";
+
+/**
+ * Finds ebb: same origin when it serves this page (or a dev server proxies to
+ * it), else on loopback at the chosen port. Health names ebb's real port, which
+ * is what the page shows, never the port the page itself came from.
+ */
 export async function connect(): Promise<Connection | null> {
   const here = await healthAt("");
   if (here) {
     base = "";
     tok = urlToken;
+    if (here.port) {
+      store("session")?.setItem(EMBEDDED_KEY, "1");
+      setApiPort(here.port);
+    }
     return { remote: false, health: here };
   }
   const at = `http://127.0.0.1:${apiPort()}`;

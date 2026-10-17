@@ -66,7 +66,8 @@ a.btn { color: var(--text); text-decoration: none; }
 .progress { height: 4px; background: var(--surface-3); border-radius: 999px; overflow: hidden; }
 .progress > i { display: block; height: 100%; width: 40%; background: var(--accent); border-radius: 999px; animation: tide 1.6s ease-in-out infinite; }
 @keyframes tide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
-@media (prefers-reduced-motion: reduce) { .progress > i { animation: none; width: 100%; opacity: 0.6; } }
+.progress.known > i { width: 100%; animation: none; transform-origin: left; transition: transform 300ms linear; }
+@media (prefers-reduced-motion: reduce) { .progress:not(.known) > i { animation: none; width: 100%; opacity: 0.6; } }
 
 /* connect gate */
 .gate { min-height: 100%; display: grid; justify-items: center; align-content: center; padding: 48px 20px; background: radial-gradient(1200px 520px at 50% -10%, var(--accent-soft), transparent 70%), var(--bg); }
@@ -163,6 +164,11 @@ dialog::backdrop { background: rgba(8, 19, 27, 0.45); }
 .chart-tip { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; display: flex; flex-direction: column; gap: 1px; min-width: 150px; max-width: 280px; padding: 9px 11px; border-radius: var(--r-2); background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-2); font-size: 12.5px; opacity: 0; transition: opacity 120ms ease; }
 .chart-tip.on { opacity: 1; }
 .chart-tip strong { font-size: 16px; font-weight: 600; }
+.chart-tip-trail { font-size: 11.5px; }
+.age-key { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; }
+.age-key i { width: 16px; height: 10px; border-radius: 2px; }
+.age-key i:first-of-type { margin-left: 5px; }
+.age-key i:last-of-type { margin-right: 5px; }
 .chart-tip-hint { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); color: var(--accent-strong); font-size: 12px; }
 .crumbs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; flex: 1; min-width: 200px; }
 .crumb { border: 0; background: transparent; padding: 3px 6px; border-radius: var(--r-1); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
