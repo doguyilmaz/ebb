@@ -1,0 +1,70 @@
+// Package app is the facade the CLI, the HTTP server and the MCP server
+// share: one place that knows how to scan, detect, persist and answer.
+package app
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
+
+	"github.com/doguyilmaz/ebb"
+	"github.com/doguyilmaz/ebb/internal/config"
+	"github.com/doguyilmaz/ebb/internal/history"
+	"github.com/doguyilmaz/ebb/internal/rules"
+	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/volume"
+)
+
+const dataVolume = "/System/Volumes/Data"
+
+var (
+	ErrNeverScanned = errors.New("no scan yet — run: ebb scan")
+	ErrScanRunning  = errors.New("a scan is already running")
+)
+
+type App struct {
+	Env     sys.Env
+	Config  config.Config
+	Rules   *rules.Set
+	History *history.Store
+	Links   volume.Firmlinks
+
+	mu      sync.Mutex
+	running bool
+	cur     *ScanResult
+}
+
+func New(env sys.Env) (*App, error) {
+	cfg, err := config.Load(env)
+	if err != nil {
+		return nil, err
+	}
+	set, err := rules.Load(env, ebb.Rules)
+	if err != nil {
+		return nil, err
+	}
+	a := &App{Env: env, Config: cfg, Rules: set, History: history.Open(sys.StateDir(env))}
+	if runtime.GOOS == "darwin" {
+		a.Links = volume.LoadFirmlinks("/usr/share/firmlinks", dataVolume)
+	}
+	return a, nil
+}
+
+// DefaultRoot is the whole data volume on macOS, the configured root when
+// set, and the sandbox home in a sandboxed session.
+func (a *App) DefaultRoot() string {
+	switch {
+	case a.Config.Scan.Root != "":
+		return rules.Expand(a.Env, a.Config.Scan.Root)
+	case sys.Sandboxed(a.Env):
+		return a.Env.Home()
+	}
+	if st, err := os.Stat(dataVolume); err == nil && st.IsDir() {
+		return dataVolume
+	}
+	return "/"
+}
+
+func (a *App) statePath(name string) string { return filepath.Join(sys.StateDir(a.Env), name) }
