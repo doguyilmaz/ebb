@@ -1,0 +1,14 @@
+{
+  "R265": {"identifier": "R265", "version": "26.5", "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-26-5",
+           "platformIdentifier": "com.apple.platform.iphonesimulator", "sizeBytes": 8494282293, "lastUsedAt": "2026-10-17T08:45:49Z",
+           "deletable": true, "state": "Ready", "path": "/System/Library/AssetsV2/a/26.dmg"},
+  "R186": {"identifier": "R186", "version": "18.6", "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-18-6",
+           "platformIdentifier": "com.apple.platform.iphonesimulator", "sizeBytes": 8838344704, "lastUsedAt": "2026-01-01T00:00:00Z",
+           "deletable": true, "state": "Ready", "path": "/System/Library/AssetsV2/b/18.dmg"},
+  "R170": {"identifier": "R170", "version": "17.0", "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.iOS-17-0",
+           "platformIdentifier": "com.apple.platform.iphonesimulator", "sizeBytes": 7000000000, "lastUsedAt": "2025-12-01T00:00:00Z",
+           "deletable": true, "state": "Ready", "path": "/System/Library/AssetsV2/c/17.dmg"},
+  "RW10": {"identifier": "RW10", "version": "10.0", "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.watchOS-10-0",
+           "platformIdentifier": "com.apple.platform.watchsimulator", "sizeBytes": 4000000000, "lastUsedAt": "2025-01-01T00:00:00Z",
+           "deletable": true, "state": "Ready", "path": "/System/Library/AssetsV2/d/w10.dmg"}
+}

@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,11 +14,13 @@ import (
 	"github.com/doguyilmaz/ebb/internal/tree"
 )
 
-// home builds a tree rooted at /h from "path=bytes" specs; intermediate
-// directories are created as needed.
-func home(t *testing.T, specs ...string) *tree.Tree {
+// home builds a tree rooted at /h from "path=MB" or "path=MB@mtime" specs;
+// intermediate directories are created as needed.
+func home(t *testing.T, specs ...string) *tree.Tree { return treeAt(t, "/h", specs...) }
+
+func treeAt(t *testing.T, root string, specs ...string) *tree.Tree {
 	t.Helper()
-	tr := tree.New("/h")
+	tr := tree.New(root)
 	dirs := map[string]tree.ID{"": tr.Root()}
 	var dir func(w *tree.Writer, p string) tree.ID
 	dir = func(w *tree.Writer, p string) tree.ID {
@@ -34,13 +37,15 @@ func home(t *testing.T, specs ...string) *tree.Tree {
 	}
 	tr.Write(func(w *tree.Writer) {
 		for _, s := range specs {
-			p, size, _ := strings.Cut(s, "=")
-			var n uint64
-			for _, c := range size {
-				n = n*10 + uint64(c-'0')
+			p, rest, _ := strings.Cut(s, "=")
+			size, mt, _ := strings.Cut(rest, "@")
+			n, _ := strconv.ParseUint(size, 10, 64)
+			mtime := int64(1)
+			if mt != "" {
+				mtime, _ = strconv.ParseInt(mt, 10, 64)
 			}
 			i := strings.LastIndex(p, "/")
-			w.AddFile(dir(w, p[:i]), []byte(p[i+1:]), tree.KindFile, n<<20, n<<20, n<<20, 1, 0)
+			w.AddFile(dir(w, p[:i]), []byte(p[i+1:]), tree.KindFile, n<<20, n<<20, n<<20, mtime, 0)
 		}
 	})
 	tr.Finish()
@@ -110,8 +115,8 @@ type stub struct {
 	fn   func(c *Context) []finding.Finding
 }
 
-func (s stub) ID() string   { return "stub" }
-func (s stub) Pass() int    { return s.pass }
+func (s stub) ID() string                                                      { return "stub" }
+func (s stub) Pass() int                                                       { return s.pass }
 func (s stub) Detect(_ context.Context, c *Context) ([]finding.Finding, error) { return s.fn(c), nil }
 
 func TestRunSecondPassUsesCovered(t *testing.T) {

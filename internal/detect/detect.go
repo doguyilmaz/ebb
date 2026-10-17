@@ -6,7 +6,10 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +32,67 @@ type Context struct {
 	// Covered reports whether a display path lies inside a target of a
 	// pass-1 finding; set by Run before pass 2.
 	Covered func(path string) bool
+	// Exists and ReadFile reach the real file system; nil means the OS.
+	Exists   func(path string) bool
+	ReadFile func(path string) ([]byte, error)
+}
+
+func (c *Context) exists(p string) bool {
+	if c.Exists != nil {
+		return c.Exists(p)
+	}
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+func (c *Context) readFile(p string) ([]byte, error) {
+	if c.ReadFile != nil {
+		return c.ReadFile(p)
+	}
+	return os.ReadFile(p)
+}
+
+// node finds a display path in the tree.
+func (c *Context) node(display string) (tree.ID, bool) { return c.Tree.Lookup(c.Links.Real(display)) }
+
+// target describes a tree node as a finding target.
+func (c *Context) target(id tree.ID) finding.Target {
+	return finding.Target{Path: c.Links.Display(c.Tree.Path(id)), Bytes: c.Tree.Reclaimable(id), Alloc: c.Tree.Node(id).Alloc}
+}
+
+func (c *Context) home(rel string) string { return filepath.Join(c.Env.Home(), rel) }
+
+func daysAgo(now time.Time, t time.Time) string {
+	d := int(now.Sub(t).Hours() / 24)
+	if d == 1 {
+		return "1 day ago"
+	}
+	return fmt.Sprintf("%d days ago", d)
+}
+
+// compareVersions orders dotted numeric versions ("18.6" < "26.5").
+func compareVersions(a, b string) int {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := range max(len(as), len(bs)) {
+		var x, y int
+		if i < len(as) {
+			x, _ = strconv.Atoi(as[i])
+		}
+		if i < len(bs) {
+			y, _ = strconv.Atoi(bs[i])
+		}
+		if c := cmp.Compare(x, y); c != 0 {
+			return c
+		}
+	}
+	return 0
+}
+
+func finish(f finding.Finding) finding.Finding {
+	slices.SortFunc(f.Targets, func(a, b finding.Target) int { return cmp.Compare(b.Alloc, a.Alloc) })
+	f.ID = finding.ID(f.RuleID, f.Targets[0].Path)
+	f.Total()
+	return f
 }
 
 type Detector interface {
@@ -39,7 +103,7 @@ type Detector interface {
 
 // All lists every detector in the order findings are claimed.
 func All() []Detector {
-	return []Detector{rulesDetector{}}
+	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, rulesDetector{}}
 }
 
 func Run(ctx context.Context, c *Context) ([]finding.Finding, []error) { return RunWith(ctx, c, All()) }

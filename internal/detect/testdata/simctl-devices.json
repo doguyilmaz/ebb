@@ -1,0 +1,18 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-5": [
+      {"udid": "AAAA", "name": "iPhone 17 Pro", "state": "Booted", "isAvailable": true, "lastBootedAt": "2026-10-16T05:40:19Z",
+       "dataPath": "/h/Library/Developer/CoreSimulator/Devices/AAAA/data", "dataPathSize": 13995294720},
+      {"udid": "BBBB", "name": "iPad Air", "state": "Shutdown", "isAvailable": true, "lastBootedAt": "2026-01-02T10:00:00Z",
+       "dataPath": "/h/Library/Developer/CoreSimulator/Devices/BBBB/data", "dataPathSize": 4000000000}
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-6": [
+      {"udid": "CCCC", "name": "iPhone 15", "state": "Shutdown", "isAvailable": true, "lastBootedAt": "2026-10-10T08:00:00Z",
+       "dataPath": "/h/Library/Developer/CoreSimulator/Devices/CCCC/data", "dataPathSize": 3000000000}
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-17-0": [
+      {"udid": "DDDD", "name": "iPhone 14", "state": "Shutdown", "isAvailable": false,
+       "dataPath": "/h/Library/Developer/CoreSimulator/Devices/DDDD/data", "dataPathSize": 2000000000}
+    ]
+  }
+}
