@@ -13,7 +13,7 @@ export function Safety({ level }: { level: string }) {
   const m = meta[level as SafetyLevel] ?? meta.caution;
   const Icon = m.icon;
   return (
-    <span className={`safety ${level}`}>
+    <span className={`safety ${level}`} data-term={`safety.${level in meta ? level : "caution"}`}>
       <Icon size={12} aria-hidden />
       {m.label}
     </span>

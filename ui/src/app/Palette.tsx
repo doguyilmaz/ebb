@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePresets, useSearch, useStartScan } from "#/api/hooks.ts";
 import { bytes } from "#/lib/format.ts";
+import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
 
 interface Command {
@@ -13,7 +14,7 @@ interface Command {
 
 /** ⌘K: go anywhere, find any folder, start a scan or a preset cleanup. */
 export function Palette() {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen } = usePalette();
   const [term, setTerm] = useState("");
   const [active, setActive] = useState(0);
   const openSheet = useSheet((s) => s.open);

@@ -1,68 +1,81 @@
-import { ChevronDown, ChevronRight, EyeOff, FolderSearch, Square, SquareCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, EyeOff, FolderSearch, Hand, Square, SquareCheck, Terminal, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFindings, useIgnore, useReveal, useSetNote } from "#/api/hooks.ts";
-import type { FindingView } from "#/api/types.gen.ts";
+import type { Action, FindingView } from "#/api/types.gen.ts";
 import { bytes } from "#/lib/format.ts";
+import { categoryTitle } from "#/lib/glossary.ts";
 import { useSelection } from "#/lib/selection.ts";
 import { useSheet } from "#/lib/sheet.ts";
 import { Presets } from "#/pages/overview/Overview.tsx";
+import { CountUp } from "#/ui/CountUp.tsx";
+import { PageHead } from "#/ui/PageHead.tsx";
 import { Safety } from "#/ui/Safety.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
+import { Info } from "#/ui/Tip.tsx";
 
-const categories: Record<string, string> = {
-  "package-cache": "Package caches",
-  "build-artifact": "Build output",
-  simulator: "Simulators",
-  sdk: "SDKs, emulators and Xcode",
-  "stale-project": "Untouched projects",
-  "app-cache": "App caches",
-  logs: "Logs",
-  installer: "Installers",
-  "large-file": "Large files",
-  trash: "Trash",
-  leftover: "Leftovers of removed apps",
-  duplicate: "Duplicates",
-  snapshot: "Time Machine",
-  growth: "Recent growth",
-  "user-data": "Your data",
-};
+const levels = ["regenerable", "caution", "user-data"] as const;
 
 export default function Findings() {
   const [showIgnored, setShowIgnored] = useState(false);
   const findings = useFindings(showIgnored);
   useEffect(() => {
     const id = decodeURIComponent(location.hash.slice(1));
-    if (id) document.getElementById(`f-${id}`)?.scrollIntoView({ block: "start" });
+    if (id) (document.getElementById(`f-${id}`) ?? document.getElementById(id))?.scrollIntoView({ block: "start" });
   }, [findings.data]);
   if (findings.error) return <Problem error={findings.error} />;
-  if (!findings.data) return <Loading />;
+  if (!findings.data) return <Loading label="Reading the findings…" />;
   const list = findings.data.findings ?? [];
   const groups = new Map<string, FindingView[]>();
   for (const f of list) groups.set(f.category, [...(groups.get(f.category) ?? []), f]);
-  const order = [...groups.keys()].sort((a, b) => groups.get(b)!.reduce((n, f) => n + f.bytes, 0) - groups.get(a)!.reduce((n, f) => n + f.bytes, 0));
+  const size = (cat: string) => groups.get(cat)!.reduce((n, f) => n + f.bytes, 0);
+  const order = [...groups.keys()].sort((a, b) => size(b) - size(a));
   return (
-    <div className="findings page-narrow">
-      <div className="row findings-head">
-        <h1>{bytes(findings.data.reclaimable)} can be cleaned</h1>
-        <label className="row muted" style={{ marginLeft: "auto", gap: 6 }}>
+    <>
+      <PageHead title="Findings" sub="Everything that takes real space, with why it is there and what removing it costs. Tick what you want and review the plan; nothing runs before you approve it.">
+        <label className="row muted small-text">
           <input type="checkbox" checked={showIgnored} onChange={(e) => setShowIgnored(e.target.checked)} /> Show ignored
+          <Info term="ignore" />
         </label>
-      </div>
-      <Presets />
-      {order.map((cat) => (
-        <section key={cat} className="stack" aria-labelledby={`cat-${cat}`}>
-          <h2 id={`cat-${cat}`}>
-            {categories[cat] ?? cat} <span className="faint num">{bytes(groups.get(cat)!.reduce((n, f) => n + f.bytes, 0))}</span>
-          </h2>
-          {groups.get(cat)!.map((f) => (
-            <FindingCard key={f.id} f={f} />
+      </PageHead>
+      <section className="card summary">
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="row faint small-text" style={{ gap: 4 }}>
+            Can be cleaned <Info term="reclaimable" />
+          </span>
+          <CountUp id="findings-total" value={findings.data.reclaimable} format={bytes} className="summary-figure num" />
+        </div>
+        <div className="safety-key" aria-label="Safety levels">
+          {levels.map((l) => (
+            <span key={l}>
+              <Safety level={l} />
+              <Info term={`safety.${l}`} />
+            </span>
           ))}
+        </div>
+      </section>
+      <Presets compact />
+      {order.map((cat) => (
+        <section key={cat} id={`cat-${cat}`} className="category" aria-labelledby={`h-${cat}`}>
+          <div className="category-head">
+            <h2 id={`h-${cat}`}>{categoryTitle(cat)}</h2>
+            <Info term={`category.${cat}` as "category.logs"} />
+            <span className="size num">{bytes(size(cat))}</span>
+          </div>
+          <div className="stack findings-list" style={{ gap: 10 }}>
+            {groups.get(cat)!.map((f) => (
+              <FindingCard key={f.id} f={f} />
+            ))}
+          </div>
         </section>
       ))}
       {list.length === 0 && <p className="empty">Nothing stands out on this disk.</p>}
-    </div>
+    </>
   );
 }
+
+const ActionIcon = ({ a }: { a: Action }) => (a.kind === "manual" ? <Hand size={13} aria-hidden /> : a.kind === "command" ? <Terminal size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />);
+const actionText = (a: Action) =>
+  a.kind === "command" ? `Runs ${(a.argv ?? []).join(" ")}` : a.kind === "trash" ? "Moves to the Trash" : a.kind === "delete" ? "Deletes it" : a.kind === "empty-trash" ? "Empties the Trash" : "You do it yourself";
 
 function FindingCard({ f }: { f: FindingView }) {
   const [open, setOpen] = useState(false);
@@ -74,10 +87,10 @@ function FindingCard({ f }: { f: FindingView }) {
   const actionable = (f.actions?.length ?? 0) > 0 && f.actions![0].kind !== "manual";
   const targets = f.targets ?? [];
   return (
-    <article id={`f-${f.id}`} className={`finding ${f.ignored ? "ignored" : ""}`}>
+    <article id={`f-${f.id}`} className={`finding ${f.ignored ? "ignored" : ""}`} data-selected={selected || undefined} data-tour="finding">
       <header className="finding-head">
         {actionable ? (
-          <button className="icon-btn" aria-pressed={selected} aria-label={selected ? "Remove from cleanup" : "Add to cleanup"} onClick={() => toggle(f.id)}>
+          <button className="icon-btn" aria-pressed={selected} aria-label={selected ? "Remove from cleanup" : "Add to cleanup"} data-tip={selected ? "In the cleanup tray" : "Add to the cleanup tray"} onClick={() => toggle(f.id)}>
             {selected ? <SquareCheck size={18} /> : <Square size={18} />}
           </button>
         ) : (
@@ -106,6 +119,13 @@ function FindingCard({ f }: { f: FindingView }) {
       ) : null}
       {f.notes && <p className="faint">{f.notes}</p>}
       {f.actions?.[0]?.kind === "manual" && f.actions[0].hint && <code className="hint">{f.actions[0].hint}</code>}
+      {f.actions?.[0] && (
+        <p className="row muted small-text" style={{ gap: 6 }}>
+          <ActionIcon a={f.actions[0]} />
+          <span className="ellipsis">{actionText(f.actions[0])}</span>
+          <Info term={`action.${f.actions[0].kind}` as "action.trash"} />
+        </p>
+      )}
       <div className="row finding-foot">
         {targets.length > 0 && (
           <button className="btn ghost small" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -117,7 +137,7 @@ function FindingCard({ f }: { f: FindingView }) {
             <FolderSearch size={14} aria-hidden /> Show in Finder
           </button>
         )}
-        <button className="btn ghost small" onClick={() => ignore.mutate({ id: f.id, undo: f.ignored })}>
+        <button className="btn ghost small" data-term="ignore" onClick={() => ignore.mutate({ id: f.id, undo: f.ignored })}>
           <EyeOff size={14} aria-hidden /> {f.ignored ? "Stop ignoring" : "Ignore"}
         </button>
       </div>
@@ -143,7 +163,7 @@ function Note({ id, initial }: { id: string; initial: string }) {
   useEffect(() => setText(initial), [initial]);
   if (!editing && !initial)
     return (
-      <button className="btn ghost small add-note" onClick={() => setEditing(true)}>
+      <button className="btn ghost small add-note" data-term="note" onClick={() => setEditing(true)}>
         Add a note
       </button>
     );

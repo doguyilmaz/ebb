@@ -1,9 +1,10 @@
-import { Link } from "@tanstack/react-router";
-import { Activity, Compass, Gauge, ListChecks, RefreshCw, Settings, Square } from "lucide-react";
+import { Link, useLocation } from "@tanstack/react-router";
+import { Activity, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
-import { ago, bytes, count } from "#/lib/format.ts";
+import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
+import { usePalette } from "#/lib/palette.ts";
 import { SelectionTray } from "./SelectionTray.tsx";
 
 const nav = [
@@ -15,84 +16,100 @@ const nav = [
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const wide = pathname.startsWith("/explore");
   return (
     <div className="shell">
       <aside className="side">
         <div className="brand">
-          <img src="/favicon.svg" width={24} height={24} alt="" />
+          <img src="/favicon.svg" width={26} height={26} alt="" />
           ebb
         </div>
-        {nav.map(({ to, label, icon: Icon }) => (
-          <Link key={to} to={to} className="nav" activeOptions={{ exact: to === "/" }}>
-            <Icon size={16} aria-hidden />
-            {label}
-          </Link>
-        ))}
-        <SideFoot />
+        <nav className="stack" style={{ gap: 2 }} aria-label="Pages">
+          {nav.map(({ to, label, icon: Icon }) => (
+            <Link key={to} to={to} className="nav" activeOptions={{ exact: to === "/" }}>
+              <Icon size={16} aria-hidden />
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <DiskMeter />
       </aside>
       <div className="main">
-        <TopBar />
-        <div className="page">{children}</div>
+        <TopBar title={nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)))?.label ?? ""} />
+        <div className="content">
+          <div className={wide ? "page wide" : "page"}>{children}</div>
+        </div>
         <SelectionTray />
       </div>
     </div>
   );
 }
 
-function SideFoot() {
+/** How full the disk is, always in view. The status colour appears only when space is actually low. */
+function DiskMeter() {
   const status = useStatus();
   const last = status.data?.last;
   if (!last) return null;
-  const used = last.used / Math.max(1, last.used + last.free);
+  const total = Math.max(1, last.used + last.free);
+  const used = last.used / total;
+  const low = last.free / total < 0.1;
   return (
-    <div className="side-foot">
-      <div className="waterline" title={`${bytes(last.free)} free`}>
-        <i style={{ height: `${Math.round(used * 100)}%` }} />
+    <div className="disk-meter" data-low={low || undefined}>
+      <div className="row between small-text">
+        <span className="medium">This Mac</span>
+        <span className="num faint">{percent(used)} full</span>
       </div>
-      <span className="muted">{bytes(last.free)} free</span>
-      <span className="faint">scanned {ago(last.time)}</span>
+      <div className="meter" role="img" aria-label={`${percent(used)} of the disk used, ${bytes(last.free)} free`}>
+        <i style={{ transform: `scaleX(${used})` }} />
+      </div>
+      <span className="faint small-text num">
+        {low ? <span className="low">Low on space · </span> : null}
+        {bytes(last.free)} free
+      </span>
     </div>
   );
 }
 
-function TopBar() {
+function TopBar({ title }: { title: string }) {
   const status = useStatus();
   const start = useStartScan();
   const stop = useStopScan();
   const live = useLive((s) => s.scan);
+  const openPalette = usePalette((s) => s.setOpen);
   const running = status.data?.scan.running || start.isPending || !!live;
   const last = status.data?.last;
   // A rescan reads about as many files as the last one did; that is the best estimate there is.
   const share = live && last?.files ? Math.min(0.99, live.files / last.files) : null;
   return (
     <header className="topbar">
-      <div className="grow">
-        {running ? (
-          <div className="stack" style={{ gap: 6 }}>
-            <span className="muted num">
-              Scanning {live ? `${count(live.files)} files · ${bytes(live.bytes)} · ${Math.round(live.elapsedMs / 1000)} s` : "…"}
-              {share !== null && <span className="faint"> · about {Math.round(share * 100)}%</span>}
-            </span>
-            <div className={`progress${share !== null ? " known" : ""}`} role="progressbar" aria-valuenow={share !== null ? Math.round(share * 100) : undefined}>
-              <i style={share !== null ? { transform: `scaleX(${share})` } : undefined} />
-            </div>
-          </div>
-        ) : status.data?.last ? (
-          <span className="muted mono">{status.data.last.root}</span>
-        ) : (
-          <span className="muted">Nothing scanned yet</span>
-        )}
-      </div>
-      <kbd className="faint kbd" title="Command palette">⌘K</kbd>
+      <span className="topbar-title">{title}</span>
       {running ? (
-        <button className="btn" disabled={stop.isPending} onClick={() => stop.mutate()} data-tip="Stops reading. Your last scan stays as it was.">
-          <Square size={13} aria-hidden fill="currentColor" />
-          Stop
-        </button>
-      ) : (
+        <span className="scan-pill" data-state="running" style={share !== null ? { ["--share" as string]: `${share * 100}%` } : undefined} role="status">
+          <span className="pulse" aria-hidden />
+          <span className="num">
+            Scanning{live ? ` · ${count(live.files)} files` : "…"}
+            {share !== null && <span className="faint"> · about {Math.round(share * 100)}%</span>}
+          </span>
+          <button className="btn small ghost" disabled={stop.isPending} onClick={() => stop.mutate()} data-tip="Stops reading. Your last scan stays as it was.">
+            <Square size={11} aria-hidden fill="currentColor" /> Stop
+          </button>
+        </span>
+      ) : last ? (
+        <span className="scan-pill" data-tip={`${last.root} · ${count(last.files)} files in ${Math.round(last.elapsed / 1e9)} s`}>
+          Scanned {ago(last.time)}
+        </span>
+      ) : null}
+      <span className="grow" />
+      <button className="btn topbar-search" onClick={() => openPalette(true)}>
+        <Search size={14} aria-hidden />
+        <span>Go to, find a folder, clean…</span>
+        <kbd>⌘K</kbd>
+      </button>
+      {!running && (
         <button className="btn primary" onClick={() => start.mutate({})}>
-          <RefreshCw size={15} aria-hidden />
-          {status.data?.last ? "Scan again" : "Scan this Mac"}
+          <RefreshCw size={14} aria-hidden />
+          {last ? "Scan again" : "Scan this Mac"}
         </button>
       )}
     </header>

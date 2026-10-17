@@ -8,7 +8,7 @@ export interface Palette {
   text2: string;
   text3: string;
   accent: string;
-  accentRGB: RGB;
+  tide: RGB;
 }
 
 export type RGB = [number, number, number];
@@ -25,7 +25,7 @@ export function readPalette(): Palette {
     text2: v("--text-2"),
     text3: v("--text-3"),
     accent: v("--accent"),
-    accentRGB: rgb(v("--accent")),
+    tide: rgb(v("--tide")),
   };
 }
 
@@ -58,13 +58,13 @@ export const frame = (c: RGB): RGB => mix(c, BLACK, 0.24);
 
 export type ColorMode = "folder" | "age";
 
-/** One hue from the surface to the accent: older data is darker. cuts are bucket bounds in days, ascending. */
+/** One hue from the surface to the tide: older data is stronger. cuts are bucket bounds in days, ascending. */
 export function ageFill(p: Palette, modified: number | undefined, now: number, cuts: number[]): RGB {
   if (!modified) return p.other;
   const days = (now - modified) / 86400;
   let i = 0;
   while (i < cuts.length && days >= cuts[i]) i++;
-  return mix(p.surface, p.accentRGB, 0.22 + (0.78 * i) / Math.max(1, cuts.length));
+  return mix(p.surface, p.tide, 0.22 + (0.78 * i) / Math.max(1, cuts.length));
 }
 
 const lum = ([r, g, b]: RGB) => {

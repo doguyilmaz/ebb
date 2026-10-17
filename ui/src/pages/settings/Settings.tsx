@@ -3,19 +3,31 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "#/api/client.ts";
 import { useFindings, useIgnore, useSaveSettings, useSettings, useStatus, useWebAccess } from "#/api/hooks.ts";
 import type { Settings as S } from "#/api/types.gen.ts";
+import type { TermId } from "#/lib/glossary.ts";
+import { PageHead } from "#/ui/PageHead.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
+import { Info } from "#/ui/Tip.tsx";
+
+function Head({ title, term }: { title: string; term?: TermId }) {
+  return (
+    <div className="setting-head">
+      <h2>{title}</h2>
+      {term && <Info term={term} />}
+    </div>
+  );
+}
 
 export default function Settings() {
   return (
-    <div className="page-narrow settings">
-      <h1>Settings</h1>
+    <>
+      <PageHead title="Settings" sub="How ebb scans, what it never touches, and which web pages may connect to it." />
       <Scan />
       <Protect />
       <Ignored />
       <Access />
       <Web />
       <Theme />
-    </div>
+    </>
   );
 }
 
@@ -28,13 +40,13 @@ function Scan() {
   if (!draft) return <Loading />;
   const set = <K extends keyof S>(k: K, v: S[K]) => setDraft({ ...draft, [k]: v });
   return (
-    <section className="panel setting">
-      <h2>Scanning</h2>
+    <section className="card setting">
+      <Head title="Scanning" />
       <label>
         Folder to scan <span className="faint">(empty: the whole disk)</span>
         <input className="input" value={draft.root} placeholder="/System/Volumes/Data" onChange={(e) => set("root", e.target.value)} />
       </label>
-      <div className="row" style={{ flexWrap: "wrap", gap: 16 }}>
+      <div className="fields">
         <label>
           Parallel readers <span className="faint">(0: automatic)</span>
           <input className="input" type="number" min={0} max={64} value={draft.threads} onChange={(e) => set("threads", Number(e.target.value))} />
@@ -63,8 +75,8 @@ function Protect() {
   const [glob, setGlob] = useState("");
   const list = settings.data?.protect ?? [];
   return (
-    <section className="panel setting">
-      <h2>Never touch</h2>
+    <section className="card setting">
+      <Head title="Never touch" term="protect" />
       <p className="muted">Folders and patterns ebb never offers or removes, on top of system folders, Keychains and cloud-synced folders. Use ~ for your home and ** for any depth.</p>
       <ul className="chips">
         {list.map((p) => (
@@ -95,8 +107,8 @@ function Ignored() {
   const ignored = (findings.data?.findings ?? []).filter((f) => f.ignored);
   if (ignored.length === 0) return null;
   return (
-    <section className="panel setting">
-      <h2>Ignored findings</h2>
+    <section className="card setting">
+      <Head title="Ignored findings" term="ignore" />
       <ul className="chips">
         {ignored.map((f) => (
           <li key={f.id}>
@@ -113,8 +125,8 @@ function Access() {
   const status = useStatus();
   if (!status.data) return null;
   return (
-    <section className="panel setting">
-      <h2>Full Disk Access</h2>
+    <section className="card setting">
+      <Head title="Full Disk Access" term="fda" />
       {status.data.fullDiskAccess ? (
         <p className="muted">ebb can read app containers, Mail and Messages data.</p>
       ) : (
@@ -145,8 +157,8 @@ function Web() {
   if (!web.data) return null;
   const pending = web.data.pending;
   return (
-    <section className="panel setting">
-      <h2>Web access</h2>
+    <section className="card setting">
+      <Head title="Web access" term="web" />
       <p className="muted">Pages that may connect to ebb on this Mac. A page gets in only after you confirm the code it shows.</p>
       <ul className="chips">
         {(web.data.allowed ?? []).map((o) => (
@@ -192,8 +204,8 @@ function Theme() {
     } catch {}
   };
   return (
-    <section className="panel setting">
-      <h2>Appearance</h2>
+    <section className="card setting">
+      <Head title="Appearance" />
       <div className="seg" role="group" aria-label="Theme">
         {[["", "System"], ["light", "Light"], ["dark", "Dark"]].map(([v, l]) => (
           <button key={l} aria-pressed={theme === v} onClick={() => pick(v)}>{l}</button>

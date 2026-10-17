@@ -4,6 +4,7 @@ import { ChartPie, LayoutGrid, List, Rows3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { sliceQuery, useAges, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
 import { ageColor } from "#/lib/ages.ts";
+import { readPrefs, savePrefs } from "#/lib/prefs.ts";
 import { baseName } from "#/lib/format.ts";
 import { exploreRoute, type View } from "#/router.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
@@ -25,7 +26,12 @@ const depthFor = (v: View) => (v === "sunburst" ? 5 : 6);
 const budgetFor = (v: View) => (v === "treemap" ? 6000 : v === "icicle" ? 4000 : 3500);
 
 export default function Explore() {
-  const { path, view, unique, color } = exploreRoute.useSearch();
+  const search = exploreRoute.useSearch();
+  const [prefs] = useState(readPrefs);
+  const { path } = search;
+  const view = search.view ?? prefs.view ?? "sunburst";
+  const unique = search.unique ?? prefs.unique ?? false;
+  const color = search.color ?? prefs.color ?? "folder";
   const navigate = useNavigate({ from: "/explore" });
   const qc = useQueryClient();
   const status = useStatus();
@@ -36,8 +42,12 @@ export default function Explore() {
   const cuts = useMemo(() => (buckets ?? []).filter((b) => b.days > 0).map((b) => b.days), [buckets]);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [picked, setPicked] = useState<Focus | null>(null);
-  const go = (next: { path?: string; view?: View; unique?: boolean; color?: "age" }) =>
+  const go = (next: { path?: string; view?: View; unique?: boolean; color?: "age" | "folder" }) =>
     navigate({ search: (s) => ({ ...s, ...next }), replace: next.path === undefined && next.view !== undefined });
+  const choose = (next: { view?: View; unique?: boolean; color?: "age" | "folder" }) => {
+    savePrefs(next);
+    go(next);
+  };
   const open = (p: string | undefined) => {
     setPicked(null);
     setHoverKey(null);
@@ -57,33 +67,29 @@ export default function Explore() {
 
   return (
     <div className="explore">
+      <Breadcrumb path={here} root={scanned} onOpen={open} />
       <div className="explore-bar">
-        <Breadcrumb path={here} root={scanned} onOpen={open} />
         <Search onOpen={open} />
-        <div className="row" style={{ gap: 4 }} data-tour="metric">
+        <span className="grow" />
+        <div className="row" style={{ gap: 2 }} data-tour="metric">
           <div className="seg" role="group" aria-label="Size">
-            <button aria-pressed={!unique} onClick={() => go({ unique: undefined })}>Allocated</button>
-            <button aria-pressed={!!unique} onClick={() => go({ unique: true })}>Unique</button>
+            <button aria-pressed={!unique} onClick={() => choose({ unique: false })} data-term="allocated">Allocated</button>
+            <button aria-pressed={unique} onClick={() => choose({ unique: true })} data-term="unique">Unique</button>
           </div>
-          <Info term={unique ? "unique" : "allocated"} />
         </div>
         {view !== "list" && (
-          <div className="row" style={{ gap: 4 }}>
-            <div className="seg" role="group" aria-label="Colour">
-              <button aria-pressed={!color} onClick={() => go({ color: undefined })} data-term="color.folder">Folders</button>
-              <button aria-pressed={color === "age"} onClick={() => go({ color: "age" })} data-term="color.age">Age</button>
-            </div>
+          <div className="seg" role="group" aria-label="Colour">
+            <button aria-pressed={color === "folder"} onClick={() => choose({ color: "folder" })} data-term="color.folder">Folders</button>
+            <button aria-pressed={color === "age"} onClick={() => choose({ color: "age" })} data-term="color.age">Age</button>
           </div>
         )}
-        <div className="row" style={{ gap: 4 }} data-tour="views">
-          <div className="seg" role="group" aria-label="View">
-            {views.map(({ id, label, icon: Icon }) => (
-              <button key={id} aria-pressed={view === id} onClick={() => go({ view: id })} aria-label={label} data-term={`view.${id}`}>
-                <Icon size={15} aria-hidden />
-                <span className="seg-label">{label}</span>
-              </button>
-            ))}
-          </div>
+        <div className="seg" role="group" aria-label="View" data-tour="views">
+          {views.map(({ id, label, icon: Icon }) => (
+            <button key={id} aria-pressed={view === id} onClick={() => choose({ view: id })} aria-label={label} data-term={`view.${id}`}>
+              <Icon size={15} aria-hidden />
+              <span className="seg-label">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
       <div className="explore-body">
@@ -98,7 +104,7 @@ export default function Explore() {
               metric={metric}
               upLabel={atTop ? undefined : baseName(parent) || parent}
               disk={volume.data?.capacity}
-              color={color ?? "folder"}
+              color={color}
               now={status.data?.last ? Math.floor(new Date(status.data.last.time).getTime() / 1000) : Math.floor(Date.now() / 1000)}
               cuts={cuts}
               hoverKey={hoverKey}

@@ -34,6 +34,8 @@ export const sliceQuery = (path: string | undefined, depth: number, maxNodes: nu
     queryKey: ["tree", path ?? "", depth, maxNodes],
     queryFn: () => api.get<SliceResponse>(`/tree?depth=${depth}&maxNodes=${maxNodes}&minShare=0.003${path ? `&path=${q(path)}` : ""}`),
     staleTime: 30_000,
+    // Slices are large (thousands of nodes); hovering prefetches many, so unused ones go quickly.
+    gcTime: 60_000,
     retry: false,
   });
 

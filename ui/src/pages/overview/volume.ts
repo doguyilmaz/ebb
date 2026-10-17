@@ -5,7 +5,6 @@ export interface Segment {
   label: string;
   bytes: number;
   color: string;
-  hint: string;
 }
 
 /**
@@ -21,12 +20,12 @@ export function segments(v: Breakdown, apps: number, reclaimable: number): Segme
   const known = v.systemUsed + others + scanned + v.notVisible + v.free;
   const system = v.systemUsed + others + Math.max(0, v.capacity - known);
   const all: Segment[] = [
-    { key: "system", label: "macOS", bytes: system, color: "var(--s7)", hint: "The system, its swap and recovery volumes" },
-    { key: "apps", label: "Apps", bytes: appsPart, color: "var(--s1)", hint: "Everything in /Applications" },
-    { key: "reclaimable", label: "Can be cleaned", bytes: reclaimPart, color: "var(--s3)", hint: "What ebb's findings can free" },
-    { key: "rest", label: "Everything else", bytes: rest, color: "var(--s4)", hint: "Your files, projects and app data" },
-    { key: "hidden", label: "Not visible", bytes: v.notVisible, color: "var(--other)", hint: "Space the scan could not read" },
-    { key: "free", label: "Free", bytes: v.free, color: "transparent", hint: "Available now" },
+    { key: "system", label: "macOS", bytes: system, color: "var(--s7)" },
+    { key: "apps", label: "Apps", bytes: appsPart, color: "var(--s1)" },
+    { key: "reclaimable", label: "Can be cleaned", bytes: reclaimPart, color: "var(--s3)" },
+    { key: "rest", label: "Everything else", bytes: rest, color: "var(--s4)" },
+    { key: "hidden", label: "Not visible", bytes: v.notVisible, color: "var(--other)" },
+    { key: "free", label: "Free", bytes: v.free, color: "transparent" },
   ];
   return all.filter((s) => s.bytes > 0);
 }

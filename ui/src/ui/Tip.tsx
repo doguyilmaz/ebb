@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { term, type TermId } from "#/lib/glossary.ts";
 
 interface Shown {
+  value?: string;
   title?: string;
   body: string;
   target: HTMLElement;
@@ -12,13 +13,15 @@ interface Shown {
 const DELAY = 450;
 const GAP = 8;
 
-function content(el: HTMLElement): { title?: string; body: string } | null {
+/** data-term names a glossary entry, data-tip is plain text, data-value adds a figure on top (a size, a share). */
+function content(el: HTMLElement): { value?: string; title?: string; body: string } | null {
+  const value = el.dataset.value;
   const id = el.dataset.term;
   if (id) {
     const t = term(id);
-    return t ? { title: t.title, body: t.body } : null;
+    return t ? { value, title: t.title, body: t.body } : null;
   }
-  return el.dataset.tip ? { body: el.dataset.tip } : null;
+  return el.dataset.tip ? { value, body: el.dataset.tip } : null;
 }
 
 /**
@@ -122,6 +125,7 @@ export function TipHost() {
 
   return (
     <div ref={el} id="ebb-tip" role="tooltip" popover="manual" className="tip" data-instant={shown?.instant || undefined}>
+      {shown?.value && <b className="tip-value num">{shown.value}</b>}
       {shown?.title && <strong>{shown.title}</strong>}
       {shown && <span>{shown.body}</span>}
     </div>

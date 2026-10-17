@@ -5,84 +5,97 @@
 @font-face { font-family: "Plex Mono"; src: url("/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 
 /*
- * Low tide: sea mist by day, deep water by night, one tide-teal accent.
- * Components use only these names.
+ * Instrument: neutral graphite chrome, ink for anything you can press, and
+ * colour only where it means something — data series, safety, and the tide
+ * (free space, the brand). Components use only these names.
  */
 :root {
   --font: "Plex", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mono: "Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  --bg: #eef2f4;
+  --bg: #f3f3f2;
   --surface: #ffffff;
-  --surface-2: #f5f8f9;
-  --surface-3: #e6ecef;
-  --line: #d9e1e6;
-  --line-strong: #c3cfd6;
-  --text: #10202b;
-  --text-2: #475a66;
-  --text-3: #66788a;
-  --accent: #0b7a83;
-  --accent-strong: #075e66;
-  --accent-soft: #ddf0f1;
+  --surface-2: #f6f6f5;
+  --surface-3: #ececea;
+  --line: #e4e4e1;
+  --line-strong: #d2d2ce;
+  --control: #9b9b96;
+  --text: #17171a;
+  --text-2: #4f4f57;
+  --text-3: #6a6a72;
+
+  /* interactive: ink, so the data keeps every colour */
+  --accent: #17171a;
+  --accent-strong: #000000;
+  --accent-soft: #ececea;
   --on-accent: #ffffff;
 
+  /* the tide: free space, the waterline, the brand mark */
+  --tide: #0b7f8a;
+  --tide-soft: #def1f2;
+
   /* status: safety of an item; always paired with an icon and a word */
-  --good: #0ca30c;
-  --warning: #b77800;
-  --serious: #c9592c;
-  --critical: #d03b3b;
-  --good-soft: #e4f4e4;
-  --warning-soft: #fbf0d8;
-  --serious-soft: #fbe8de;
-  --critical-soft: #f9e2e2;
+  --good: #12863f;
+  --warning: #985b00;
+  --serious: #c2532a;
+  --critical: #c8312f;
+  --good-soft: #e4f3e9;
+  --warning-soft: #faf0dc;
+  --serious-soft: #fbe9e1;
+  --critical-soft: #f9e3e2;
 
   /* chart series, fixed order (validated palette) */
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
-  --other: #b9c3c9;
+  --other: #b8b8b4;
 
-  --shadow-1: 0 1px 2px rgba(16, 32, 43, 0.06);
-  --shadow-2: 0 10px 34px rgba(16, 32, 43, 0.12), 0 2px 6px rgba(16, 32, 43, 0.06);
+  --shadow-1: 0 1px 2px rgba(20, 20, 18, 0.06);
+  --shadow-2: 0 8px 28px rgba(20, 20, 18, 0.1), 0 1px 3px rgba(20, 20, 18, 0.06);
+  --shadow-3: 0 22px 64px rgba(20, 20, 18, 0.2), 0 2px 8px rgba(20, 20, 18, 0.08);
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
-  --r-1: 6px;
+  --r-1: 7px;
   --r-2: 10px;
-  --r-3: 16px;
-  --sidebar: 220px;
+  --r-3: 14px;
+  --sidebar: 228px;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #08131b; --surface: #0e1c26; --surface-2: #132532; --surface-3: #1a2f3e;
-    --line: #1d3241; --line-strong: #2a4456;
-    --text: #e4edf1; --text-2: #9fb3be; --text-3: #8399a5;
-    --accent: #3cc4cd; --accent-strong: #6ed8df; --accent-soft: #0f3036; --on-accent: #04161a;
-    --good: #2fbf2f; --warning: #fab219; --serious: #ec835a; --critical: #e46565;
-    --good-soft: #10291a; --warning-soft: #2e2410; --serious-soft: #321c13; --critical-soft: #331616;
+    --bg: #0c0c0e; --surface: #141416; --surface-2: #19191c; --surface-3: #222226;
+    --line: #232327; --line-strong: #323237; --control: #6c6c74;
+    --text: #ededef; --text-2: #a7a7ae; --text-3: #8c8c94;
+    --accent: #ededef; --accent-strong: #ffffff; --accent-soft: #26262a; --on-accent: #0c0c0e;
+    --tide: #3cc4cd; --tide-soft: #0f2b2e;
+    --good: #3bc46d; --warning: #f0ae4c; --serious: #f08a62; --critical: #ff7468;
+    --good-soft: #10291a; --warning-soft: #2f2412; --serious-soft: #331d14; --critical-soft: #381716;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-    --other: #3b5363;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.5);
+    --other: #46464c;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.5);
+    --shadow-3: 0 26px 72px rgba(0, 0, 0, 0.65);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #08131b; --surface: #0e1c26; --surface-2: #132532; --surface-3: #1a2f3e;
-  --line: #1d3241; --line-strong: #2a4456;
-  --text: #e4edf1; --text-2: #9fb3be; --text-3: #8399a5;
-  --accent: #3cc4cd; --accent-strong: #6ed8df; --accent-soft: #0f3036; --on-accent: #04161a;
-  --good: #2fbf2f; --warning: #fab219; --serious: #ec835a; --critical: #e46565;
-  --good-soft: #10291a; --warning-soft: #2e2410; --serious-soft: #321c13; --critical-soft: #331616;
+  --bg: #0c0c0e; --surface: #141416; --surface-2: #19191c; --surface-3: #222226;
+  --line: #232327; --line-strong: #323237; --control: #6c6c74;
+  --text: #ededef; --text-2: #a7a7ae; --text-3: #8c8c94;
+  --accent: #ededef; --accent-strong: #ffffff; --accent-soft: #26262a; --on-accent: #0c0c0e;
+  --tide: #3cc4cd; --tide-soft: #0f2b2e;
+  --good: #3bc46d; --warning: #f0ae4c; --serious: #f08a62; --critical: #ff7468;
+  --good-soft: #10291a; --warning-soft: #2f2412; --serious-soft: #331d14; --critical-soft: #381716;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
   --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-  --other: #3b5363;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --other: #46464c;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 26px 72px rgba(0, 0, 0, 0.65);
   color-scheme: dark;
 }
