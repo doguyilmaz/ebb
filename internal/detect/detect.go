@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/finding"
+	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/tree"
@@ -25,6 +26,7 @@ type Context struct {
 	Volume     volume.Breakdown
 	Env        sys.Env
 	Rules      *rules.Set
+	History    *history.Store // nil: no growth findings
 	Links      volume.Firmlinks
 	Now        time.Time
 	StaleAfter time.Duration
@@ -103,7 +105,7 @@ type Detector interface {
 
 // All lists every detector in the order findings are claimed.
 func All() []Detector {
-	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, docker{}, snapshots{}, stale{}, rulesDetector{}, large{}}
+	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, docker{}, snapshots{}, stale{}, rulesDetector{}, large{}, growth{}}
 }
 
 func Run(ctx context.Context, c *Context) ([]finding.Finding, []error) { return RunWith(ctx, c, All()) }
