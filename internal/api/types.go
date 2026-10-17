@@ -52,6 +52,19 @@ type SliceResponse struct {
 	Root *tree.SliceNode `json:"root"`
 }
 
+// AgeBucket holds the bytes last changed less than Days days before the scan;
+// Days is 0 for the oldest bucket.
+type AgeBucket struct {
+	Label string `json:"label"`
+	Days  int    `json:"days"`
+	Bytes uint64 `json:"bytes"`
+}
+
+type AgesResponse struct {
+	Path    string      `json:"path"`
+	Buckets []AgeBucket `json:"buckets"`
+}
+
 type Item struct {
 	Path     string   `json:"path"`
 	Name     string   `json:"name"`
@@ -193,7 +206,7 @@ const (
 
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
-	Status{}, ScanRequest{}, SliceResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
+	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }

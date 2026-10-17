@@ -77,6 +77,28 @@ func (a *App) Slice(path string, depth int, minShare float64, maxNodes int) (api
 	return api.SliceResponse{Path: a.Links.Display(r.Tree.Path(id)), Root: r.Tree.Slice(id, depth, minShare, maxNodes)}, nil
 }
 
+var ageBuckets = []api.AgeBucket{{Label: "Past week", Days: 7}, {Label: "Past month", Days: 30}, {Label: "Past 3 months", Days: 91},
+	{Label: "Past year", Days: 365}, {Label: "1–2 years", Days: 730}, {Label: "Older"}}
+
+// Ages splits a folder's bytes by how long before the scan they last changed.
+func (a *App) Ages(path string) (api.AgesResponse, error) {
+	r, id, err := a.Resolve(path)
+	if err != nil {
+		return api.AgesResponse{}, err
+	}
+	const day = 86400
+	cuts := make([]int64, 0, len(ageBuckets)-1)
+	for _, b := range ageBuckets[:len(ageBuckets)-1] {
+		cuts = append(cuts, int64(b.Days)*day)
+	}
+	got := r.Tree.Ages(id, r.Meta.Time.Unix(), cuts)
+	out := api.AgesResponse{Path: a.Links.Display(r.Tree.Path(id)), Buckets: slices.Clone(ageBuckets)}
+	for i := range out.Buckets {
+		out.Buckets[i].Bytes = got[i]
+	}
+	return out, nil
+}
+
 // Children lists a folder's stored children and, when asked, the small files
 // folded into it, read live from disk because the scan does not keep them.
 func (a *App) Children(path string, limit int, small bool) (api.ChildrenResponse, error) {

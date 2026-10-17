@@ -295,6 +295,7 @@ GET  /api/v1/events                         SSE: hello, scan.progress, scan.done
                                             plan.progress, plan.done, findings.changed, history.changed
 GET  /api/v1/volume
 GET  /api/v1/tree?path&depth&minShare&maxNodes      LOD slice for charts
+GET  /api/v1/ages?path                       bytes by last-modified age bucket
 GET  /api/v1/children?path&limit&small=1
 GET  /api/v1/search?q&limit
 GET  /api/v1/findings?category&minBytes
@@ -342,6 +343,12 @@ Screens
 
 Cleanup sheet: plan review (actions, warnings, blockers) → confirm → progress → result. ⌘K palette for paths and
 actions.
+
+Guidance: a first-run Welcome (what ebb does, read-only scan, Full Disk Access explained), a live scan progress
+screen, and a guided tour after the first scan (re-openable from the help button and ⌘K). Every concept has a short
+explanation behind an (i) tooltip, all from one glossary. Charts animate with a keyed morph (zoom, metric switch,
+refresh), show labels where they fit, a cursor tooltip and a ranked legend (also the table view); motion follows
+`prefers-reduced-motion`. Overview adds cleanable space by category and an age breakdown.
 
 Rendering: Canvas 2D for sunburst/treemap/icicle (SVG does not survive tens of thousands of shapes), layouts from
 `d3-hierarchy`, Sankey from `d3-sankey`, timeline as hand-drawn SVG. Charts fetch LOD slices and refetch on zoom.

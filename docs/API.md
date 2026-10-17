@@ -16,6 +16,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/scans/current` | — | `ScanState` | — |
 | GET | `/volume` | — | `Breakdown` | 409 `never-scanned` |
 | GET | `/tree?path&depth&minShare&maxNodes` | — | `SliceResponse` | 400 `outside-root`, 409 `never-scanned` |
+| GET | `/ages?path` | — | `AgesResponse` (bytes by last-modified bucket, relative to the scan time) | 400 `outside-root`, 409 `never-scanned` |
 | GET | `/children?path&limit&small=1` | — | `ChildrenResponse` | 400 `outside-root` |
 | GET | `/search?q&limit` | — | `SearchResponse` | — |
 | GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |

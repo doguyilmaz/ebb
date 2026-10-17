@@ -22,6 +22,10 @@ func (s *Server) dataRoutes() {
 	s.api("GET /api/v1/scans/current", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.ScanState(), nil })
 	s.api("GET /api/v1/volume", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.Volume() })
 	s.api("GET /api/v1/tree", s.tree)
+	s.api("GET /api/v1/ages", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		out, err := s.app.Ages(r.URL.Query().Get("path"))
+		return out, pathError(err)
+	})
 	s.api("GET /api/v1/children", s.children)
 	s.api("GET /api/v1/search", s.search)
 	s.api("GET /api/v1/findings", s.findings)

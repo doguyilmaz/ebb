@@ -61,6 +61,17 @@ export interface SliceResponse {
   root: SliceNode | null;
 }
 
+export interface AgeBucket {
+  label: string;
+  days: number;
+  bytes: number;
+}
+
+export interface AgesResponse {
+  path: string;
+  buckets: AgeBucket[] | null;
+}
+
 export interface Item {
   path: string;
   name: string;
