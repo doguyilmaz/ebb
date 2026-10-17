@@ -99,7 +99,10 @@ function TopBar({ title }: { title: string }) {
   const running = status.data?.scan.running || start.isPending || !!live;
   const last = status.data?.last;
   // A rescan reads about as many files as the last one did; that is the best estimate there is.
-  const share = live && last?.files ? Math.min(0.99, live.files / last.files) : null;
+  const share = live && last?.files && !(status.data?.changes?.ready && !status.data.changes.lost) ? Math.min(0.99, live.files / last.files) : null;
+  const ch = status.data?.changes;
+  const changed = ch && ch.ready && !ch.lost ? ch.folders : 0;
+  const quick = !!ch && ch.ready && !ch.lost;
   return (
     <header className="topbar">
       <span className="topbar-title">{title}</span>
@@ -118,8 +121,9 @@ function TopBar({ title }: { title: string }) {
           </button>
         </span>
       ) : last ? (
-        <span className="scan-pill" data-tip={`${last.root} · ${count(last.files)} files in ${Math.round(last.elapsed / 1e9)} s`}>
-          Scanned {ago(last.time)}
+        <span className="scan-pill" data-tip={`${last.root} · ${count(last.files)} files${last.incremental ? `, updated in ${(last.elapsed / 1e9).toFixed(1)} s` : ` in ${Math.round(last.elapsed / 1e9)} s`}`}>
+          {last.incremental ? "Updated" : "Scanned"} {ago(last.time)}
+          {changed > 0 && <span className="faint num"> · {count(changed)} {changed === 1 ? "folder" : "folders"} changed</span>}
         </span>
       ) : null}
       <span className="grow" />
@@ -132,7 +136,11 @@ function TopBar({ title }: { title: string }) {
         <CircleHelp size={17} />
       </button>
       {!running && (
-        <button className="btn primary" onClick={() => start.mutate({})}>
+        <button
+          className="btn primary"
+          onClick={() => start.mutate({})}
+          data-tip={last ? (quick ? "Reads again only the folders that changed since the last scan, usually in seconds. ⌘K has “Scan everything again”." : "Reads every folder; ebb does not know yet what changed.") : undefined}
+        >
           <RefreshCw size={14} aria-hidden />
           {last ? "Scan again" : "Scan this Mac"}
         </button>

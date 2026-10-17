@@ -225,28 +225,48 @@ func (t *Tree) Finish() {
 	defer t.mu.Unlock()
 	var kids []ID
 	for p := range t.first {
-		if t.first[p] == uint32(None) || t.next[t.first[p]] == uint32(None) {
-			continue
-		}
-		kids = kids[:0]
-		for c := ID(t.first[p]); c != None; c = ID(t.next[c]) {
-			kids = append(kids, c)
-		}
-		slices.SortStableFunc(kids, func(a, b ID) int {
-			if c := cmp.Compare(t.alloc[b], t.alloc[a]); c != 0 {
-				return c
-			}
-			return bytes.Compare(t.name(a), t.name(b))
-		})
-		t.first[p] = uint32(kids[0])
-		for i := range kids {
-			nx := None
-			if i+1 < len(kids) {
-				nx = kids[i+1]
-			}
-			t.next[kids[i]] = uint32(nx)
+		kids = t.sortChildren(ID(p), kids)
+	}
+}
+
+// FinishDirs orders the children of dirs and of every folder above them,
+// whose order their new sizes may have changed; the rest stays as it was.
+func (t *Tree) FinishDirs(dirs []ID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	done := map[ID]bool{}
+	var kids []ID
+	for _, d := range dirs {
+		for p := d; p != None && !done[p]; p = ID(t.parent[p]) {
+			done[p] = true
+			kids = t.sortChildren(p, kids)
 		}
 	}
+}
+
+func (t *Tree) sortChildren(p ID, kids []ID) []ID {
+	if t.first[p] == uint32(None) || t.next[t.first[p]] == uint32(None) {
+		return kids
+	}
+	kids = kids[:0]
+	for c := ID(t.first[p]); c != None; c = ID(t.next[c]) {
+		kids = append(kids, c)
+	}
+	slices.SortStableFunc(kids, func(a, b ID) int {
+		if c := cmp.Compare(t.alloc[b], t.alloc[a]); c != 0 {
+			return c
+		}
+		return bytes.Compare(t.name(a), t.name(b))
+	})
+	t.first[p] = uint32(kids[0])
+	for i := range kids {
+		nx := None
+		if i+1 < len(kids) {
+			nx = kids[i+1]
+		}
+		t.next[kids[i]] = uint32(nx)
+	}
+	return kids
 }
 
 func (t *Tree) name(id ID) []byte {

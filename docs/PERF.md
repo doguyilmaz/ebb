@@ -34,6 +34,18 @@ parent descriptor (Task 13).
 - Worker count is not settled: runs at 8/10/14 workers swung between 14 and 19 s with the cache state; measure
   interleaved, several rounds, before changing the default. The real lever for repeat scans is FSEvents (Task 30).
 
+### incremental rescans (FSEvents, 2026-10-18)
+
+Same Mac, data volume, ebb serving (watcher live), a few minutes of normal use between scans:
+
+| | Total | Folders listed again |
+|---|---|---|
+| full scan (baseline that stores the event ID) | 52 s | all 1.05M |
+| "scan again", first version | 10.7 s | 416 (8.2 s: whole-tree re-sort + quadratic clearing of big folders) |
+| "scan again", targeted sort + linear clearing | **2.6 s** | 208 in 1.2 s; the rest is detectors, saving the tree and a snapshot |
+
+FSEvents replay after ebb was off: ~3.6 h of changes = 30k folder events in 11 s, then the update as above.
+
 ## full scan (`/System/Volumes/Data`: 5.95M files, 1.04M folders, 410.6 GB, no Full Disk Access)
 
 | Build | Walk | Total (incl. detectors, saving) | Max RSS |

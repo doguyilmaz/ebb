@@ -181,6 +181,8 @@ type Session struct {
 
 	root, ioRoot string
 	removed      bool // a refresh took nodes out; the arena needs compacting
+	update       bool // an update sorts only the folders it touched
+	touched      []tree.ID
 	openFDs      atomic.Int64
 	fdBudget     int64
 	pending      int
@@ -298,7 +300,11 @@ func (s *Session) build() {
 			s.q.close()
 		}
 	}
-	s.t.Finish()
+	if s.update {
+		s.t.FinishDirs(s.touched)
+	} else {
+		s.t.Finish()
+	}
 	s.elapsed = time.Since(s.start)
 	close(s.done)
 }
@@ -340,7 +346,10 @@ func (s *Session) apply(b *batch) {
 			return
 		}
 		if b.refresh && errors.Is(b.err, fs.ErrNotExist) {
-			s.t.Write(func(w *tree.Writer) { w.Remove(b.dir) })
+			s.t.Write(func(w *tree.Writer) {
+				s.touched = append(s.touched, w.Node(b.dir).Parent)
+				w.Remove(b.dir)
+			})
 			s.removed = true
 			return
 		}
@@ -353,6 +362,9 @@ func (s *Session) apply(b *batch) {
 		p = s.root + rest
 	}
 	s.current.Store(&p)
+	if s.update {
+		s.touched = append(s.touched, b.dir)
+	}
 	var files, bytes uint64
 	s.t.Write(func(w *tree.Writer) {
 		var smallN uint32

@@ -23,7 +23,8 @@ import type {
 
 const q = encodeURIComponent;
 
-export const useStatus = () => useQuery({ queryKey: ["status"], queryFn: () => api.get<Status>("/status") });
+// Polled gently so "N folders changed" stays current while ebb watches the disk.
+export const useStatus = () => useQuery({ queryKey: ["status"], queryFn: () => api.get<Status>("/status"), refetchInterval: 15_000 });
 export const useVolume = () => useQuery({ queryKey: ["volume"], queryFn: () => api.get<Breakdown>("/volume"), retry: false });
 
 export const useFindings = (ignored = false) =>

@@ -38,7 +38,7 @@ export function Kpis({ volume, reclaimable, last, diff }: { volume: Breakdown; r
           <span className="kpi-value num">{count(last.files)}</span>
           <span className="kpi-delta num" data-dir={filesDelta === null ? undefined : Math.sign(filesDelta)}>
             {filesDelta !== null ? `${signed(filesDelta, count)} · ` : ""}
-            {Math.round(last.elapsed / 1e9)} s, {ago(last.time)}
+            {last.incremental ? `updated in ${(last.elapsed / 1e9).toFixed(1)} s` : `${Math.round(last.elapsed / 1e9)} s`}, {ago(last.time)}
           </span>
         </div>
       )}

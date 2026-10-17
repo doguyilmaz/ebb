@@ -52,6 +52,7 @@ func UpdateWith(ctx context.Context, t *tree.Tree, dirs, subtrees []string, opt 
 		jobs = append(jobs, job{path: ioRoot + rel, dir: id, refresh: true, deep: deep[id]})
 	}
 	s := newSession(ctx, opt, t, root, ioRoot)
+	s.update = true
 	s.run(jobs)
 	res, err := s.follow(every, fn)
 	if s.removed {

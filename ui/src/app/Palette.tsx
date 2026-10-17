@@ -50,7 +50,8 @@ export function Palette() {
       { id: "findings", label: "Findings", run: go("/findings") },
       { id: "activity", label: "Activity", run: go("/activity") },
       { id: "settings", label: "Settings", run: go("/settings") },
-      { id: "scan", label: "Scan again", run: () => (close(), scan.mutate({})) },
+      { id: "scan", label: "Scan again", hint: "only what changed", run: () => (close(), scan.mutate({})) },
+      { id: "scan-full", label: "Scan everything again", hint: "every folder", run: () => (close(), scan.mutate({ full: true })) },
       { id: "tour", label: "Take the tour", run: () => (close(), startTour()) },
       ...(presets.data ?? [])
         .filter((p) => p.bytes > 0)

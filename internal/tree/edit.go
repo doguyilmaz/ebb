@@ -9,16 +9,31 @@ package tree
 // It returns the removed file nodes.
 func (w *Writer) ClearOwn(dir ID) []ID {
 	t := w.t
+	// One pass: unlink every file child and keep the subfolders in order;
+	// removing files one by one would rescan the sibling list each time.
 	var removed []ID
-	for c := ID(t.first[dir]); c != None; c = ID(t.next[c]) {
-		if t.kind[c] != KindDir {
+	last := None
+	for c := ID(t.first[dir]); c != None; {
+		next := ID(t.next[c])
+		if t.kind[c] == KindDir {
+			if last == None {
+				t.first[dir] = uint32(c)
+			} else {
+				t.next[last] = uint32(c)
+			}
+			last = c
+		} else {
 			removed = append(removed, c)
 		}
+		c = next
 	}
-	for _, c := range removed {
-		w.Remove(c)
+	if last == None {
+		t.first[dir] = uint32(None)
+	} else {
+		t.next[last] = uint32(None)
 	}
-	// Beyond the subfolders, what a folder holds is its small-file total.
+	// What is left beyond the subfolders is the folder's own files: stored
+	// ones just unlinked plus the small-file total.
 	alloc, unique, logical, files := t.alloc[dir], t.unique[dir], t.logical[dir], t.files[dir]
 	for c := ID(t.first[dir]); c != None; c = ID(t.next[c]) {
 		alloc -= min(t.alloc[c], alloc)

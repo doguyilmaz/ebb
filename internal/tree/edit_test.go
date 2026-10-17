@@ -1,6 +1,10 @@
 package tree
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
 
 // editTree: /r/d holds a stored file, three small files and a subfolder s with
 // its own stored file; /r/gone is a second folder.
@@ -94,4 +98,48 @@ func TestRejoinKeepsTheCountedCopy(t *testing.T) {
 			t.Fatal("seen from gone, the copy is counted elsewhere")
 		}
 	})
+}
+
+func TestClearOwnManyFilesIsLinear(t *testing.T) {
+	tr := New("/r")
+	var d ID
+	tr.Write(func(w *Writer) {
+		d = w.AddDir(tr.Root(), []byte("d"), 1, 0)
+		w.AddDir(d, []byte("keep"), 1, 0)
+		for i := range 20000 {
+			w.AddFile(d, fmt.Appendf(nil, "f%05d", i), KindFile, 2<<20, 2<<20, 2<<20, 1, 0)
+		}
+	})
+	start := time.Now()
+	tr.Write(func(w *Writer) {
+		if n := len(w.ClearOwn(d)); n != 20000 {
+			t.Fatalf("removed %d", n)
+		}
+	})
+	if el := time.Since(start); el > 200*time.Millisecond {
+		t.Fatalf("clearing 20k files took %v", el)
+	}
+	if n := tr.Node(d); n.Alloc != 0 || len(tr.Children(d)) != 1 {
+		t.Fatalf("after clear %+v %v", n, tr.Children(d))
+	}
+}
+
+func TestFinishDirsSortsOnlyWhatChanged(t *testing.T) {
+	tr := New("/r")
+	var a, b ID
+	tr.Write(func(w *Writer) {
+		a = w.AddDir(tr.Root(), []byte("a"), 1, 0)
+		b = w.AddDir(tr.Root(), []byte("b"), 1, 0)
+		w.AddFile(a, []byte("x"), KindFile, 2<<20, 2<<20, 2<<20, 1, 0)
+		w.AddFile(b, []byte("y"), KindFile, 4<<20, 4<<20, 4<<20, 1, 0)
+	})
+	tr.Finish()
+	tr.Write(func(w *Writer) { w.AddFile(a, []byte("z"), KindFile, 9<<20, 9<<20, 9<<20, 1, 0) })
+	tr.FinishDirs([]ID{a})
+	if kids := tr.Children(tr.Root()); kids[0] != a {
+		t.Fatal("a grew past b; its parent's order must follow")
+	}
+	if kids := tr.Children(a); tr.Node(kids[0]).Name != "z" {
+		t.Fatal("a's own children are sorted")
+	}
 }
