@@ -1,0 +1,10 @@
+/bin/
+/dist/
+*.test
+*.out
+*.prof
+node_modules/
+ui/dist/
+internal/server/assets/dist/*
+!internal/server/assets/dist/README
+.DS_Store
