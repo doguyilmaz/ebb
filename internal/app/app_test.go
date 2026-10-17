@@ -218,3 +218,14 @@ func TestChooseFolder(t *testing.T) {
 		t.Fatal("unknown purposes must be refused, the prompt is never built from input")
 	}
 }
+
+func TestDiffWithoutEarlierScan(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	d, err := a.Diff("", "", 0)
+	if err != nil || d.From != nil || len(d.Changes) != 0 || d.To.Root == "" {
+		t.Fatalf("a single scan compares with nothing yet: %+v %v", d, err)
+	}
+}

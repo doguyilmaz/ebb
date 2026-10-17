@@ -7,8 +7,8 @@ const signed = (n: number, fmt: (v: number) => string) => (n === 0 ? "no change"
 /** The few numbers people check every time, each with how it moved since the scan before. */
 export function Kpis({ volume, reclaimable, last, diff }: { volume: Breakdown; reclaimable: number; last: Meta | null; diff?: DiffResponse }) {
   const used = volume.capacity - volume.free;
-  const usedDelta = diff ? diff.to.used - diff.from.used : null;
-  const filesDelta = diff ? diff.to.files - diff.from.files : null;
+  const usedDelta = diff?.from ? diff.to.used - diff.from.used : null;
+  const filesDelta = diff?.from ? diff.to.files - diff.from.files : null;
   return (
     <section className="kpis" aria-label="Key numbers">
       <div className="kpi">

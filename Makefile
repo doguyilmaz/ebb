@@ -16,7 +16,10 @@ check:
 	@out=$$(gofmt -l $$(find . -name '*.go' -not -path './ui/*')); test -z "$$out" || (echo "$$out"; exit 1)
 	cd ui && bun run typecheck && bun test
 
+e2e:
+	scripts/e2e.sh
+
 bench:
 	go test -run '^$$' -bench . -benchmem ./internal/walk ./internal/tree
 
-.PHONY: ui build test check bench
+.PHONY: ui build test check e2e bench

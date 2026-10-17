@@ -152,8 +152,10 @@ type HistoryResponse struct {
 	Snapshots []history.Meta `json:"snapshots"`
 }
 
+// DiffResponse compares two snapshots; From is null while there is no earlier
+// scan of the same folder to compare with.
 type DiffResponse struct {
-	From    history.Meta     `json:"from"`
+	From    *history.Meta    `json:"from"`
 	To      history.Meta     `json:"to"`
 	Changes []history.Change `json:"changes"`
 }

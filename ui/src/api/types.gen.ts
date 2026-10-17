@@ -173,7 +173,7 @@ export interface Change {
 }
 
 export interface DiffResponse {
-  from: Meta;
+  from: Meta | null;
   to: Meta;
   changes: Change[] | null;
 }

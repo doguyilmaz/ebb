@@ -76,6 +76,10 @@ func newDiffCmd(g *globals) *cobra.Command {
 				d.Changes = changes
 				return emitJSON(cmd.OutOrStdout(), d)
 			}
+			if d.From == nil {
+				fmt.Fprintf(cmd.OutOrStdout(), "No earlier scan of %s to compare with yet.\n", units.Printable(d.To.Root))
+				return nil
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "%s → %s\n", d.From.Time.Local().Format("2006-01-02 15:04"), d.To.Time.Local().Format("2006-01-02 15:04"))
 			var rows [][]string
 			for _, c := range changes {

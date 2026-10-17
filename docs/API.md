@@ -25,7 +25,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | POST | `/reveal` | `PathRequest` | 204 | 400 `outside-root` |
 | POST | `/choose-folder` | `ChooseRequest {purpose: scan\|protect}` | `ChooseResponse {path}` (empty when cancelled; shows the macOS chooser on this Mac) | 400, 409 `sandboxed` |
 | GET | `/history` | — | `HistoryResponse` | — |
-| GET | `/history/diff?from&to` | — | `DiffResponse` | 404 |
+| GET | `/history/diff?from&to` | — | `DiffResponse` (`from` is null while there is no earlier scan of the same folder; empty IDs mean the newest and the one before) | 404 |
 | GET/POST | `/settings` | `Settings` | `Settings` | 400 |
 | GET | `/presets` | — | `PresetView[]` | — |
 | POST | `/plans` | `PlanRequest {findingIds?, paths?, preset?, source?}` | `Plan` | 400, 409 `never-scanned` |

@@ -243,16 +243,15 @@ func (a *App) Diff(fromID, toID string, minDelta uint64) (api.DiffResponse, erro
 	}
 	var from *history.Snapshot
 	if fromID != "" {
-		from, err = a.History.Load(fromID)
-	} else {
-		from, err = a.History.Previous(to.Meta.Root, to.Meta.Time)
-	}
-	if err != nil {
-		return api.DiffResponse{}, errors.New("no earlier scan of " + to.Meta.Root + " to compare with")
+		if from, err = a.History.Load(fromID); err != nil {
+			return api.DiffResponse{}, ErrNotInScan
+		}
+	} else if from, err = a.History.Previous(to.Meta.Root, to.Meta.Time); err != nil {
+		return api.DiffResponse{To: to.Meta, Changes: []history.Change{}}, nil
 	}
 	changes := history.Explaining(history.Diff(from, to, minDelta))
 	if changes == nil {
 		changes = []history.Change{}
 	}
-	return api.DiffResponse{From: from.Meta, To: to.Meta, Changes: changes}, nil
+	return api.DiffResponse{From: &from.Meta, To: to.Meta, Changes: changes}, nil
 }

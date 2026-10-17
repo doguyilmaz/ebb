@@ -14,7 +14,7 @@ export function Changes() {
       <div className="card-head">
         <h2>Changed since the scan before</h2>
       </div>
-      {!d ? (
+      {!d?.from ? (
         <p className="muted">{diff.isLoading ? "Comparing…" : "After your next scan, this shows what grew and what shrank."}</p>
       ) : rows.length === 0 ? (
         <p className="muted">Nothing changed by more than 10 MB since {ago(d.from.time)}.</p>
