@@ -19,12 +19,40 @@ type Scan struct {
 	LargeFile string `toml:"large_file"`
 }
 
-type Config struct {
-	Scan Scan `toml:"scan"`
+type Server struct {
+	Port         int      `toml:"port"`
+	WebOrigins   []string `toml:"web_origins"`
+	WebConfirmed []string `toml:"web_confirmed"`
 }
 
+type Clean struct {
+	Protect []string `toml:"protect"`
+}
+
+type MCP struct {
+	// AutoExecute lets AI agents run plans without a confirmation when every
+	// item is "regenerable"; "never" always asks.
+	AutoExecute string `toml:"auto_execute"`
+}
+
+type Config struct {
+	Scan   Scan   `toml:"scan"`
+	Server Server `toml:"server"`
+	Clean  Clean  `toml:"clean"`
+	MCP    MCP    `toml:"mcp"`
+}
+
+const (
+	DefaultPort         = 47340
+	DefaultHostedOrigin = "https://ebb.apps.doguyilmaz.com"
+)
+
 func Default() Config {
-	return Config{Scan: Scan{StaleDays: 30, LargeFile: "1GiB"}}
+	return Config{
+		Scan:   Scan{StaleDays: 30, LargeFile: "1GiB"},
+		Server: Server{Port: DefaultPort, WebOrigins: []string{DefaultHostedOrigin}},
+		MCP:    MCP{AutoExecute: "regenerable"},
+	}
 }
 
 func Path(env sys.Env) string { return filepath.Join(sys.ConfigDir(env), "config.toml") }

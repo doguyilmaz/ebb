@@ -1,0 +1,67 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/signal"
+	"syscall"
+
+	"github.com/spf13/cobra"
+
+	"github.com/doguyilmaz/ebb/internal/server"
+	"github.com/doguyilmaz/ebb/internal/sys"
+)
+
+func newServeCmd(g *globals) *cobra.Command {
+	var port int
+	var open bool
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Run the local web UI and API on 127.0.0.1",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a, err := g.app()
+			if err != nil {
+				return err
+			}
+			token, err := server.LoadOrCreateToken(a.Env)
+			if err != nil {
+				return err
+			}
+			if st, ok := server.Live(a.Env); ok {
+				url := st.URL() + "/#token=" + token
+				fmt.Fprintf(cmd.OutOrStdout(), "ebb is already running: %s\n", url)
+				if open {
+					return openURL(a.Env, url)
+				}
+				return nil
+			}
+			if port == 0 {
+				port = a.Config.Server.Port
+			}
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			s := server.New(a, Version, token)
+			defer server.RemoveStatus(a.Env)
+			return server.Serve(ctx, s, fmt.Sprintf("127.0.0.1:%d", port), func(url string) {
+				_ = server.WriteStatus(a.Env, server.Status{PID: os.Getpid(), Port: port, Version: Version, Started: a.Env.Now()})
+				fmt.Fprintf(cmd.OutOrStdout(), "ebb is running: %s\nPress Ctrl-C to stop.\n", url)
+				if open {
+					_ = openURL(a.Env, url)
+				}
+			})
+		},
+	}
+	cmd.Flags().IntVar(&port, "port", 0, "port on 127.0.0.1 (default from config, 47340)")
+	cmd.Flags().BoolVar(&open, "open", false, "open the UI in the browser")
+	return cmd
+}
+
+func openURL(env sys.Env, url string) error {
+	if sys.Sandboxed(env) {
+		return nil
+	}
+	return exec.CommandContext(context.Background(), "open", url).Start()
+}

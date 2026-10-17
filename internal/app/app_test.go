@@ -124,3 +124,16 @@ func TestDefaultRootSandboxed(t *testing.T) {
 	}
 	_ = state.NewToken
 }
+
+func TestNormalizeOrigin(t *testing.T) {
+	for in, want := range map[string]string{"https://EBB.apps.doguyilmaz.com/": "https://ebb.apps.doguyilmaz.com", "http://localhost:3000": "http://localhost:3000"} {
+		if got, ok := NormalizeOrigin(in); !ok || got != want {
+			t.Errorf("%q → %q %v", in, got, ok)
+		}
+	}
+	for _, bad := range []string{"http://evil.example", "https://x.com/path", "javascript:alert(1)", "https://u:p@x.com", ""} {
+		if _, ok := NormalizeOrigin(bad); ok {
+			t.Errorf("%q must be rejected", bad)
+		}
+	}
+}

@@ -1,0 +1,1 @@
+Built web UI goes here (scripts/build-ui.sh). This marker keeps go:embed compiling on source builds.
