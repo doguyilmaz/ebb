@@ -44,8 +44,11 @@ func treeAt(t *testing.T, root string, specs ...string) *tree.Tree {
 			if mt != "" {
 				mtime, _ = strconv.ParseInt(mt, 10, 64)
 			}
-			i := strings.LastIndex(p, "/")
-			w.AddFile(dir(w, p[:i]), []byte(p[i+1:]), tree.KindFile, n<<20, n<<20, n<<20, mtime, 0)
+			parent, name := "", p
+			if i := strings.LastIndex(p, "/"); i >= 0 {
+				parent, name = p[:i], p[i+1:]
+			}
+			w.AddFile(dir(w, parent), []byte(name), tree.KindFile, n<<20, n<<20, n<<20, mtime, 0)
 		}
 	})
 	tr.Finish()
