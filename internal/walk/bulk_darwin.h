@@ -12,3 +12,5 @@ typedef struct {
 int ebb_bulk(int fd, char *attrbuf, size_t attrcap, ebb_entry *out, int outcap,
              char *names, size_t namecap, size_t *nameused, int want_clone);
 int ebb_set_iopolicy(int throttle);
+/* openat; returns the descriptor or -errno. */
+int ebb_openat(int dirfd, const char *name, int flags);

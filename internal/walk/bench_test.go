@@ -5,10 +5,12 @@ package walk
 import (
 	"context"
 	"os"
+	"strconv"
 	"testing"
 )
 
-// BenchmarkScanHome scans EBB_BENCH_ROOT with each reader configuration.
+// BenchmarkScanHome scans EBB_BENCH_ROOT with each reader configuration,
+// using EBB_BENCH_THREADS workers when set.
 func BenchmarkScanHome(b *testing.B) {
 	root := os.Getenv("EBB_BENCH_ROOT")
 	if root == "" {
@@ -24,7 +26,8 @@ func BenchmarkScanHome(b *testing.B) {
 		b.Run(c.name, func(b *testing.B) {
 			for b.Loop() {
 				benchReader = c.r()
-				res, err := Scan(context.Background(), Options{Root: root}, 0, nil)
+				threads, _ := strconv.Atoi(os.Getenv("EBB_BENCH_THREADS"))
+				res, err := Scan(context.Background(), Options{Root: root, Threads: threads}, 0, nil)
 				benchReader = nil
 				if err != nil {
 					b.Fatal(err)

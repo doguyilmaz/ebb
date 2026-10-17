@@ -23,6 +23,17 @@ deduplicated like hardlinks. CPU profile: ~90 % of time is kernel work — direc
 `getattrlistbulk` (~30 %); Go-side work is negligible. Next lever: open children with `openat` relative to the
 parent descriptor (Task 13).
 
+### openat and searchfs (2026-10-17)
+
+- Opening subfolders with `openat` relative to the parent's descriptor (kept open while its children are queued,
+  budget half the process fd limit, path fallback beyond it): 8.6 → 8.0 s on `~/Library` (880k files, warm, back to
+  back). Profile afterwards: `openat` ~49 %, `getattrlistbulk` ~41 %, Go ~2 % — the cost is the kernel's per-vnode
+  work, not path lookup, so no language or FFI change helps.
+- `searchfs(2)` catalog scan, as a read-only probe: works without root and returns sizes, but runs on one thread —
+  117 s for the whole data volume (7.06M entries) versus ~45 s for the parallel walk. Not worth pursuing.
+- Worker count is not settled: runs at 8/10/14 workers swung between 14 and 19 s with the cache state; measure
+  interleaved, several rounds, before changing the default. The real lever for repeat scans is FSEvents (Task 30).
+
 ## full scan (`/System/Volumes/Data`: 5.95M files, 1.04M folders, 410.6 GB, no Full Disk Access)
 
 | Build | Walk | Total (incl. detectors, saving) | Max RSS |

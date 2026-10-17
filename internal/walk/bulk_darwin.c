@@ -1,6 +1,7 @@
 #include "bulk_darwin.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/attr.h>
 #include <sys/resource.h>
@@ -127,4 +128,9 @@ int ebb_set_iopolicy(int throttle) {
 	/* Never download iCloud files or folders just because a scan looked. */
 	setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_OFF);
 	return setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, throttle ? IOPOL_THROTTLE : IOPOL_UTILITY);
+}
+
+int ebb_openat(int dirfd, const char *name, int flags) {
+	int fd = openat(dirfd, name, flags);
+	return fd < 0 ? -errno : fd;
 }

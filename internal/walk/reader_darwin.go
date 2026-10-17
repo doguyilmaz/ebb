@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -46,6 +47,7 @@ type scratch struct {
 	attr  []byte
 	names []byte
 	out   []C.ebb_entry
+	name  []byte // NUL-terminated child name for openat
 }
 
 type bulkReader struct {
@@ -66,12 +68,41 @@ func newBulkReader() *bulkReader {
 	return r
 }
 
-func (r *bulkReader) readDir(path string, b *batch) error {
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|oNoFollowAny, 0)
+const openFlags = syscall.O_RDONLY | syscall.O_DIRECTORY | syscall.O_CLOEXEC | oNoFollowAny
+
+func (r *bulkReader) open(j job) (int, error) {
+	if j.parent == nil {
+		return syscall.Open(j.path, openFlags, 0)
+	}
+	sc := r.scratch.Get().(*scratch)
+	defer r.scratch.Put(sc)
+	sc.name = append(append(sc.name[:0], j.path[strings.LastIndexByte(j.path, '/')+1:]...), 0)
+	fd := int(C.ebb_openat(C.int(j.parent.fd), (*C.char)(unsafe.Pointer(&sc.name[0])), C.int(openFlags)))
+	if fd < 0 {
+		return -1, syscall.Errno(-fd)
+	}
+	return fd, nil
+}
+
+func (r *bulkReader) readDir(s *Session, j job, b *batch) error {
+	path := j.path
+	fd, err := r.open(j)
 	if err != nil {
 		return &os.PathError{Op: "open", Path: path, Err: err}
 	}
-	defer syscall.Close(fd)
+	if err := r.read(fd, path, b); err != nil {
+		syscall.Close(fd)
+		return err
+	}
+	if d, ok := s.keep(fd); ok {
+		b.fd = d
+	} else {
+		syscall.Close(fd)
+	}
+	return nil
+}
+
+func (r *bulkReader) read(fd int, path string, b *batch) error {
 	sc := r.scratch.Get().(*scratch)
 	defer r.scratch.Put(sc)
 	for {

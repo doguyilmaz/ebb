@@ -13,7 +13,8 @@ import (
 // and the reference the faster platform readers are checked against.
 type genericReader struct{}
 
-func (genericReader) readDir(path string, b *batch) error {
+func (genericReader) readDir(_ *Session, j job, b *batch) error {
+	path := j.path
 	var dirSt syscall.Stat_t
 	if err := syscall.Stat(path, &dirSt); err != nil {
 		return &os.PathError{Op: "stat", Path: path, Err: err}

@@ -25,6 +25,7 @@ type Options struct {
 	Gentle         bool   // throttled I/O for background scans
 	SmallThreshold uint64 // 0 → 1 MiB
 	Reader         string // "" picks the fastest reader for the platform; "generic" forces ReadDir+Lstat
+	maxOpen        int64  // directories kept open at once; 0 derives it from the process limit
 }
 
 type Progress struct {
@@ -78,6 +79,25 @@ type batch struct {
 	entries []entry
 	names   []byte
 	err     error
+	// fd stays open after reading so subfolders open relative to it; the
+	// builder hands it to their jobs.
+	fd *dirFD
+}
+
+// dirFD is an open directory shared by the jobs of its subfolders. Opening a
+// child with openat skips the kernel's lookup of every path component, which
+// was the largest part of a scan.
+type dirFD struct {
+	fd   int
+	refs atomic.Int32
+	open *atomic.Int64
+}
+
+func (d *dirFD) release() {
+	if d != nil && d.refs.Add(-1) == 0 {
+		closeFD(d.fd)
+		d.open.Add(-1)
+	}
 }
 
 func (b *batch) name(e *entry) []byte { return b.names[e.nameOff : e.nameOff+uint32(e.nameLen)] }
@@ -89,12 +109,15 @@ func (b *batch) addName(name string) (uint32, uint16) {
 }
 
 type reader interface {
-	readDir(path string, b *batch) error
+	// readDir lists j's directory into b. A reader that can keep the
+	// directory open sets b.fd when s still has descriptors to spare.
+	readDir(s *Session, j job, b *batch) error
 }
 
 type job struct {
-	path string
-	dir  tree.ID
+	path   string
+	dir    tree.ID
+	parent *dirFD // open parent directory, or nil to open by path
 }
 
 type queue struct {
@@ -152,6 +175,8 @@ type Session struct {
 	current                       atomic.Pointer[string]
 
 	root, ioRoot string
+	openFDs      atomic.Int64
+	fdBudget     int64
 	pending      int
 	problems     []Problem
 	done         chan struct{}
@@ -188,6 +213,10 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 		threshold: opt.SmallThreshold, start: time.Now(), done: make(chan struct{}),
 	}
 	s.pool.New = func() any { return &batch{} }
+	s.fdBudget = opt.maxOpen
+	if s.fdBudget == 0 {
+		s.fdBudget = fdBudget()
+	}
 	setIOPolicy(opt.Gentle)
 	r := newReader(opt.Reader)
 
@@ -201,7 +230,7 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 	}()
 	s.pending = 1
 	s.root, s.ioRoot = root, ioRoot
-	s.q.push(job{ioRoot, s.t.Root()})
+	s.q.push(job{ioRoot, s.t.Root(), nil})
 	go s.build()
 	return s, nil
 }
@@ -213,19 +242,34 @@ func (s *Session) work(r reader) {
 			return
 		}
 		b := s.pool.Get().(*batch)
-		b.dir, b.path, b.entries, b.names, b.err = j.dir, j.path, b.entries[:0], b.names[:0], nil
+		b.dir, b.path, b.entries, b.names, b.err, b.fd = j.dir, j.path, b.entries[:0], b.names[:0], nil, nil
 		if err := s.ctx.Err(); err != nil {
 			b.err = err
 		} else {
-			b.err = r.readDir(j.path, b)
+			b.err = r.readDir(s, j, b)
 		}
+		j.parent.release()
 		s.batches <- b
 	}
+}
+
+// keep wraps an open directory for its subfolders' jobs, or reports false
+// when too many are open already.
+func (s *Session) keep(fd int) (*dirFD, bool) {
+	if s.openFDs.Add(1) > s.fdBudget {
+		s.openFDs.Add(-1)
+		return nil, false
+	}
+	d := &dirFD{fd: fd, open: &s.openFDs}
+	d.refs.Store(1)
+	return d, true
 }
 
 func (s *Session) build() {
 	for b := range s.batches {
 		s.apply(b)
+		b.fd.release()
+		b.fd = nil
 		if cap(b.entries) <= maxPooledEntries {
 			s.pool.Put(b)
 		}
@@ -237,6 +281,18 @@ func (s *Session) build() {
 	s.t.Finish()
 	s.elapsed = time.Since(s.start)
 	close(s.done)
+}
+
+func closeFD(fd int) { syscall.Close(fd) }
+
+// fdBudget is how many directories may stay open at once: half the process
+// limit, so the rest of ebb (server, history) never runs out.
+func fdBudget() int64 {
+	var lim syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &lim); err != nil {
+		return 64
+	}
+	return max(64, min(4096, int64(lim.Cur/2)))
 }
 
 func childPath(dir string, name []byte) string {
@@ -302,7 +358,10 @@ func (s *Session) apply(b *batch) {
 				id := w.AddDir(b.dir, name, e.mtime, 0)
 				s.pending++
 				s.dirs.Add(1)
-				s.q.push(job{childPath(b.path, name), id})
+				if b.fd != nil {
+					b.fd.refs.Add(1)
+				}
+				s.q.push(job{childPath(b.path, name), id, b.fd})
 				continue
 			}
 			markers |= tree.MarkerBit(string(name))

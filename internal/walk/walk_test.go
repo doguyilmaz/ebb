@@ -245,3 +245,29 @@ func TestScanThroughSymlinkedRoot(t *testing.T) {
 		}
 	}
 }
+
+func TestScanReleasesDirectories(t *testing.T) {
+	root := fixture(t)
+	full := scanFiles(t, root, 0)
+	if got := scanFiles(t, root, 1); got != full {
+		t.Fatalf("with one spare descriptor the scan sees %d files, with plenty %d", got, full)
+	}
+}
+
+// scanFiles scans root with at most budget directories kept open (0: the
+// default) and checks that every one of them was closed again.
+func scanFiles(t *testing.T, root string, budget int64) uint64 {
+	t.Helper()
+	s, err := Start(context.Background(), Options{Root: root, maxOpen: budget})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.Wait()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := s.openFDs.Load(); n != 0 {
+		t.Fatalf("%d directories still open after the scan", n)
+	}
+	return res.Files
+}
