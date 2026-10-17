@@ -6,6 +6,7 @@ package clean
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -37,6 +38,13 @@ func canonical(p string) string {
 		return "/"
 	}
 	return p
+}
+
+// isFile: the top-level rule guards folders like ~/Documents, not a download
+// lying directly in the home folder. Anything unreadable counts as a folder.
+func isFile(path string) bool {
+	st, err := os.Lstat(path)
+	return err == nil && !st.IsDir()
 }
 
 func within(p, root string) bool {
@@ -113,7 +121,7 @@ func (g Guard) checkName(path string) error {
 		return errors.New("protected folder")
 	}
 	parent := filepath.Dir(p)
-	if slices.ContainsFunc(tops, func(t string) bool { return lower(t) == parent }) {
+	if slices.ContainsFunc(tops, func(t string) bool { return lower(t) == parent }) && !isFile(path) {
 		return errors.New("top-level folder: remove what is inside it instead")
 	}
 	for _, glob := range g.Protect {
@@ -166,15 +174,20 @@ func (g Guard) checkIdentity(resolved string) error {
 			return errors.New("protected folder")
 		}
 	}
-	inRoot := false
-	if id, ok := idOf(resolved, false); ok {
+	// The data volume is reached through firmlinks (/Users, /private) whose
+	// parent chain runs over the system volume and never passes the root, and
+	// both volumes report one device. For it the name check on the resolved
+	// path, already done, is the whole answer; system locations have their
+	// own protections and the system volume is read-only.
+	inRoot := slices.ContainsFunc(g.Roots, func(r string) bool { return canonical(filepath.Clean(r)) == "/" })
+	if id, ok := idOf(resolved, false); ok && !inRoot {
 		_, inRoot = rootIDs[id]
 	}
 	first := true
 	for dir := filepath.Dir(resolved); ; dir = filepath.Dir(dir) {
 		id, ok := idOf(dir, true)
 		if ok {
-			if _, hit := topIDs[id]; hit && first {
+			if _, hit := topIDs[id]; hit && first && !isFile(resolved) {
 				return errors.New("top-level folder: remove what is inside it instead")
 			}
 			if id == usrLocal {

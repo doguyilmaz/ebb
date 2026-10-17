@@ -329,3 +329,41 @@ func TestGuardVolumeRootChildren(t *testing.T) {
 		t.Errorf("deep temp folders stay allowed: %v", err)
 	}
 }
+
+// Paths under the data volume reach it through firmlinks (/Users, /private):
+// their parent chain never passes /System/Volumes/Data, yet they are inside it.
+func TestGuardFirmlinkedPathInsideDataVolume(t *testing.T) {
+	if _, err := os.Stat(dataVolume); err != nil {
+		t.Skip("no data volume")
+	}
+	dir := t.TempDir()
+	f := filepath.Join(dir, "cache.bin")
+	if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := Guard{Home: filepath.Join(dir, "home"), Roots: []string{dataVolume}}
+	if err := g.Check(f); err != nil {
+		t.Fatalf("a file on the scanned data volume is inside it: %v", err)
+	}
+	if err := (Guard{Home: g.Home, Roots: []string{filepath.Join(dir, "elsewhere")}}).Check(f); err == nil {
+		t.Fatal("a file outside a folder root is still outside")
+	}
+}
+
+func TestGuardFileDirectlyInHomeIsFine(t *testing.T) {
+	home := t.TempDir()
+	zip := filepath.Join(home, "archive.zip")
+	if err := os.WriteFile(zip, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(home, "Work"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := Guard{Home: home, Roots: []string{home}}
+	if err := g.Check(zip); err != nil {
+		t.Fatalf("a file in the home folder is not a top-level folder: %v", err)
+	}
+	if err := g.Check(filepath.Join(home, "Work")); err == nil {
+		t.Fatal("a folder directly in home stays protected")
+	}
+}
