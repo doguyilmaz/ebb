@@ -61,15 +61,27 @@ func (s *Server) api(pattern string, h func(http.ResponseWriter, *http.Request) 
 	s.mux.HandleFunc(pattern, s.auth(s.json(h)))
 }
 
+// local registers a route only this machine's own token may call: a token
+// issued to a paired page must never widen web access for itself or others.
+func (s *Server) local(pattern string, h func(http.ResponseWriter, *http.Request) (any, error)) {
+	s.mux.HandleFunc(pattern, s.auth(func(w http.ResponseWriter, r *http.Request) {
+		if !s.master(r) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "only ebb on this machine can manage web access", "code": "local-only"})
+			return
+		}
+		s.json(h)(w, r)
+	}))
+}
+
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+healthPath, s.json(s.health))
 	s.mux.HandleFunc("POST /api/v1/pair", s.json(s.pair))
-	s.api("GET /api/v1/pair/pending", s.pairPending)
-	s.api("POST /api/v1/pair/confirm", s.pairConfirm)
-	s.api("POST /api/v1/pair/reject", s.pairReject)
+	s.local("GET /api/v1/pair/pending", s.pairPending)
+	s.local("POST /api/v1/pair/confirm", s.pairConfirm)
+	s.local("POST /api/v1/pair/reject", s.pairReject)
 	s.api("GET /api/v1/web", s.webAccess)
-	s.api("POST /api/v1/web/allow", s.webAllow)
-	s.api("POST /api/v1/web/deny", s.webDeny)
+	s.local("POST /api/v1/web/allow", s.webAllow)
+	s.local("POST /api/v1/web/deny", s.webDeny)
 	s.mux.HandleFunc("GET /api/v1/events", s.auth(s.handleEvents))
 	s.mux.HandleFunc("/api/", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such endpoint"})
@@ -77,12 +89,20 @@ func (s *Server) routes() {
 	s.mux.Handle("/", s.spa)
 }
 
-func (s *Server) authorized(r *http.Request) bool {
+func bearer(r *http.Request) string {
 	tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok || tok == "" {
 		tok = r.URL.Query().Get("token")
 	}
-	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1 || s.app.WebTokenValid(tok)
+	return tok
+}
+
+func (s *Server) master(r *http.Request) bool {
+	return subtle.ConstantTimeCompare([]byte(bearer(r)), []byte(s.token)) == 1
+}
+
+func (s *Server) authorized(r *http.Request) bool {
+	return s.master(r) || s.app.WebTokenValid(bearer(r))
 }
 
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {

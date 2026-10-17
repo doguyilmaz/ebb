@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/doguyilmaz/ebb/internal/finding"
-	"github.com/doguyilmaz/ebb/internal/report"
 	"github.com/doguyilmaz/ebb/internal/units"
 )
 
@@ -41,7 +40,7 @@ func newFindingsCmd(g *globals) *cobra.Command {
 			var rows [][]string
 			for _, f := range fs {
 				act := "-"
-				if report.Actionable(f) {
+				if f.Actionable() {
 					act = f.Actions[0].Kind
 				} else if len(f.Actions) > 0 {
 					act = "manual"

@@ -56,16 +56,12 @@ func newWebCmd(g *globals) *cobra.Command {
 			}
 			return show(cmd, w)
 		}},
-		&cobra.Command{Use: "confirm [code]", Short: "Approve the page waiting to pair (check the code it shows)", Args: cobra.MaximumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		&cobra.Command{Use: "confirm <code>", Short: "Approve the page waiting to pair, by the code it shows", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := g.app()
 			if err != nil {
 				return err
 			}
-			code := ""
-			if len(args) == 1 {
-				code = args[0]
-			}
-			p, err := a.ConfirmPair(code)
+			p, err := a.ConfirmPair(args[0])
 			if err != nil {
 				return err
 			}

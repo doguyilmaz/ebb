@@ -35,7 +35,7 @@ func WriteText(w io.Writer, r *Report, width int) error {
 	line("      %s", strings.Join(parts, " · "))
 	actionable := 0
 	for _, f := range r.Findings {
-		if Actionable(f) {
+		if f.Actionable() {
 			actionable++
 		}
 	}

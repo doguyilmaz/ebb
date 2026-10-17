@@ -144,3 +144,38 @@ func TestWebAllowDeny(t *testing.T) {
 		t.Fatalf("deny: %d", status)
 	}
 }
+
+func pairedToken(t *testing.T, c *client) string {
+	_, body := c.post("/api/v1/pair", hosted, false, nonce)
+	c.post("/api/v1/pair/confirm", "", true, `{"code":"`+body["code"].(string)+`"}`)
+	_, got := c.post("/api/v1/pair", hosted, false, nonce)
+	return got["token"].(string)
+}
+
+func TestWebTokenCannotManageAccess(t *testing.T) {
+	c := newClient(t)
+	tok := pairedToken(t, c)
+	for _, p := range []string{"/api/v1/web/allow", "/api/v1/web/deny", "/api/v1/pair/confirm", "/api/v1/pair/reject"} {
+		r, _ := http.NewRequest("POST", c.srv.URL+p, strings.NewReader(`{"origin":"https://x.example","code":"123456"}`))
+		r.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 403 {
+			t.Fatalf("%s with a page token: %d", p, resp.StatusCode)
+		}
+	}
+}
+
+func TestConfirmNeedsTheCode(t *testing.T) {
+	c := newClient(t)
+	c.post("/api/v1/pair", hosted, false, nonce)
+	if status, _ := c.post("/api/v1/pair/confirm", "", true, `{}`); status != 400 {
+		t.Fatalf("confirming without the code the page shows: %d", status)
+	}
+	if p, _ := c.app.PendingPair(); p == nil || p.Confirmed {
+		t.Fatal("request must stay unconfirmed")
+	}
+}

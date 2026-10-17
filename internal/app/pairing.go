@@ -196,10 +196,9 @@ func (a *App) PendingPair() (*PendingPair, error) {
 // the CLI or the local interface — never from the page that is asking. It
 // approves the open request; the page then claims its token with its nonce.
 //
-// An empty code confirms whatever single request is open, which is what someone
-// typing `ebb web confirm` at their own keyboard means. Passing the code
-// checks it, for anyone who wants to be sure the page in front of them is the
-// one being let in.
+// The code is required: comparing it with the one the page shows is what
+// makes sure the page in front of the person is the one being let in, even if
+// another allowed page asked a moment earlier.
 func (a *App) ConfirmPair(code string) (PendingPair, error) {
 	p, err := a.PendingPair()
 	if err != nil {
@@ -208,7 +207,10 @@ func (a *App) ConfirmPair(code string) (PendingPair, error) {
 	if p == nil {
 		return PendingPair{}, errors.New("nothing is waiting to be confirmed")
 	}
-	if code != "" && subtle.ConstantTimeCompare([]byte(code), []byte(p.Code)) != 1 {
+	if code == "" {
+		return PendingPair{}, fmt.Errorf("type the 6-digit code the page from %s shows, so you approve that page and no other", p.Origin)
+	}
+	if subtle.ConstantTimeCompare([]byte(code), []byte(p.Code)) != 1 {
 		// Count the miss and retire the request once it has been guessed at
 		// enough times, so the six digits cannot be walked.
 		p.Attempts++

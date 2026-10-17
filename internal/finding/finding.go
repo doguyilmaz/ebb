@@ -78,3 +78,7 @@ func (f *Finding) Total() {
 		f.Alloc += t.Alloc
 	}
 }
+
+// Actionable reports whether ebb can carry out the default action itself
+// (manual and informational findings only explain).
+func (f Finding) Actionable() bool { return len(f.Actions) > 0 && f.Actions[0].Kind != "manual" }

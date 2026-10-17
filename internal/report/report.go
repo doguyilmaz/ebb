@@ -40,11 +40,6 @@ type Report struct {
 	Notes       []string          `json:"notes"`
 }
 
-// Actionable reports whether ebb can carry out the finding's default action.
-func Actionable(f finding.Finding) bool {
-	return len(f.Actions) > 0 && f.Actions[0].Kind != "manual"
-}
-
 func Build(r *app.ScanResult, links volume.Firmlinks, version string) *Report {
 	t := r.Tree
 	root := t.Node(t.Root())
@@ -53,7 +48,7 @@ func Build(r *app.ScanResult, links volume.Firmlinks, version string) *Report {
 		rep.Findings = []finding.Finding{}
 	}
 	for _, f := range r.Findings {
-		if Actionable(f) {
+		if f.Actionable() {
 			rep.Reclaimable += f.Bytes
 		}
 	}

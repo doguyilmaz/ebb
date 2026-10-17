@@ -15,10 +15,9 @@ import (
 var htmlTemplate string
 
 var page = template.Must(template.New("report").Funcs(template.FuncMap{
-	"bytes":      units.Bytes,
-	"pct":        func(f float64) string { return strconv.FormatFloat(f*100, 'f', 1, 64) + "%" },
-	"indent":     func(d int) int { return (d - 1) * 16 },
-	"actionable": Actionable,
+	"bytes":  units.Bytes,
+	"pct":    func(f float64) string { return strconv.FormatFloat(f*100, 'f', 1, 64) + "%" },
+	"indent": func(d int) int { return (d - 1) * 16 },
 }).Parse(htmlTemplate))
 
 // WriteHTML writes a single self-contained page: the data is inlined and the
