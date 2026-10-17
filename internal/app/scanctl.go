@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
@@ -21,10 +22,21 @@ func (a *App) begin(root string) error {
 func (a *App) end(err error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.running = false
-	if err != nil {
+	a.running, a.stop = false, nil
+	if err != nil && !errors.Is(err, ErrScanStopped) {
 		a.scanErr = err.Error()
 	}
+}
+
+// StopScan cancels the background scan, if one runs; the last result stays.
+func (a *App) StopScan() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.running || a.stop == nil {
+		return false
+	}
+	a.stop()
+	return true
 }
 
 // StartScan runs a scan in the background. progress is called every 100 ms
@@ -37,8 +49,13 @@ func (a *App) StartScan(opt ScanOptions, progress func(api.Progress), done func(
 	if err := a.begin(a.Links.Display(root)); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.mu.Lock()
+	a.stop = cancel
+	a.mu.Unlock()
 	go func() {
-		res, err := a.scan(context.Background(), opt, func(p walk.Progress) {
+		defer cancel()
+		res, err := a.scan(ctx, opt, func(p walk.Progress) {
 			ap := api.Progress{Dirs: p.Dirs, Files: p.Files, Bytes: p.Bytes, Problems: p.Problems, Path: a.Links.Display(p.Path), ElapsedMs: p.Elapsed.Milliseconds()}
 			a.mu.Lock()
 			a.progress = &ap
@@ -47,6 +64,9 @@ func (a *App) StartScan(opt ScanOptions, progress func(api.Progress), done func(
 				progress(ap)
 			}
 		})
+		if ctx.Err() != nil {
+			res, err = nil, ErrScanStopped
+		}
 		a.end(err)
 		if done != nil {
 			done(res, err)

@@ -14,6 +14,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/status` | — | `Status` | — |
 | POST | `/scans` | `ScanRequest` | `ScanState` (202) | 409 `scan-running` |
 | GET | `/scans/current` | — | `ScanState` | — |
+| DELETE | `/scans/current` | — | `ScanState` (202; `scan.done` follows with `stopped: true`, the last result stays) | 409 `no-scan` |
 | GET | `/volume` | — | `Breakdown` | 409 `never-scanned` |
 | GET | `/tree?path&depth&minShare&maxNodes` | — | `SliceResponse` | 400 `outside-root`, 409 `never-scanned` |
 | GET | `/ages?path` | — | `AgesResponse` (bytes by last-modified bucket, relative to the scan time) | 400 `outside-root`, 409 `never-scanned` |

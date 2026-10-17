@@ -50,6 +50,9 @@ func (s *Server) cors(w http.ResponseWriter, r *http.Request) bool {
 
 func (s *Server) health(_ http.ResponseWriter, r *http.Request) (any, error) {
 	h := api.Health{OK: true, Version: s.version, Allowed: true}
+	if a, ok := r.Context().Value(http.LocalAddrContextKey).(*net.TCPAddr); ok {
+		h.Port = a.Port
+	}
 	if origin := r.Header.Get("Origin"); origin != "" && !s.app.WebOriginAllowed(origin) {
 		h.Allowed = false
 		return h, nil

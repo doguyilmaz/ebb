@@ -212,6 +212,7 @@ export interface Health {
   version: string;
   allowed: boolean;
   device?: string;
+  port?: number;
 }
 
 export interface Error {

@@ -2,7 +2,9 @@ package server
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -59,8 +61,16 @@ func (c *client) req(method, path string, hdr map[string]string) *http.Response 
 
 func TestHealthOpen(t *testing.T) {
 	c := newClient(t)
-	if resp := c.req("GET", "/api/v1/health", nil); resp.StatusCode != 200 {
+	resp := c.req("GET", "/api/v1/health", nil)
+	if resp.StatusCode != 200 {
 		t.Fatalf("health %d", resp.StatusCode)
+	}
+	var h api.Health
+	if err := json.NewDecoder(resp.Body).Decode(&h); err != nil {
+		t.Fatal(err)
+	}
+	if want := c.srv.Listener.Addr().(*net.TCPAddr).Port; h.Port != want {
+		t.Fatalf("health port %d, listening on %d", h.Port, want)
 	}
 }
 

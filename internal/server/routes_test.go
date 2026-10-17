@@ -162,3 +162,18 @@ func TestSettingsRoundTripAndValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestStopScanRoute(t *testing.T) {
+	c, root := scanned(t)
+	auth := map[string]string{"Authorization": "Bearer secret"}
+	if resp := c.req("DELETE", "/api/v1/scans/current", auth); resp.StatusCode != 409 {
+		t.Fatalf("stop with nothing running: %d", resp.StatusCode)
+	}
+	if code, out := c.post("/api/v1/scans", "", true, `{"root":"`+root+`"}`); code != 202 {
+		t.Fatalf("start: %d %v", code, out)
+	}
+	// A small fixture may finish first; then there is nothing left to stop.
+	if resp := c.req("DELETE", "/api/v1/scans/current", auth); resp.StatusCode != 202 && resp.StatusCode != 409 {
+		t.Fatalf("stop: %d", resp.StatusCode)
+	}
+}

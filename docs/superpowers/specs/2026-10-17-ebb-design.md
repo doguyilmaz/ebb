@@ -290,7 +290,7 @@ Homebrew upgrades may require re-granting; the UI detects and explains this.
 
 ```
 GET  /api/v1/status                         version, scan state, last scan, FDA status
-POST /api/v1/scans {root?, threads?}        start (one active scan); GET /api/v1/scans/current
+POST /api/v1/scans {root?, threads?}        start (one active scan); GET /api/v1/scans/current; DELETE stops it
 GET  /api/v1/events                         SSE: hello, scan.progress, scan.done,
                                             plan.progress, plan.done, findings.changed, history.changed
 GET  /api/v1/volume

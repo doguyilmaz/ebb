@@ -3,6 +3,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,6 +25,7 @@ const dataVolume = "/System/Volumes/Data"
 var (
 	ErrNeverScanned = errors.New("no scan yet — run: ebb scan")
 	ErrScanRunning  = errors.New("a scan is already running")
+	ErrScanStopped  = errors.New("the scan was stopped")
 )
 
 type App struct {
@@ -35,6 +37,7 @@ type App struct {
 
 	mu       sync.Mutex
 	running  bool
+	stop     context.CancelFunc
 	scanRoot string
 	scanErr  string
 	progress *api.Progress

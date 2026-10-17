@@ -169,3 +169,26 @@ func hasFinding(fs []api.FindingView, id string) bool {
 	}
 	return false
 }
+
+func TestStopScan(t *testing.T) {
+	a, root := testApp(t)
+	if a.StopScan() {
+		t.Fatal("stopped a scan that was not running")
+	}
+	done := make(chan error, 1)
+	if err := a.StartScan(ScanOptions{Root: root}, nil, func(_ *ScanResult, err error) { done <- err }); err != nil {
+		t.Fatal(err)
+	}
+	if !a.StopScan() {
+		t.Fatal("no running scan to stop")
+	}
+	if err := <-done; !errors.Is(err, ErrScanStopped) {
+		t.Fatalf("want ErrScanStopped, got %v", err)
+	}
+	if st := a.ScanState(); st.Running || st.Error != "" {
+		t.Fatalf("a stopped scan is not an error: %+v", st)
+	}
+	if _, err := a.Last(); !errors.Is(err, ErrNeverScanned) {
+		t.Fatalf("a stopped scan must not replace the last result: %v", err)
+	}
+}

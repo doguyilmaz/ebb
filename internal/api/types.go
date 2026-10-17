@@ -186,6 +186,7 @@ type Health struct {
 	Version string `json:"version"`
 	Allowed bool   `json:"allowed"`
 	Device  string `json:"device,omitempty"`
+	Port    int    `json:"port,omitempty"` // the port this ebb listens on, also behind a dev proxy
 }
 
 type Error struct {
