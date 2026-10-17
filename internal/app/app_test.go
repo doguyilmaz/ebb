@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -190,5 +191,30 @@ func TestStopScan(t *testing.T) {
 	}
 	if _, err := a.Last(); !errors.Is(err, ErrNeverScanned) {
 		t.Fatalf("a stopped scan must not replace the last result: %v", err)
+	}
+}
+
+func TestChooseFolder(t *testing.T) {
+	a, _ := testApp(t)
+	var script string
+	a.Env.(*sys.Fake).RunFn = func(_ string, name string, args ...string) ([]byte, error) {
+		script = strings.Join(args, " ")
+		return []byte("/Users/me/Work/\n"), nil
+	}
+	got, err := a.ChooseFolder(context.Background(), "scan")
+	if err != nil || got != "/Users/me/Work" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if !strings.Contains(script, "choose folder") {
+		t.Fatalf("script %q", script)
+	}
+	a.Env.(*sys.Fake).RunFn = func(string, string, ...string) ([]byte, error) {
+		return nil, &exec.ExitError{Stderr: []byte("execution error: User canceled. (-128)")}
+	}
+	if got, err := a.ChooseFolder(context.Background(), "protect"); err != nil || got != "" {
+		t.Fatalf("cancel: %q, %v", got, err)
+	}
+	if _, err := a.ChooseFolder(context.Background(), `"); do shell script "x`); err == nil {
+		t.Fatal("unknown purposes must be refused, the prompt is never built from input")
 	}
 }

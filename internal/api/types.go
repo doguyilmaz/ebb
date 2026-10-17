@@ -65,6 +65,16 @@ type AgesResponse struct {
 	Buckets []AgeBucket `json:"buckets"`
 }
 
+// ChooseRequest asks ebb to show the macOS folder chooser; Purpose is "scan" or "protect".
+type ChooseRequest struct {
+	Purpose string `json:"purpose"`
+}
+
+// ChooseResponse has the picked folder, or an empty path when the person cancelled.
+type ChooseResponse struct {
+	Path string `json:"path"`
+}
+
 type Item struct {
 	Path     string   `json:"path"`
 	Name     string   `json:"name"`
@@ -207,7 +217,7 @@ const (
 
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
-	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
+	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }

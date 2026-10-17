@@ -94,7 +94,7 @@ Differences from lockstep, on purpose
 Paths (XDG, like lockstep): config `~/.config/ebb/config.toml`, user rules `~/.config/ebb/rules/*.toml`, state
 `~/.local/state/ebb/` (`daemon.json`, `ui-token`, `oplog.jsonl`, `snapshots/`, `pending-pair.json`, `daemon.log`).
 `EBB_HOME` re-roots everything; `EBB_SANDBOX=1` disables real commands, trash and OS service calls (tests, demos).
-Default daemon port `47340`. Launchd label `dev.ebb.daemon`. Default hosted origin
+Default daemon port `47340`. Launchd label `com.doguyilmaz.ebb`. Default hosted origin
 `https://ebb.apps.doguyilmaz.com` (deployed the same way as lockstep's hosted UI).
 
 ## 4. Scanning engine

@@ -23,6 +23,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |
 | GET | `/report?format=json\|csv\|html\|text` | — | file | 400 `bad-format` |
 | POST | `/reveal` | `PathRequest` | 204 | 400 `outside-root` |
+| POST | `/choose-folder` | `ChooseRequest {purpose: scan\|protect}` | `ChooseResponse {path}` (empty when cancelled; shows the macOS chooser on this Mac) | 400, 409 `sandboxed` |
 | GET | `/history` | — | `HistoryResponse` | — |
 | GET | `/history/diff?from&to` | — | `DiffResponse` | 404 |
 | GET/POST | `/settings` | `Settings` | `Settings` | 400 |

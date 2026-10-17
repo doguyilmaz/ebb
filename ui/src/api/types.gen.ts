@@ -72,6 +72,14 @@ export interface AgesResponse {
   buckets: AgeBucket[] | null;
 }
 
+export interface ChooseRequest {
+  purpose: string;
+}
+
+export interface ChooseResponse {
+  path: string;
+}
+
 export interface Item {
   path: string;
   name: string;

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"slices"
@@ -38,6 +39,22 @@ func (s *Server) dataRoutes() {
 	s.api("GET /api/v1/findings", s.findings)
 	s.mux.HandleFunc("GET /api/v1/report", s.auth(s.report))
 	s.api("POST /api/v1/reveal", s.reveal)
+	s.api("POST /api/v1/choose-folder", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		var req api.ChooseRequest
+		if err := decode(r, &req); err != nil {
+			return nil, err
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+		defer cancel()
+		path, err := s.app.ChooseFolder(ctx, req.Purpose)
+		if errors.Is(err, sys.ErrSandbox) {
+			return nil, coded(http.StatusConflict, "sandboxed", "the folder chooser is off in the sandbox; type the path instead")
+		}
+		if err != nil {
+			return nil, err
+		}
+		return api.ChooseResponse{Path: path}, nil
+	})
 	s.api("GET /api/v1/history", s.history)
 	s.api("GET /api/v1/history/diff", s.diff)
 	s.api("GET /api/v1/settings", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.Settings(), nil })

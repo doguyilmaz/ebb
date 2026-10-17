@@ -1,8 +1,11 @@
 package app
 
 import (
+	"bytes"
 	"cmp"
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -193,6 +196,32 @@ func (a *App) Reveal(path string) error {
 		return nil
 	}
 	return exec.Command("open", "-R", r.Tree.Path(id)).Run()
+}
+
+var choosePrompts = map[string]string{"scan": "Choose a folder for ebb to scan", "protect": "Choose a folder ebb must never touch"}
+
+// ChooseFolder shows the macOS folder chooser on this Mac and returns the
+// picked folder, or "" when the person cancels. A browser cannot hand a page
+// a real path, so the page asks ebb. The prompt is fixed per purpose; nothing
+// from the request reaches the script.
+func (a *App) ChooseFolder(ctx context.Context, purpose string) (string, error) {
+	prompt, ok := choosePrompts[purpose]
+	if !ok {
+		return "", fmt.Errorf("unknown purpose %q", purpose)
+	}
+	out, err := a.Env.Run(ctx, "", "osascript", "-e", "activate", "-e", `POSIX path of (choose folder with prompt "`+prompt+`")`)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && bytes.Contains(exit.Stderr, []byte("(-128)")) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	p := strings.TrimSpace(string(out))
+	if len(p) > 1 {
+		p = strings.TrimSuffix(p, "/")
+	}
+	return a.Links.Display(p), nil
 }
 
 // Diff compares two snapshots; empty IDs mean the newest one and the scan of
