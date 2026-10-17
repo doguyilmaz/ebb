@@ -39,12 +39,14 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 		Short:         "See where your disk space went, and win it back safely",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Args:          cobra.NoArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if g.home != "" {
 				return os.Setenv(sys.HomeEnv, g.home)
 			}
 			return nil
 		},
+		RunE: func(cmd *cobra.Command, _ []string) error { return runOverview(g, cmd) },
 	}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
@@ -54,6 +56,13 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 	pf.BoolVarP(&g.verbose, "verbose", "v", false, "verbose diagnostics on stderr")
 
 	root.AddCommand(
+		newScanCmd(g),
+		newTopCmd(g),
+		newFindCmd(g),
+		newFindingsCmd(g),
+		newReportCmd(g),
+		newHistoryCmd(g),
+		newDiffCmd(g),
 		newVersionCmd(g),
 	)
 	return root

@@ -1,0 +1,14 @@
+fill 3145728 tree/big.bin
+exec ebb scan $WORK/tree
+exec ebb report
+stdout 'Largest folders'
+exec ebb report --format json
+stdout '"reclaimable"'
+exec ebb report --format csv
+stdout '^kind,path,title'
+exec ebb report --format html -o $WORK/r.html
+exists $WORK/r.html
+grep 'id="ebb-data"' $WORK/r.html
+! grep 'src="https' $WORK/r.html
+! exec ebb report --format pdf
+stderr 'unknown format'

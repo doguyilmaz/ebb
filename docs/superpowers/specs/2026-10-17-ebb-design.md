@@ -9,9 +9,9 @@ Answer "where did my disk go, and why" on macOS in seconds, and reclaim space sa
 
 Success criteria
 
-- Full scan of the data volume (≈7.3M inodes, 423 GB on the reference Mac) finishes in ≤ 30 s, shows first results
-  in ≤ 1 s, peaks ≤ 300 MB RSS, and leaves the machine responsive (throttled I/O, bounded workers). Measured in
-  phase 1; targets are revised only with benchmark evidence.
+- Full scan of the data volume (5.95M files, 410 GB on the reference Mac) finishes in ≈ 45–52 s, shows first results
+  in ≤ 1 s, peaks ≈ 400 MB RSS, and leaves the machine responsive (throttled I/O, bounded workers). Measured in
+  phase 1 (docs/PERF.md): the walk is kernel-bound; repeat scans are incremental via FSEvents.
 - Every byte of `statfs` "used" is attributed: scanned, sealed system volume, other APFS volumes (VM, Preboot…),
   local snapshots, purgeable, or an explicit "not visible" bucket with the reason (permissions / Full Disk Access).
 - Each finding says what it is, why it is large, what deleting it costs, and how safe it is.

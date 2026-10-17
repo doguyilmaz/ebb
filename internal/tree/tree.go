@@ -49,12 +49,18 @@ type Node struct {
 	OwnMtime      int64
 	SmallCount    uint32
 	SmallAlloc    uint64
+	Markers       uint16
 }
 
-type link struct {
+// group is data shared by several directory entries: a hardlinked inode or a
+// set of pure APFS clones. Its bytes count once, at first; lca is the lowest
+// directory containing every copy seen so far.
+type group struct {
 	nlink uint32
+	seen  uint32
 	alloc uint64
-	dirs  []ID
+	first ID
+	lca   ID
 }
 
 type Tree struct {
@@ -62,7 +68,7 @@ type Tree struct {
 	rootPath string
 
 	parent, first, next, nameOff []uint32
-	nameLen                      []uint16
+	nameLen, depth, markers      []uint16
 	kind                         []Kind
 	flags                        []Flag
 	alloc, unique, logical       []uint64
@@ -71,14 +77,17 @@ type Tree struct {
 	maxMtime, ownMtime           []int64
 	names                        []byte
 
-	links  map[uint64]*link // hardlinked inodes
-	clones map[uint64]*link // APFS clone groups by clone ID
+	links  map[uint64]*group // hardlinked inodes
+	clones map[uint64]*group // APFS clone groups by clone ID
+
+	keptMu sync.Mutex
+	kept   []uint64 // per node: shared bytes a copy outside keeps alive; nil = stale
 }
 
 type Writer struct{ t *Tree }
 
 func New(rootPath string) *Tree {
-	t := &Tree{rootPath: rootPath, links: map[uint64]*link{}, clones: map[uint64]*link{}}
+	t := &Tree{rootPath: rootPath, links: map[uint64]*group{}, clones: map[uint64]*group{}}
 	t.add(None, []byte(rootPath), KindDir, 0)
 	return t
 }
@@ -90,6 +99,12 @@ func (t *Tree) add(parent ID, name []byte, k Kind, f Flag) ID {
 	t.next = append(t.next, uint32(None))
 	t.nameOff = append(t.nameOff, uint32(len(t.names)))
 	t.nameLen = append(t.nameLen, uint16(len(name)))
+	var d uint16
+	if parent != None {
+		d = t.depth[parent] + 1
+	}
+	t.depth = append(t.depth, d)
+	t.markers = append(t.markers, 0)
 	t.names = append(t.names, name...)
 	t.kind = append(t.kind, k)
 	t.flags = append(t.flags, f)
@@ -126,6 +141,9 @@ func (t *Tree) grow(id ID, alloc, unique, logical uint64, files uint32, mtime in
 func (t *Tree) Write(fn func(w *Writer)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.keptMu.Lock()
+	t.kept = nil
+	t.keptMu.Unlock()
 	fn(&Writer{t})
 }
 
@@ -168,23 +186,37 @@ func (w *Writer) SetFlags(id ID, f Flag) { w.t.flags[id] |= f }
 // inode is seen; the caller then counts its bytes, otherwise adds the file
 // with zero bytes and FlagShared.
 func (w *Writer) Link(ino uint64, nlink uint32, alloc uint64, dir ID) bool {
-	return register(w.t.links, ino, nlink, alloc, dir)
+	return w.t.register(w.t.links, ino, nlink, alloc, dir)
 }
 
 // Clone registers a file that is a pure APFS clone (refs files share one data
 // stream). It returns true the first time the clone ID is seen; later copies
 // keep their allocated bytes, as du counts them, but add no unique bytes.
 func (w *Writer) Clone(cloneID uint64, refs uint32, alloc uint64, dir ID) bool {
-	return register(w.t.clones, cloneID, refs, alloc, dir)
+	return w.t.register(w.t.clones, cloneID, refs, alloc, dir)
 }
 
-func register(m map[uint64]*link, key uint64, n uint32, alloc uint64, dir ID) bool {
-	if l, ok := m[key]; ok {
-		l.dirs = append(l.dirs, dir)
+func (t *Tree) register(m map[uint64]*group, key uint64, n uint32, alloc uint64, dir ID) bool {
+	if g, ok := m[key]; ok {
+		g.seen++
+		g.lca = t.lca(g.lca, dir)
 		return false
 	}
-	m[key] = &link{nlink: n, alloc: alloc, dirs: []ID{dir}}
+	m[key] = &group{nlink: n, seen: 1, alloc: alloc, first: dir, lca: dir}
 	return true
+}
+
+func (t *Tree) lca(a, b ID) ID {
+	for t.depth[a] > t.depth[b] {
+		a = ID(t.parent[a])
+	}
+	for t.depth[b] > t.depth[a] {
+		b = ID(t.parent[b])
+	}
+	for a != b {
+		a, b = ID(t.parent[a]), ID(t.parent[b])
+	}
+	return a
 }
 
 // Finish orders every directory's children by allocated size, largest first.
@@ -242,6 +274,7 @@ func (t *Tree) node(id ID) Node {
 		ID: id, Parent: ID(t.parent[id]), Name: string(t.name(id)), Kind: t.kind[id], Flags: t.flags[id],
 		Alloc: t.alloc[id], Unique: t.unique[id], Logical: t.logical[id], Files: t.files[id],
 		MaxMtime: t.maxMtime[id], OwnMtime: t.ownMtime[id], SmallCount: t.smallCount[id], SmallAlloc: t.smallAlloc[id],
+		Markers: t.markers[id],
 	}
 }
 
@@ -337,16 +370,30 @@ func (t *Tree) isAncestor(a, b ID) bool {
 func (t *Tree) Reclaimable(id ID) uint64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	n := t.unique[id]
-	for _, m := range []map[uint64]*link{t.links, t.clones} {
-		for _, l := range m {
-			if !t.isAncestor(id, l.dirs[0]) {
-				continue
+	t.keptMu.Lock()
+	if t.kept == nil {
+		t.kept = t.computeKept()
+	}
+	kept := t.kept[id]
+	t.keptMu.Unlock()
+	return t.unique[id] - min(kept, t.unique[id])
+}
+
+// computeKept charges each group's bytes to the directories between where
+// they were counted and the lowest folder holding every copy; when copies
+// live outside the scan, all the way to the root.
+func (t *Tree) computeKept() []uint64 {
+	kept := make([]uint64, len(t.parent))
+	for _, m := range []map[uint64]*group{t.links, t.clones} {
+		for _, g := range m {
+			stop := None
+			if g.seen >= g.nlink {
+				stop = g.lca
 			}
-			if keep := uint32(len(l.dirs)) < l.nlink || slices.ContainsFunc(l.dirs[1:], func(d ID) bool { return !t.isAncestor(id, d) }); keep && n >= l.alloc {
-				n -= l.alloc
+			for x := g.first; x != stop; x = ID(t.parent[x]) {
+				kept[x] += g.alloc
 			}
 		}
 	}
-	return n
+	return kept
 }

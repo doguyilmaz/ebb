@@ -41,6 +41,7 @@ func (rulesDetector) Detect(_ context.Context, c *Context) ([]finding.Finding, e
 				continue
 			}
 			claimed = append(claimed, path)
+			c.claimed = append(c.claimed, c.Links.Display(path))
 			n := c.Tree.Node(id)
 			if n.Alloc < uint64(r.MinTarget) {
 				continue

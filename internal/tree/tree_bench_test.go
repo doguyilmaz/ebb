@@ -36,3 +36,20 @@ func BenchmarkSlice(b *testing.B) {
 		tr.Slice(tr.Root(), 4, 0.005, 4000)
 	}
 }
+
+func BenchmarkReclaimable(b *testing.B) {
+	tr := synthetic(10_000, 10)
+	tr.Write(func(w *Writer) {
+		for i := 0; i < 200_000; i++ {
+			d := ID(1 + i%10_000)
+			w.Clone(uint64(i/2), 2, 1<<20, d)
+		}
+	})
+	tr.Finish()
+	b.ResetTimer()
+	for b.Loop() {
+		for d := ID(1); d < 1001; d++ {
+			tr.Reclaimable(d)
+		}
+	}
+}

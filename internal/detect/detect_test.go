@@ -153,3 +153,10 @@ func TestRulesDetectorMatchRule(t *testing.T) {
 		t.Fatalf("%+v", fs)
 	}
 }
+
+func walkMarker(name string) uint16 {
+	if name == "xcode" {
+		return tree.MarkerXcode
+	}
+	return tree.MarkerBit(name)
+}

@@ -147,3 +147,29 @@ func TestCloneGroupUniqueOnce(t *testing.T) {
 		t.Fatalf("both clones inside: %d", got)
 	}
 }
+
+func TestReclaimableNestedLinks(t *testing.T) {
+	tr := New("/r")
+	var a, b, c ID
+	tr.Write(func(w *Writer) {
+		a = w.AddDir(tr.Root(), []byte("a"), 1, 0)
+		b = w.AddDir(a, []byte("b"), 1, 0)
+		c = w.AddDir(a, []byte("c"), 1, 0)
+		w.Link(5, 2, 1<<20, b)
+		w.AddFile(b, []byte("f"), KindFile, 1<<20, 1<<20, 1<<20, 1, 0)
+		w.Link(5, 2, 1<<20, c)
+		w.AddFile(c, []byte("f"), KindFile, 0, 0, 1<<20, 1, FlagShared)
+	})
+	tr.Finish()
+	if tr.Reclaimable(b) != 0 || tr.Reclaimable(c) != 0 || tr.Reclaimable(a) != 1<<20 || tr.Reclaimable(tr.Root()) != 1<<20 {
+		t.Fatalf("b=%d c=%d a=%d", tr.Reclaimable(b), tr.Reclaimable(c), tr.Reclaimable(a))
+	}
+	tr.Write(func(w *Writer) {
+		d := w.AddDir(tr.Root(), []byte("d"), 1, 0)
+		w.Link(6, 2, 1<<20, d)
+		w.AddFile(d, []byte("g"), KindFile, 1<<20, 1<<20, 1<<20, 1, 0)
+	})
+	if tr.Reclaimable(tr.Root()) != 1<<20 {
+		t.Fatalf("a write must invalidate the cached figures: %d", tr.Reclaimable(tr.Root()))
+	}
+}

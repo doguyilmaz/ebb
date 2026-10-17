@@ -22,3 +22,17 @@ Clone IDs (`ATTR_CMNEXT_CLONEID` + `CLONE_REFCNT`) cost ≈ 19 % over the plain 
 deduplicated like hardlinks. CPU profile: ~90 % of time is kernel work — directory `open` by full path (~45 %) and
 `getattrlistbulk` (~30 %); Go-side work is negligible. Next lever: open children with `openat` relative to the
 parent descriptor (Task 13).
+
+## full scan (`/System/Volumes/Data`: 5.95M files, 1.04M folders, 410.6 GB, no Full Disk Access)
+
+| Build | Walk | Total (incl. detectors, saving) | Max RSS |
+|---|---|---|---|
+| first version | 48.6 s | 85.2 s | 491 MB |
+| O(1) `Reclaimable` (shared-group LCA cache) + 256 MiB soft memory limit | 42.8 s | 44.6 s | 395 MB |
+| same, `--threads 16` | 43.7 s | 45.1 s | 406 MB |
+| after detector fixes (run-to-run variance) | 50.4 s | 52.3 s | 411 MB |
+
+The walk is kernel-bound: ~165 s of system CPU across 8 workers, and 16 workers add kernel CPU without finishing
+sooner, so 8 stays the default. Detectors and persistence take ~2 s. The tree holds 1.07M nodes (~100 MB) plus 225k
+APFS clone groups. `Reclaimable` used to scan every shared group per call (36 s spent in the stale-project
+detector); it now reads a per-node cache computed once per write in O(groups × depth): 1.4 s → 0.9 ms per 1,000 calls.

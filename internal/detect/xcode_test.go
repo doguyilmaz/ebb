@@ -128,9 +128,9 @@ func TestXcodeKeepsSelectedAndNewest(t *testing.T) {
 	c.Env.(*sys.Fake).HomeDir = "/Users/h"
 	c.Env.(*sys.Fake).RunFn = runner(t, map[string]string{
 		"xcode-select -p": "/Applications/Xcode-beta.app/Contents/Developer\n",
-		"plutil -convert json -o - /Applications/Xcode-26.6.0.app/Contents/Info.plist": `{"CFBundleShortVersionString":"26.6"}`,
-		"plutil -convert json -o - /Applications/Xcode-16.4.app/Contents/Info.plist":   `{"CFBundleShortVersionString":"16.4"}`,
-		"plutil -convert json -o - /Applications/Xcode-beta.app/Contents/Info.plist":   `{"CFBundleShortVersionString":"26.1"}`,
+		"plutil -convert json -o - /Applications/Xcode-26.6.0.app/Contents/Info.plist": `{"CFBundleIdentifier":"com.apple.dt.Xcode","CFBundleShortVersionString":"26.6"}`,
+		"plutil -convert json -o - /Applications/Xcode-16.4.app/Contents/Info.plist":   `{"CFBundleIdentifier":"com.apple.dt.Xcode","CFBundleShortVersionString":"16.4"}`,
+		"plutil -convert json -o - /Applications/Xcode-beta.app/Contents/Info.plist":   `{"CFBundleIdentifier":"com.apple.dt.Xcode","CFBundleShortVersionString":"26.1"}`,
 	})
 	fs, _ := xcode{}.Detect(context.Background(), c)
 	old := byRule(fs, "xcode.old")
@@ -176,5 +176,21 @@ func TestDetectorsSkipWhenToolMissing(t *testing.T) {
 	fs, err := simulators{}.Detect(context.Background(), c)
 	if err != nil || len(fs) != 0 {
 		t.Fatalf("missing simctl must yield nothing: %v %v", fs, err)
+	}
+}
+
+func TestXcodeIgnoresOtherAppsNamedLikeXcode(t *testing.T) {
+	tr := treeAt(t, "/", "Applications/Xcode-26.6.0.app/Contents/x=3000", "Applications/Xcodes.app/Contents/x=50", "Applications/Xcode-16.4.app/Contents/x=2500")
+	c := ctxFor(t, tr)
+	c.Env.(*sys.Fake).RunFn = runner(t, map[string]string{
+		"xcode-select -p": "/Applications/Xcode-26.6.0.app/Contents/Developer\n",
+		"plutil -convert json -o - /Applications/Xcode-26.6.0.app/Contents/Info.plist": `{"CFBundleIdentifier":"com.apple.dt.Xcode","CFBundleShortVersionString":"26.6"}`,
+		"plutil -convert json -o - /Applications/Xcode-16.4.app/Contents/Info.plist":   `{"CFBundleIdentifier":"com.apple.dt.Xcode","CFBundleShortVersionString":"16.4"}`,
+		"plutil -convert json -o - /Applications/Xcodes.app/Contents/Info.plist":       `{"CFBundleIdentifier":"com.xcodesorg.xcodesapp","CFBundleShortVersionString":"4.1.1"}`,
+	})
+	fs, _ := xcode{}.Detect(context.Background(), c)
+	old := byRule(fs, "xcode.old")
+	if old == nil || !slices.Equal(paths(old), []string{"/Applications/Xcode-16.4.app"}) {
+		t.Fatalf("only real Xcode apps may be offered: %+v", old)
 	}
 }

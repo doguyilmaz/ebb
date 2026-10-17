@@ -11,27 +11,76 @@ import (
 	"github.com/doguyilmaz/ebb/internal/tree"
 )
 
+type artifact struct {
+	what string
+	// markers lists the project files that make this folder build output; a
+	// "build" folder next to only a package.json, say, may hold real sources.
+	markers []string
+}
+
+var (
+	js       = []string{"package.json"}
+	gradle   = []string{"build.gradle", "build.gradle.kts", "settings.gradle"}
+	python   = []string{"pyproject.toml", "requirements.txt", "setup.py"}
+	xcodeDir = []string{"xcode"}
+)
+
 // artifacts are folders a project's tools rebuild from its sources.
-var artifacts = map[string]string{
-	"node_modules": "JavaScript dependencies", "target": "Rust and Maven build output", "build": "build output",
-	".gradle": "Gradle project cache", "Pods": "CocoaPods dependencies", ".next": "Next.js build output",
-	".expo": "Expo cache", ".turbo": "Turborepo cache", ".parcel-cache": "Parcel cache", ".venv": "Python virtual environment",
-	"venv": "Python virtual environment", "DerivedData": "Xcode build output",
+var artifacts = map[string]artifact{
+	"node_modules":  {"JavaScript dependencies", js},
+	".next":         {"Next.js build output", js},
+	".expo":         {"Expo cache", js},
+	".turbo":        {"Turborepo cache", js},
+	".parcel-cache": {"Parcel cache", js},
+	"target":        {"Rust and Maven build output", []string{"Cargo.toml", "pom.xml"}},
+	"build":         {"Build output", append(append(slices.Clone(gradle), python...), xcodeDir...)},
+	".gradle":       {"Gradle project cache", gradle},
+	"Pods":          {"CocoaPods dependencies", []string{"Podfile"}},
+	".venv":         {"Python virtual environment", python},
+	"venv":          {"Python virtual environment", python},
+	"DerivedData":   {"Xcode build output", xcodeDir},
+}
+
+func markerMask(names []string) uint16 {
+	var m uint16
+	for _, n := range names {
+		if n == "xcode" {
+			m |= tree.MarkerXcode
+		} else {
+			m |= tree.MarkerBit(n)
+		}
+	}
+	return m
 }
 
 type stale struct{}
 
 func (stale) ID() string { return "stale" }
-func (stale) Pass() int  { return 1 }
+
+// Pass 2: folders another finding already claims (package caches, say) are
+// skipped, so their contents are never reported a second time.
+func (stale) Pass() int { return 2 }
 
 func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 	type hit struct{ artifact, project tree.ID }
 	var hits []hit
-	project := map[tree.ID]bool{}
-	c.Tree.WalkDirs(c.Tree.Root(), func(n tree.Node) bool {
-		project[n.ID] = n.Flags&tree.FlagProject != 0
-		if _, ok := artifacts[n.Name]; ok {
-			if project[n.Parent] {
+	claimed := c.coveredIDs()
+	markers := map[tree.ID]uint16{}
+	home, ok := c.node(c.Env.Home())
+	if !ok {
+		return nil, nil
+	}
+	// Only the person's own projects: apps, editor extensions, global tool
+	// installs and everything in ~/Library or dot-folders run from their
+	// node_modules and break without them.
+	c.Tree.WalkDirs(home, func(n tree.Node) bool {
+		if claimed[n.ID] || strings.HasSuffix(n.Name, ".app") ||
+			(n.Parent == home && (n.Name == "Library" || strings.HasPrefix(n.Name, "."))) {
+			return false
+		}
+		markers[n.ID] = n.Markers
+		if a, ok := artifacts[n.Name]; ok {
+			if markers[n.Parent]&markerMask(a.markers) != 0 {
 				hits = append(hits, hit{n.ID, n.Parent})
 			}
 			return false
@@ -64,7 +113,7 @@ func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 		f, ok := groups[name]
 		if !ok {
 			f = &finding.Finding{RuleID: "stale." + strings.TrimPrefix(name, "."), Category: "stale-project", Safety: finding.Regenerable,
-				Why:     fmt.Sprintf("%s of projects nobody has changed in %d+ days.", capitalize(artifacts[name]), int(c.StaleAfter.Hours()/24)),
+				Why:     fmt.Sprintf("%s of projects nobody has changed in %d+ days.", artifacts[name].what, int(c.StaleAfter.Hours()/24)),
 				Impact:  "The project's install or build step recreates it the next time you work on it.",
 				Actions: []finding.Action{{Kind: "delete"}}}
 			groups[name] = f
@@ -87,11 +136,4 @@ func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 		}
 	}
 	return fs, nil
-}
-
-func capitalize(s string) string {
-	if s == "" {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
 }

@@ -34,6 +34,8 @@ type Context struct {
 	// Covered reports whether a display path lies inside a target of a
 	// pass-1 finding; set by Run before pass 2.
 	Covered func(path string) bool
+	covered []string
+	claimed []string // locations data rules matched, reported or not
 	// Exists and ReadFile reach the real file system; nil means the OS.
 	Exists   func(path string) bool
 	ReadFile func(path string) ([]byte, error)
@@ -105,7 +107,7 @@ type Detector interface {
 
 // All lists every detector in the order findings are claimed.
 func All() []Detector {
-	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, docker{}, snapshots{}, stale{}, rulesDetector{}, large{}, growth{}}
+	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, docker{}, snapshots{}, rulesDetector{}, stale{}, large{}, growth{}}
 }
 
 func Run(ctx context.Context, c *Context) ([]finding.Finding, []error) { return RunWith(ctx, c, All()) }
@@ -125,23 +127,33 @@ func RunWith(ctx context.Context, c *Context, ds []Detector) ([]finding.Finding,
 			out = append(out, fs...)
 		}
 	}
+	c.claimed = c.claimed[:0]
 	run(1)
-	c.Covered = coveredBy(out)
+	c.covered = append(c.covered[:0], c.claimed...)
+	for _, f := range out {
+		for _, t := range f.Targets {
+			c.covered = append(c.covered, t.Path)
+		}
+	}
+	c.Covered = func(p string) bool {
+		return slices.ContainsFunc(c.covered, func(t string) bool { return within(p, t) })
+	}
 	run(2)
+	// A finding whose locations add up to almost nothing is noise.
+	out = slices.DeleteFunc(out, func(f finding.Finding) bool { return len(f.Targets) > 0 && f.Alloc < 1<<20 })
 	slices.SortStableFunc(out, func(a, b finding.Finding) int { return cmp.Compare(b.Bytes, a.Bytes) })
 	return out, errs
 }
 
-func coveredBy(fs []finding.Finding) func(string) bool {
-	var paths []string
-	for _, f := range fs {
-		for _, t := range f.Targets {
-			paths = append(paths, t.Path)
+// coveredIDs are the tree nodes of pass-1 targets.
+func (c *Context) coveredIDs() map[tree.ID]bool {
+	ids := map[tree.ID]bool{}
+	for _, p := range c.covered {
+		if id, ok := c.node(p); ok {
+			ids[id] = true
 		}
 	}
-	return func(p string) bool {
-		return slices.ContainsFunc(paths, func(t string) bool { return within(p, t) })
-	}
+	return ids
 }
 
 // within reports whether p is root or below it.

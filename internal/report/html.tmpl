@@ -115,7 +115,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
   if (!root || !root.children) { box.style.display = "none"; return; }
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const fmt = (n) => { const u = ["B", "kB", "MB", "GB", "TB"]; let i = 0; while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; } return (i ? n.toFixed(1).replace(/\.0$/, "") : n) + " " + u[i]; };
-  const tops = root.children.filter((c) => c.alloc > 0);
+  // A folder that is almost entirely one subfolder says nothing on its own:
+  // show "Users/me" and that subfolder's contents instead.
+  const collapse = (n) => {
+    let name = n.name, node = n;
+    while (node.children && node.children.length) {
+      const big = node.children.reduce((a, b) => (b.alloc > a.alloc ? b : a));
+      if (big.kind !== 0 || big.alloc < 0.85 * node.alloc) break;
+      name += "/" + big.name; node = big;
+    }
+    return { ...node, name, alloc: n.alloc, files: n.files };
+  };
+  const tops = root.children.filter((c) => c.alloc > 0).map(collapse);
   const slot = (i, node) => node.kind === 3 || i >= 8 ? "--other" : "--s" + (i + 1);
 
   // Squarified treemap: lay rows along the shorter side, keeping aspect ratios near 1.

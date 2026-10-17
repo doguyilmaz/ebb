@@ -1,0 +1,19 @@
+fill 3145728 tree/a/big.bin
+fill 1000 tree/a/small.txt
+exec ebb scan $WORK/tree --json
+stdout '"files": 2'
+exec ebb top $WORK/tree/a --files
+stdout 'big.bin'
+exec ebb top $WORK/tree
+stdout 'a'
+exec ebb find '*.bin'
+stdout 'big.bin'
+exec ebb find '*.bin' --json
+stdout '"path": ".*big.bin"'
+exec ebb findings
+exec ebb
+stdout 'Reclaimable'
+! exec ebb --home $WORK/empty top
+stderr 'no scan yet'
+! exec ebb top $WORK/elsewhere
+stderr 'not in the last scan'

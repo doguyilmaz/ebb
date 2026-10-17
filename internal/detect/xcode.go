@@ -70,8 +70,10 @@ func (c *Context) oldXcodes(ctx context.Context) (finding.Finding, bool) {
 			continue
 		}
 		path := c.Links.Display(c.Tree.Path(id))
-		var info struct{ CFBundleShortVersionString string }
-		_ = plist.DecodeFile(ctx, c.Env, filepath.Join(c.Tree.Path(id), "Contents", "Info.plist"), &info)
+		var info struct{ CFBundleIdentifier, CFBundleShortVersionString string }
+		if plist.DecodeFile(ctx, c.Env, filepath.Join(c.Tree.Path(id), "Contents", "Info.plist"), &info) != nil || info.CFBundleIdentifier != "com.apple.dt.Xcode" {
+			continue
+		}
 		found = append(found, app{id, path, info.CFBundleShortVersionString})
 	}
 	newest := ""

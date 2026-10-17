@@ -17,3 +17,14 @@ safety = "regenerable"
 why = "Electron and Chromium apps cache web content, compiled scripts and GPU shaders, and rarely trim them."
 impact = "Apps load a little slower until their caches warm up again. Quit the app first for the cleanest result."
 action = { kind = "delete" }
+
+[[rule]]
+id = "unity.assetstore"
+title = "Unity Asset Store downloads"
+owner = "Unity"
+category = "app-cache"
+paths = ["~/Library/Unity/Asset Store-5.x"]
+safety = "caution"
+why = "Unity keeps every Asset Store package you ever downloaded, even after importing it into a project."
+impact = "Packages are downloaded again from the Asset Store when you import them next time."
+action = { kind = "trash" }

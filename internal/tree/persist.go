@@ -10,7 +10,7 @@ import (
 
 const (
 	magic   = "EBBT"
-	version = uint32(1)
+	version = uint32(3)
 )
 
 var le = binary.LittleEndian
@@ -36,7 +36,7 @@ func (t *Tree) Save(w io.Writer) error {
 	if err := put(uint64(len(t.parent))); err != nil {
 		return err
 	}
-	for _, v := range []any{t.parent, t.first, t.next, t.nameOff, t.nameLen, t.kind, t.flags, t.alloc, t.unique,
+	for _, v := range []any{t.parent, t.first, t.next, t.nameOff, t.nameLen, t.depth, t.markers, t.kind, t.flags, t.alloc, t.unique,
 		t.logical, t.smallAlloc, t.files, t.smallCount, t.maxMtime, t.ownMtime} {
 		if err := put(v); err != nil {
 			return err
@@ -48,12 +48,12 @@ func (t *Tree) Save(w io.Writer) error {
 	if _, err := bw.Write(t.names); err != nil {
 		return err
 	}
-	for _, m := range []map[uint64]*link{t.links, t.clones} {
+	for _, m := range []map[uint64]*group{t.links, t.clones} {
 		if err := put(uint64(len(m))); err != nil {
 			return err
 		}
-		for key, l := range m {
-			for _, v := range []any{key, l.nlink, l.alloc, uint32(len(l.dirs)), l.dirs} {
+		for key, g := range m {
+			for _, v := range []any{key, g.nlink, g.seen, g.alloc, g.first, g.lca} {
 				if err := put(v); err != nil {
 					return err
 				}
@@ -92,12 +92,12 @@ func Load(r io.Reader) (*Tree, error) {
 	if err := get(&n); err != nil {
 		return nil, err
 	}
-	t := &Tree{rootPath: string(root), links: map[uint64]*link{}, clones: map[uint64]*link{},
+	t := &Tree{rootPath: string(root), links: map[uint64]*group{}, clones: map[uint64]*group{},
 		parent: make([]uint32, n), first: make([]uint32, n), next: make([]uint32, n), nameOff: make([]uint32, n),
-		nameLen: make([]uint16, n), kind: make([]Kind, n), flags: make([]Flag, n), alloc: make([]uint64, n),
+		nameLen: make([]uint16, n), depth: make([]uint16, n), markers: make([]uint16, n), kind: make([]Kind, n), flags: make([]Flag, n), alloc: make([]uint64, n),
 		unique: make([]uint64, n), logical: make([]uint64, n), smallAlloc: make([]uint64, n), files: make([]uint32, n),
 		smallCount: make([]uint32, n), maxMtime: make([]int64, n), ownMtime: make([]int64, n)}
-	for _, v := range []any{t.parent, t.first, t.next, t.nameOff, t.nameLen, t.kind, t.flags, t.alloc, t.unique,
+	for _, v := range []any{t.parent, t.first, t.next, t.nameOff, t.nameLen, t.depth, t.markers, t.kind, t.flags, t.alloc, t.unique,
 		t.logical, t.smallAlloc, t.files, t.smallCount, t.maxMtime, t.ownMtime} {
 		if err := get(v); err != nil {
 			return nil, err
@@ -110,23 +110,19 @@ func Load(r io.Reader) (*Tree, error) {
 	if _, err := io.ReadFull(br, t.names); err != nil {
 		return nil, err
 	}
-	for _, m := range []map[uint64]*link{t.links, t.clones} {
+	for _, m := range []map[uint64]*group{t.links, t.clones} {
 		if err := get(&n); err != nil {
 			return nil, err
 		}
 		for range n {
-			var key, alloc uint64
-			var nlink, nd uint32
-			for _, v := range []any{&key, &nlink, &alloc, &nd} {
+			var key uint64
+			g := &group{}
+			for _, v := range []any{&key, &g.nlink, &g.seen, &g.alloc, &g.first, &g.lca} {
 				if err := get(v); err != nil {
 					return nil, err
 				}
 			}
-			dirs := make([]ID, nd)
-			if err := get(dirs); err != nil {
-				return nil, err
-			}
-			m[key] = &link{nlink: nlink, alloc: alloc, dirs: dirs}
+			m[key] = g
 		}
 	}
 	return t, nil

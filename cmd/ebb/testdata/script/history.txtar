@@ -1,0 +1,9 @@
+fill 12582912 tree/a/one.bin
+exec ebb scan $WORK/tree
+fill 31457280 tree/a/two.bin
+exec ebb scan $WORK/tree
+exec ebb history
+stdout -count=2 'tree'
+exec ebb diff
+stdout 'tree/a'
+stdout '\+31.5 MB'

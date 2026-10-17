@@ -25,11 +25,7 @@ type Options struct {
 	Gentle         bool   // throttled I/O for background scans
 	SmallThreshold uint64 // 0 → 1 MiB
 	Reader         string // "" picks the fastest reader for the platform; "generic" forces ReadDir+Lstat
-	Markers        []string
 }
-
-var DefaultMarkers = []string{"package.json", "Cargo.toml", "go.mod", "build.gradle", "build.gradle.kts",
-	"settings.gradle", "Podfile", "pubspec.yaml", "pyproject.toml", "requirements.txt", "Gemfile", "composer.json"}
 
 type Progress struct {
 	Dirs, Files, Bytes, Problems uint64
@@ -51,6 +47,10 @@ type Result struct {
 }
 
 const (
+	// Batches from huge directories are dropped instead of pooled so a few
+	// outliers do not pin their buffers for the whole scan.
+	maxPooledEntries = 16 << 10
+
 	efMayShareBlocks = 0x1
 	sfDataless       = 0x40000000
 )
@@ -145,7 +145,6 @@ type Session struct {
 	q         *queue
 	batches   chan *batch
 	pool      sync.Pool
-	markers   map[string]bool
 	threshold uint64
 	start     time.Time
 
@@ -177,15 +176,9 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 	if opt.SmallThreshold == 0 {
 		opt.SmallThreshold = 1 << 20
 	}
-	if opt.Markers == nil {
-		opt.Markers = DefaultMarkers
-	}
 	s := &Session{
 		ctx: ctx, opt: opt, t: tree.New(root), q: newQueue(), batches: make(chan *batch, 256),
-		markers: map[string]bool{}, threshold: opt.SmallThreshold, start: time.Now(), done: make(chan struct{}),
-	}
-	for _, m := range opt.Markers {
-		s.markers[m] = true
+		threshold: opt.SmallThreshold, start: time.Now(), done: make(chan struct{}),
 	}
 	s.pool.New = func() any { return &batch{} }
 	setIOPolicy(opt.Gentle)
@@ -225,7 +218,9 @@ func (s *Session) work(r reader) {
 func (s *Session) build() {
 	for b := range s.batches {
 		s.apply(b)
-		s.pool.Put(b)
+		if cap(b.entries) <= maxPooledEntries {
+			s.pool.Put(b)
+		}
 		s.pending--
 		if s.pending == 0 {
 			s.q.close()
@@ -264,7 +259,7 @@ func (s *Session) apply(b *batch) {
 		var smallN uint32
 		var smallAlloc, smallUnique, smallLogical uint64
 		var smallMtime int64
-		project := false
+		var markers uint16
 		for i := range b.entries {
 			e := &b.entries[i]
 			name := b.name(e)
@@ -278,7 +273,7 @@ func (s *Session) apply(b *batch) {
 					continue
 				}
 				if n := string(name); strings.HasSuffix(n, ".xcodeproj") || strings.HasSuffix(n, ".xcworkspace") {
-					project = true
+					markers |= tree.MarkerXcode
 				}
 				id := w.AddDir(b.dir, name, e.mtime, 0)
 				s.pending++
@@ -286,9 +281,7 @@ func (s *Session) apply(b *batch) {
 				s.q.push(job{childPath(b.path, name), id})
 				continue
 			}
-			if s.markers[string(name)] {
-				project = true
-			}
+			markers |= tree.MarkerBit(string(name))
 			alloc := e.alloc
 			var flags tree.Flag
 			if e.flags&sfDataless != 0 {
@@ -321,8 +314,8 @@ func (s *Session) apply(b *batch) {
 		if smallN > 0 {
 			w.AddSmall(b.dir, smallN, smallAlloc, smallUnique, smallLogical, smallMtime)
 		}
-		if project {
-			w.SetFlags(b.dir, tree.FlagProject)
+		if markers != 0 {
+			w.SetMarkers(b.dir, markers)
 		}
 	})
 	s.files.Add(files)

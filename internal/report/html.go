@@ -26,7 +26,7 @@ var page = template.Must(template.New("report").Funcs(template.FuncMap{
 func WriteHTML(w io.Writer, r *Report, t *tree.Tree) error {
 	var slice *tree.SliceNode
 	if t != nil {
-		slice = t.Slice(t.Root(), 2, 0.004, 600)
+		slice = t.Slice(t.Root(), 6, 0.004, 2500)
 	}
 	data, err := json.Marshal(map[string]any{"tree": slice})
 	if err != nil {
