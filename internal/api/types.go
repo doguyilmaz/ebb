@@ -115,15 +115,20 @@ type PathRequest struct {
 }
 
 type WebAccess struct {
-	Allowed   []string     `json:"allowed"`
-	Confirmed []string     `json:"confirmed"`
-	Pending   *PendingPair `json:"pending"`
+	Allowed []string     `json:"allowed"`
+	Paired  []string     `json:"paired"`
+	Pending *PendingPair `json:"pending"`
 }
 
 type PendingPair struct {
-	Origin  string `json:"origin"`
-	Code    string `json:"code"`
-	Expires string `json:"expires"`
+	Origin    string `json:"origin"`
+	Code      string `json:"code"`
+	Requested string `json:"requested"`
+	Confirmed bool   `json:"confirmed"`
+}
+
+type PairRequest struct {
+	Nonce string `json:"nonce"`
 }
 
 type PairResponse struct {
@@ -163,7 +168,7 @@ const (
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
-	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairResponse{}, Health{},
+	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{},
 }
 

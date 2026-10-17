@@ -38,9 +38,14 @@ inside the scanned root.
 ## Pairing (hosted web app)
 
 1. `GET /health` from the page tells "no server" apart from "server, origin not allowed" (`allowed`).
-2. `POST /pair` with an `Origin` header and no token. Unknown origin → 403. Allowed origin not yet confirmed →
-   `PairResponse {pending, code, expires, confirm}`; confirmed → `{token, device, version}`.
+2. The page makes a random nonce (≥ 24 characters), keeps it, and sends `POST /pair` `PairRequest {nonce}` with
+   its `Origin` header and no token. Unknown origin → 403; another page already waiting → 409 `pair-busy`.
+   Otherwise → `PairResponse {pending, code, expires, confirm}`; repeating the same nonce returns the same code.
 3. The person confirms on the machine: `ebb web confirm <code>` or the local UI
    (`GET /pair/pending`, `POST /pair/confirm {code}`, `POST /pair/reject`). Confirmation from a non-loopback origin
    is refused, so a page can never approve itself. Codes are 6 digits, valid 5 minutes, 5 attempts.
-4. `GET /web`, `POST /web/allow {origin}`, `POST /web/deny {origin}` manage the list (`WebAccess`).
+4. The page repeats `POST /pair` with the same nonce and receives `{token, device, version}` — a token issued to
+   that origin (only its hash is stored), once. An `Origin` header alone never releases a token: any local process
+   can send one.
+5. `GET /web`, `POST /web/allow {origin}`, `POST /web/deny {origin}` manage the list (`WebAccess`); deny also
+   revokes every token issued to that origin.

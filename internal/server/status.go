@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -30,12 +33,28 @@ func WriteStatus(env sys.Env, s Status) error { return state.SaveJSON(statusPath
 
 func RemoveStatus(env sys.Env) { _ = os.Remove(statusPath(env)) }
 
-// Live returns the running server's status, if its process is alive.
+// Live returns the running server's status when its process is alive and
+// runs this same program. A stale file whose pid was reused must not make the
+// CLI hand the API token to whatever listens on that port now.
 func Live(env sys.Env) (Status, bool) {
 	var s Status
 	if err := state.LoadJSON(statusPath(env), &s); err != nil || s.PID <= 0 {
 		return s, false
 	}
-	err := syscall.Kill(s.PID, 0)
-	return s, err == nil || errors.Is(err, syscall.EPERM)
+	if err := syscall.Kill(s.PID, 0); err != nil && !errors.Is(err, syscall.EPERM) {
+		return s, false
+	}
+	return s, sameProgram(s.PID)
+}
+
+func sameProgram(pid int) bool {
+	out, err := exec.Command("ps", "-o", "comm=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return false
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	return filepath.Base(strings.TrimSpace(string(out))) == filepath.Base(self)
 }

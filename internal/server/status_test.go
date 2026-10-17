@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/doguyilmaz/ebb/internal/sys"
@@ -27,5 +28,19 @@ func TestStatusLiveness(t *testing.T) {
 	RemoveStatus(env)
 	if _, err := os.Stat(statusPath(env)); !os.IsNotExist(err) {
 		t.Fatal("status file left behind")
+	}
+}
+
+func TestStatusRejectsForeignProcess(t *testing.T) {
+	home := t.TempDir()
+	env := &sys.Fake{HomeDir: home, GOOS: "darwin", Envs: map[string]string{sys.HomeEnv: home}}
+	other := exec.Command("sleep", "5")
+	if err := other.Start(); err != nil {
+		t.Skip(err)
+	}
+	t.Cleanup(func() { other.Process.Kill(); other.Wait() })
+	WriteStatus(env, Status{PID: other.Process.Pid, Port: 47340})
+	if _, ok := Live(env); ok {
+		t.Fatal("a live pid running another program must not be trusted with the token")
 	}
 }

@@ -63,6 +63,13 @@ func (s *Server) api(pattern string, h func(http.ResponseWriter, *http.Request) 
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+healthPath, s.json(s.health))
+	s.mux.HandleFunc("POST /api/v1/pair", s.json(s.pair))
+	s.api("GET /api/v1/pair/pending", s.pairPending)
+	s.api("POST /api/v1/pair/confirm", s.pairConfirm)
+	s.api("POST /api/v1/pair/reject", s.pairReject)
+	s.api("GET /api/v1/web", s.webAccess)
+	s.api("POST /api/v1/web/allow", s.webAllow)
+	s.api("POST /api/v1/web/deny", s.webDeny)
 	s.mux.HandleFunc("GET /api/v1/events", s.auth(s.handleEvents))
 	s.mux.HandleFunc("/api/", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such endpoint"})
@@ -75,7 +82,7 @@ func (s *Server) authorized(r *http.Request) bool {
 	if !ok || tok == "" {
 		tok = r.URL.Query().Get("token")
 	}
-	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1
+	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1 || s.app.WebTokenValid(tok)
 }
 
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {

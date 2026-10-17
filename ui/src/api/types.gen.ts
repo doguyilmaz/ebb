@@ -168,13 +168,18 @@ export interface PathRequest {
 export interface PendingPair {
   origin: string;
   code: string;
-  expires: string;
+  requested: string;
+  confirmed: boolean;
 }
 
 export interface WebAccess {
   allowed: string[] | null;
-  confirmed: string[] | null;
+  paired: string[] | null;
   pending: PendingPair | null;
+}
+
+export interface PairRequest {
+  nonce: string;
 }
 
 export interface PairResponse {

@@ -20,9 +20,8 @@ type Scan struct {
 }
 
 type Server struct {
-	Port         int      `toml:"port"`
-	WebOrigins   []string `toml:"web_origins"`
-	WebConfirmed []string `toml:"web_confirmed"`
+	Port       int      `toml:"port"`
+	WebOrigins []string `toml:"web_origins"`
 }
 
 type Clean struct {

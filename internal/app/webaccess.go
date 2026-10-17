@@ -1,9 +1,14 @@
 package app
 
 import (
+	"fmt"
 	"net/url"
 	"slices"
 	"strings"
+	"time"
+
+	"github.com/doguyilmaz/ebb/internal/api"
+	"github.com/doguyilmaz/ebb/internal/config"
 )
 
 // NormalizeOrigin reduces an origin to scheme://host[:port], lowercased.
@@ -27,6 +32,32 @@ func NormalizeOrigin(raw string) (string, bool) {
 	return scheme + "://" + host, true
 }
 
+func errInvalidOrigin(o string) error {
+	return fmt.Errorf("%q is not an origin like https://example.com (plain http only for localhost)", o)
+}
+
+// reloadConfig re-reads config.toml so a grant made by the CLI reaches a
+// server that is already running.
+func (a *App) reloadConfig() config.Config {
+	if cfg, err := config.Load(a.Env); err == nil {
+		a.mu.Lock()
+		a.Config = cfg
+		a.mu.Unlock()
+		return cfg
+	}
+	return a.Config
+}
+
+func (a *App) SaveConfig(cfg config.Config) error {
+	if err := config.Save(a.Env, cfg); err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.Config = cfg
+	a.mu.Unlock()
+	return nil
+}
+
 // WebOriginAllowed reports whether a page on origin may ask this machine for
 // access at all (pairing still needs a confirmation here).
 func (a *App) WebOriginAllowed(origin string) bool {
@@ -34,8 +65,59 @@ func (a *App) WebOriginAllowed(origin string) bool {
 	if !ok {
 		return false
 	}
-	return slices.ContainsFunc(a.Config.Server.WebOrigins, func(x string) bool {
-		n, _ := NormalizeOrigin(x)
-		return n == o
-	})
+	return slices.Contains(a.reloadConfig().Server.WebOrigins, o)
+}
+
+// WebAccess is what the local UI shows about web pairing; the nonce hash and
+// attempt counter stay in the state file.
+func (a *App) WebAccess() api.WebAccess {
+	cfg := a.reloadConfig()
+	out := api.WebAccess{Allowed: cfg.Server.WebOrigins, Paired: []string{}}
+	if p, _ := a.PendingPair(); p != nil {
+		out.Pending = &api.PendingPair{Origin: p.Origin, Code: p.Code, Requested: p.Requested.Format(time.RFC3339), Confirmed: p.Confirmed}
+	}
+	ts, _ := a.webTokens()
+	for _, t := range ts {
+		if !slices.Contains(out.Paired, t.Origin) {
+			out.Paired = append(out.Paired, t.Origin)
+		}
+	}
+	return out
+}
+
+func (a *App) AllowWebOrigin(origin string) (api.WebAccess, error) {
+	norm, ok := NormalizeOrigin(origin)
+	if !ok {
+		return api.WebAccess{}, errInvalidOrigin(origin)
+	}
+	cfg := a.reloadConfig()
+	if !slices.Contains(cfg.Server.WebOrigins, norm) {
+		cfg.Server.WebOrigins = append(slices.Clone(cfg.Server.WebOrigins), norm)
+		slices.Sort(cfg.Server.WebOrigins)
+		if err := a.SaveConfig(cfg); err != nil {
+			return api.WebAccess{}, err
+		}
+	}
+	return a.WebAccess(), nil
+}
+
+// DenyWebOrigin revokes a grant and its confirmation.
+func (a *App) DenyWebOrigin(origin string) (api.WebAccess, error) {
+	norm, ok := NormalizeOrigin(origin)
+	if !ok {
+		return api.WebAccess{}, errInvalidOrigin(origin)
+	}
+	cfg := a.reloadConfig()
+	before := len(cfg.Server.WebOrigins)
+	cfg.Server.WebOrigins = slices.DeleteFunc(slices.Clone(cfg.Server.WebOrigins), func(o string) bool { return o == norm })
+	if len(cfg.Server.WebOrigins) == before {
+		return a.WebAccess(), fmt.Errorf("%s was not granted access", norm)
+	}
+	if err := a.SaveConfig(cfg); err != nil {
+		return api.WebAccess{}, err
+	}
+	if err := a.RevokeWebTokens(norm); err != nil {
+		return api.WebAccess{}, err
+	}
+	return a.WebAccess(), nil
 }

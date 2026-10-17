@@ -76,7 +76,7 @@ ui/            React 19 + Vite 8 + TanStack Router/Query (lockstep stack), plain
 
 Reuse from lockstep (copied and adapted; lockstep itself is untouched): server bootstrap + JSON/error helpers,
 bearer auth (constant-time, `?token=` for EventSource), CORS + Private Network Access handling, pairing flow
-(6-digit code, 5-min window, confirm only from loopback, `web_origins`/`web_confirmed`), SSE hub, `go:embed dist`
+(6-digit code, 5-min window, confirm only from loopback, `web_origins`; ebb additionally binds each confirmation to a page nonce and issues per-origin tokens), SSE hub, `go:embed dist`
 asset handler with SPA fallback, MCP server shape (`protocolVersion "2025-06-18"`, `obj/str/boolp` schema helpers,
 text-JSON results, `isError`), launchd service install/bootout, `sys.Env`/`sys.Fake`, `state.WriteAtomic`,
 cobra `Main` + `--json` convention, testscript CLI tests, goreleaser + Homebrew tap. Extracting a shared module for
