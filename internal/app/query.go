@@ -55,11 +55,12 @@ func kindName(k tree.Kind) string {
 	return [...]string{"dir", "file", "link", "other", "small"}[k]
 }
 
-func (a *App) item(r *ScanResult, id tree.ID) api.Item {
+func (a *App) item(r *ScanResult, id tree.ID, notes map[string]string) api.Item {
 	t := r.Tree
 	n := t.Node(id)
 	path := a.Links.Display(t.Path(id))
-	it := api.Item{Path: path, Name: n.Name, Kind: kindName(n.Kind), Alloc: n.Alloc, Bytes: t.Reclaimable(id), Files: n.Files, Modified: n.MaxMtime}
+	it := api.Item{Path: path, Name: n.Name, Kind: kindName(n.Kind), Alloc: n.Alloc, Bytes: t.Reclaimable(id), Files: n.Files, Modified: n.MaxMtime,
+		Note: notes["path:"+path]}
 	for _, f := range r.Findings {
 		if slices.ContainsFunc(f.Targets, func(tg finding.Target) bool { return within(tg.Path, path) }) {
 			it.Findings = append(it.Findings, f.ID)
@@ -86,10 +87,11 @@ func (a *App) Children(path string, limit int, small bool) (api.ChildrenResponse
 	t := r.Tree
 	out := api.ChildrenResponse{Path: a.Links.Display(t.Path(id)), Items: []api.Item{}}
 	stored := map[string]bool{}
+	notes := a.Notes()
 	for _, c := range t.Children(id) {
 		stored[t.Node(c).Name] = true
 		if len(out.Items) < limit {
-			out.Items = append(out.Items, a.item(r, c))
+			out.Items = append(out.Items, a.item(r, c, notes))
 		}
 	}
 	if small && t.Node(id).Kind == tree.KindDir {
@@ -118,24 +120,33 @@ func (a *App) Search(q string, limit int) (api.SearchResponse, error) {
 	out := api.SearchResponse{Items: []api.Item{}}
 	ids := r.Tree.Find(q, 100000)
 	slices.SortFunc(ids, func(x, y tree.ID) int { return cmp.Compare(r.Tree.Node(y).Alloc, r.Tree.Node(x).Alloc) })
+	notes := a.Notes()
 	for _, id := range ids[:min(limit, len(ids))] {
-		out.Items = append(out.Items, a.item(r, id))
+		out.Items = append(out.Items, a.item(r, id, notes))
 	}
 	return out, nil
 }
 
-func (a *App) Findings(category string, minBytes uint64) (api.FindingsResponse, error) {
+// Findings lists findings with notes attached; ignored ones only when asked,
+// flagged, and never counted as reclaimable.
+func (a *App) Findings(category string, minBytes uint64, withIgnored bool) (api.FindingsResponse, error) {
 	r, err := a.Last()
 	if err != nil {
 		return api.FindingsResponse{}, err
 	}
 	out := api.FindingsResponse{Findings: []api.FindingView{}}
+	notes, ig := a.Notes(), a.ignores()
 	for _, f := range r.Findings {
 		if (category != "" && f.Category != category) || f.Bytes < minBytes {
 			continue
 		}
-		out.Findings = append(out.Findings, api.FindingView{Finding: f})
-		if f.Actionable() {
+		f.UserNote = notes["finding:"+f.ID]
+		v := api.FindingView{Finding: f, Ignored: ignored(ig, f)}
+		if v.Ignored && !withIgnored {
+			continue
+		}
+		out.Findings = append(out.Findings, v)
+		if f.Actionable() && !v.Ignored {
 			out.Reclaimable += f.Bytes
 		}
 	}

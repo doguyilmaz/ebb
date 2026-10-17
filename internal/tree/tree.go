@@ -401,3 +401,30 @@ func (t *Tree) computeKept() []uint64 {
 // Linked and Cloned report whether a hardlinked inode or clone ID was seen.
 func (w *Writer) Linked(ino uint64) bool     { _, ok := w.t.links[ino]; return ok }
 func (w *Writer) Cloned(cloneID uint64) bool { _, ok := w.t.clones[cloneID]; return ok }
+
+// Remove takes id out of the tree after it was deleted from disk: its sizes
+// leave every ancestor and it is unlinked from its parent.
+func (w *Writer) Remove(id ID) {
+	t := w.t
+	if id == 0 {
+		return
+	}
+	n := t.node(id)
+	for p := ID(t.parent[id]); p != None; p = ID(t.parent[p]) {
+		t.alloc[p] -= min(n.Alloc, t.alloc[p])
+		t.unique[p] -= min(n.Unique, t.unique[p])
+		t.logical[p] -= min(n.Logical, t.logical[p])
+		t.files[p] -= min(n.Files, t.files[p])
+	}
+	parent := ID(t.parent[id])
+	if ID(t.first[parent]) == id {
+		t.first[parent] = t.next[id]
+		return
+	}
+	for c := ID(t.first[parent]); c != None; c = ID(t.next[c]) {
+		if ID(t.next[c]) == id {
+			t.next[c] = t.next[id]
+			return
+		}
+	}
+}

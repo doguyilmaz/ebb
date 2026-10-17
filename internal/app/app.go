@@ -39,6 +39,7 @@ type App struct {
 	scanErr  string
 	progress *api.Progress
 	cur      *ScanResult
+	plans    map[string]*planEntry
 }
 
 func New(env sys.Env) (*App, error) {

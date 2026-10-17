@@ -240,3 +240,16 @@ func gzipBytes(b []byte) []byte {
 	zw.Close()
 	return buf.Bytes()
 }
+
+func TestRemoveSubtractsUpChain(t *testing.T) {
+	tr, a, b := build(t)
+	before := tr.Node(tr.Root())
+	tr.Write(func(w *Writer) { w.Remove(b) })
+	root, an := tr.Node(tr.Root()), tr.Node(a)
+	if root.Alloc != before.Alloc-5<<20 || an.Alloc != 3000 || an.Files != 3 {
+		t.Fatalf("root %+v a %+v", root, an)
+	}
+	if _, ok := tr.Lookup("/r/a/b"); ok || len(tr.Children(a)) != 0 {
+		t.Fatal("removed node still reachable")
+	}
+}

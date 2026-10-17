@@ -18,14 +18,32 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/tree?path&depth&minShare&maxNodes` | — | `SliceResponse` | 400 `outside-root`, 409 `never-scanned` |
 | GET | `/children?path&limit&small=1` | — | `ChildrenResponse` | 400 `outside-root` |
 | GET | `/search?q&limit` | — | `SearchResponse` | — |
-| GET | `/findings?category&minBytes` | — | `FindingsResponse` | — |
+| GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |
 | GET | `/report?format=json\|csv\|html\|text` | — | file | 400 `bad-format` |
 | POST | `/reveal` | `PathRequest` | 204 | 400 `outside-root` |
 | GET | `/history` | — | `HistoryResponse` | — |
 | GET | `/history/diff?from&to` | — | `DiffResponse` | 404 |
 | GET/POST | `/settings` | `Settings` | `Settings` | 400 |
 | GET | `/presets` | — | `PresetView[]` | — |
+| POST | `/plans` | `PlanRequest {findingIds?, paths?, preset?, source?}` | `Plan` | 400, 409 `never-scanned` |
+| GET | `/plans/{id}` | — | `Plan` | 404 `no-plan` |
+| POST | `/plans/{id}/approve` | — | `Plan` | 404 `no-plan` |
+| POST | `/plans/{id}/execute` | — | `PlanResult` (events `plan.progress` per item, `plan.done`) | 404, 409 `needs-approval`, 410 `plan-expired` |
+| GET | `/ops?limit` | — | `OpsResponse` | — |
+| POST | `/ops/{id}/undo` | — | 204 | 400 |
+| GET/POST | `/notes` | `NoteRequest {key, text}` (empty text removes) | `{key: text}` | 400 |
+| GET/POST | `/ignores` | `IgnoreRequest {findingId}` | `{findingId: time}` | — |
+| DELETE | `/ignores/{id}` | — | `{findingId: time}` | — |
 | GET | `/events` | — | `text/event-stream` | 401 |
+
+Plans expire after 10 minutes and run once. A plan needs approval unless every runnable item is `regenerable` and
+`[mcp] auto_execute = "regenerable"` (the default). Execute re-checks every item: it must still be the same file
+system object (device and inode) the plan saw, pass the guard (protected locations, scanned root, your protect
+list, case and symlink variants included) and its owner app must not be running. `GET /findings?ignored=1` also
+returns ignored findings, flagged.
+
+Routes that manage web access (`/pair/*`, `/web/allow`, `/web/deny`) accept only this machine's own token, never a
+token issued to a paired page.
 
 Paths are accepted in display form (`/Users/me/...`) or real form (`/System/Volumes/Data/Users/me/...`) and must lie
 inside the scanned root.

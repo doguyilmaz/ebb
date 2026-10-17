@@ -117,7 +117,7 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 		return "", refuse("%s", it.Blocked)
 	}
 	real := e.Links.Real(it.Path)
-	if sys.Sandboxed(e.Env) && !within(real, e.Env.Home()) && it.Action.Kind != "command" {
+	if sys.Sandboxed(e.Env) && !within(canonical(real), canonical(e.Env.Home())) && it.Action.Kind != "command" {
 		return "", refuse("sandboxed sessions only change files inside %s", e.Env.Home())
 	}
 	if it.Action.Kind != "empty-trash" {

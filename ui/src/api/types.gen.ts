@@ -69,6 +69,7 @@ export interface Item {
   files: number;
   modified: number;
   findings?: string[] | null;
+  note?: string;
 }
 
 export interface SmallFile {
@@ -229,6 +230,80 @@ export interface Breakdown {
   scanned: number;
   notVisible: number;
   fullDiskAccess: boolean;
+}
+
+export interface Request {
+  findingIds?: string[] | null;
+  paths?: string[] | null;
+  preset?: string;
+  app?: string;
+  source?: string;
+}
+
+export interface CleanItem {
+  path: string;
+  title?: string;
+  bytes: number;
+  safety: string;
+  action: Action;
+  command?: string[] | null;
+  findingId?: string;
+  warnings?: string[] | null;
+  blocked?: string;
+}
+
+export interface Plan {
+  id: string;
+  created: string;
+  expires: string;
+  source: string;
+  items: CleanItem[] | null;
+  bytes: number;
+  needsApproval: boolean;
+  approved: boolean;
+}
+
+export interface Event {
+  item: number;
+  path: string;
+  state: string;
+  bytes?: number;
+  err?: string;
+}
+
+export interface Op {
+  id: string;
+  planId: string;
+  path: string;
+  action: string;
+  time: string;
+  bytes: number;
+  result: string;
+  error?: string;
+  trashUrl?: string;
+}
+
+export interface Result {
+  planId: string;
+  freed: number;
+  done: number;
+  refused: number;
+  failed: number;
+  manual: number;
+  ops: Op[] | null;
+}
+
+export interface NoteRequest {
+  key: string;
+  text: string;
+}
+
+export interface IgnoreRequest {
+  findingId: string;
+}
+
+export interface OpsResponse {
+  ops: Op[] | null;
 }
 
 export const EVENTS = ["hello", "scan.progress", "scan.done", "findings.changed", "plan.progress", "plan.done", "history.changed"] as const;

@@ -26,7 +26,7 @@ func newFindingsCmd(g *globals) *cobra.Command {
 				return err
 			}
 			var fs []finding.Finding
-			for _, f := range last.Findings {
+			for _, f := range a.View(last).Findings {
 				if category == "" || f.Category == category {
 					fs = append(fs, f)
 				}

@@ -24,10 +24,20 @@ ebb top [path] [--files]    # largest folders or files under a path
 ebb find <pattern>          # glob or substring over names
 ebb report --format html -o ebb.html   # also text, json, csv
 ebb history · ebb diff      # past scans, and what grew between two of them
+ebb clean <finding|category> [--preset dev-caches] [--path p] [--dry-run] [--yes]
+ebb ops · ebb undo [op]     # what ebb did; put the last trashed item back
+ebb note <finding|path> "…" · ebb ignore <finding> · ebb protect add|rm|ls <glob>
+ebb serve --open            # local web UI and API on 127.0.0.1:47340
+ebb web allow|deny|confirm  # hosted web app pairing
 ebb version
 ```
 
-Every command takes `--json`. Grant Full Disk Access to your terminal (System Settings → Privacy & Security) to let
+Every command takes `--json`.
+
+Cleaning is always a plan first: each item shows its action (tool command, delete, Trash, or a manual step), size,
+safety and why it may be blocked. Nothing outside the scanned folder, nothing protected (system folders, top-level
+home folders, Keychains, iCloud and cloud-storage folders, your protect list) and nothing that changed since the
+plan was made is ever touched. ebb refuses to run as root. Grant Full Disk Access to your terminal (System Settings → Privacy & Security) to let
 ebb see app containers and Mail/Messages data; without it the report shows those bytes as "not visible".
 
 State lives in `~/.local/state/ebb` (last scan, history snapshots), config in `~/.config/ebb/config.toml`, your own

@@ -95,7 +95,7 @@ func (p *Planner) Plan(req Request) (*Plan, error) {
 			return nil, fmt.Errorf("unknown preset %q", req.Preset)
 		}
 		for _, f := range p.Findings {
-			if (slices.Contains(pr.Categories, f.Category) || slices.Contains(pr.Rules, f.RuleID)) && f.Safety.Rank() <= pr.MaxSafety.Rank() {
+			if PresetMatches(pr, f) {
 				items = append(items, p.findingItems(f)...)
 			}
 		}
@@ -121,6 +121,12 @@ func (p *Planner) Plan(req Request) (*Plan, error) {
 	}
 	plan.Items = items
 	return plan, nil
+}
+
+// PresetMatches reports whether a preset covers a finding.
+func PresetMatches(pr rules.Preset, f finding.Finding) bool {
+	return f.Actionable() && (slices.Contains(pr.Categories, f.Category) || slices.Contains(pr.Rules, f.RuleID)) &&
+		f.Safety.Rank() <= pr.MaxSafety.Rank()
 }
 
 func (p *Planner) preset(id string) (rules.Preset, bool) {

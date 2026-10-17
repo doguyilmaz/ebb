@@ -1,0 +1,73 @@
+mkdir $HOME/.config/ebb/rules
+cp rules.toml $HOME/.config/ebb/rules/t.toml
+fill 3145728 $HOME/w/cache/blob
+fill 2097152 $HOME/w/old.dmg
+exec ebb scan $HOME
+
+exec ebb clean t.cache --dry-run
+stdout 'delete'
+stdout 'w/cache'
+exists $HOME/w/cache/blob
+
+exec ebb clean t.cache --yes
+! exists $HOME/w/cache
+exec ebb ops
+stdout 'delete'
+
+! exec ebb clean t.dl --yes
+stderr 'confirm'
+exists $HOME/w/old.dmg
+stdin yes.txt
+exec ebb clean t.dl
+! exists $HOME/w/old.dmg
+exists $HOME/.Trash/old.dmg
+exec ebb undo
+exists $HOME/w/old.dmg
+
+exec ebb scan $HOME
+exec ebb note t.dl 'keep for now'
+exec ebb findings --json
+stdout '"userNote": "keep for now"'
+exec ebb ignore t.dl
+exec ebb findings
+! stdout 't.dl'
+exec ebb ignore t.dl --undo
+exec ebb findings
+stdout 't.dl'
+
+exec ebb protect add '~/w/**'
+exec ebb protect ls
+stdout '~/w/\*\*'
+exec ebb clean t.dl --dry-run
+stdout 'protect list'
+exec ebb protect rm '~/w/**'
+
+! exec ebb clean nope
+stderr 'unknown finding or category'
+
+-- rules.toml --
+[[rule]]
+id = "t.cache"
+title = "T cache"
+category = "package-cache"
+paths = ["~/w/cache"]
+safety = "regenerable"
+why = "w"
+impact = "i"
+min_size = "1MB"
+min_target = "1MB"
+action = { kind = "delete" }
+
+[[rule]]
+id = "t.dl"
+title = "T download"
+category = "installer"
+paths = ["~/w/old.dmg"]
+safety = "caution"
+why = "w"
+impact = "i"
+min_size = "1MB"
+min_target = "1MB"
+action = { kind = "trash" }
+-- yes.txt --
+y

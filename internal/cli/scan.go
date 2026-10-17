@@ -42,7 +42,7 @@ func newScanCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep := report.Build(res, a.Links, Version)
+			rep := report.Build(a.View(res), a.Links, Version)
 			if g.json {
 				return emitJSON(cmd.OutOrStdout(), map[string]any{"meta": res.Meta, "volume": res.Volume, "findings": len(res.Findings),
 					"reclaimable": rep.Reclaimable, "problems": res.ProblemCount})

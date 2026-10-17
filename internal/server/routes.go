@@ -120,7 +120,7 @@ func (s *Server) search(_ http.ResponseWriter, r *http.Request) (any, error) {
 
 func (s *Server) findings(_ http.ResponseWriter, r *http.Request) (any, error) {
 	min, _ := strconv.ParseUint(r.URL.Query().Get("minBytes"), 10, 64)
-	return s.app.Findings(r.URL.Query().Get("category"), min)
+	return s.app.Findings(r.URL.Query().Get("category"), min, r.URL.Query().Get("ignored") == "1")
 }
 
 func (s *Server) report(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +129,7 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 		s.json(func(http.ResponseWriter, *http.Request) (any, error) { return nil, err })(w, r)
 		return
 	}
-	rep := report.Build(last, s.app.Links, s.version)
+	rep := report.Build(s.app.View(last), s.app.Links, s.version)
 	format := r.URL.Query().Get("format")
 	types := map[string]string{"json": "application/json", "csv": "text/csv; charset=utf-8", "html": "text/html; charset=utf-8", "text": "text/plain; charset=utf-8"}
 	ct, ok := types[format]

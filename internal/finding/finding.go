@@ -57,6 +57,7 @@ type Finding struct {
 	Evidence []string `json:"evidence,omitempty"`
 	Actions  []Action `json:"actions,omitempty"`
 	Notes    string   `json:"notes,omitempty"`
+	UserNote string   `json:"userNote,omitempty"` // the person's own note, added when shown
 }
 
 // Total sums target bytes into the finding.

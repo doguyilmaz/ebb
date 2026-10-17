@@ -25,7 +25,7 @@ func newReportCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep := report.Build(last, a.Links, Version)
+			rep := report.Build(a.View(last), a.Links, Version)
 			var w io.Writer = cmd.OutOrStdout()
 			if out != "" {
 				f, err := os.Create(out)

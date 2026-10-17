@@ -21,7 +21,7 @@ func runOverview(g *globals, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	rep := report.Build(res, a.Links, Version)
+	rep := report.Build(a.View(res), a.Links, Version)
 	if g.json {
 		return emitJSON(cmd.OutOrStdout(), rep)
 	}

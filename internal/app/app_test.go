@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/state"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/walk"
@@ -158,4 +159,13 @@ func TestConfigBadLargeFileFails(t *testing.T) {
 	if _, err := New(a.Env); err == nil || !strings.Contains(err.Error(), "large_file") {
 		t.Fatalf("a typo must fail loudly instead of listing every file: %v", err)
 	}
+}
+
+func hasFinding(fs []api.FindingView, id string) bool {
+	for _, f := range fs {
+		if f.ID == id {
+			return true
+		}
+	}
+	return false
 }

@@ -316,3 +316,16 @@ func TestExecuteDeleteRechecksAfterRename(t *testing.T) {
 		}
 	}
 }
+
+func TestGuardVolumeRootChildren(t *testing.T) {
+	g := Guard{Home: "/Users/h", Roots: []string{"/", "/System/Volumes/Data"}}
+	for _, p := range []string{"/System/Volumes/Data/.DocumentRevisions-V100", "/.Spotlight-V100", "/private", "/private/var",
+		"/var", "/tmp", "/private/tmp", "/System/Volumes/Data/private/var", "/Volumes/Backup"} {
+		if err := g.Check(p); err == nil {
+			t.Errorf("%s must be protected", p)
+		}
+	}
+	if err := g.Check("/private/var/folders/xy/T/cache"); err != nil {
+		t.Errorf("deep temp folders stay allowed: %v", err)
+	}
+}

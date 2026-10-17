@@ -86,8 +86,11 @@ func (g Guard) resolved() Guard {
 func (g Guard) protectedLists() (subs, exact, tops []string) {
 	home := g.Home
 	subs = append(slices.Clone(subtrees), home+"/Library/Keychains", home+"/Library/Mobile Documents", home+"/Library/CloudStorage")
-	exact = []string{"/", "/Applications", "/Library", "/Users", "/Volumes", "/usr/local", "/opt", home, home + "/Library"}
-	tops = []string{home, "/Volumes", "/Users"}
+	exact = []string{"/", "/Applications", "/Library", "/Users", "/Volumes", "/usr/local", "/opt", "/private", "/private/var",
+		"/private/tmp", "/var", "/tmp", home, home + "/Library"}
+	// Children of these are folders the system or the person relies on as a
+	// whole (the data volume's hidden databases, mounted disks, homes).
+	tops = []string{"/", dataVolume, home, "/Volumes", "/Users"}
 	return
 }
 

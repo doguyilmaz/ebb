@@ -5,6 +5,7 @@ package api
 //go:generate go run ./tsgen -out ../../ui/src/api/types.gen.ts
 
 import (
+	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
@@ -58,6 +59,7 @@ type Item struct {
 	Files    uint32   `json:"files"`
 	Modified int64    `json:"modified"` // unix seconds, newest in subtree
 	Findings []string `json:"findings,omitempty"`
+	Note     string   `json:"note,omitempty"`
 }
 
 type SmallFile struct {
@@ -78,8 +80,29 @@ type SearchResponse struct {
 
 type FindingView struct {
 	finding.Finding
-	UserNote string `json:"userNote,omitempty"`
-	Ignored  bool   `json:"ignored,omitempty"`
+	Ignored bool `json:"ignored,omitempty"`
+}
+
+type (
+	PlanRequest = clean.Request
+	Plan        = clean.Plan
+	PlanItem    = clean.Item
+	PlanEvent   = clean.Event
+	PlanResult  = clean.Result
+	Op          = clean.Op
+)
+
+type NoteRequest struct {
+	Key  string `json:"key"` // "finding:<id>" or "path:<path>"
+	Text string `json:"text"`
+}
+
+type IgnoreRequest struct {
+	FindingID string `json:"findingId"`
+}
+
+type OpsResponse struct {
+	Ops []Op `json:"ops"`
 }
 
 type FindingsResponse struct {
@@ -169,7 +192,7 @@ const (
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
-	Error{}, volume.Breakdown{},
+	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 
 var Events = []string{EventHello, EventScanProgress, EventScanDone, EventFindingsChanged, EventPlanProgress, EventPlanDone, EventHistoryChanged}
