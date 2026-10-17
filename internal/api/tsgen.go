@@ -54,7 +54,11 @@ func (g *gen) ts(t reflect.Type) string {
 	case t.Kind() == reflect.Pointer:
 		return g.ts(t.Elem()) + " | null"
 	case t.Kind() == reflect.Slice || t.Kind() == reflect.Array:
-		return g.wrap(g.ts(t.Elem())) + "[] | null"
+		e := t.Elem()
+		if e.Kind() == reflect.Pointer {
+			e = e.Elem() // the API never sends null items inside a list
+		}
+		return g.wrap(g.ts(e)) + "[] | null"
 	case t.Kind() == reflect.Map:
 		return "Record<string, " + g.ts(t.Elem()) + "> | null"
 	case t.Kind() == reflect.Interface:

@@ -121,7 +121,17 @@ func (s *Server) search(_ http.ResponseWriter, r *http.Request) (any, error) {
 
 func (s *Server) findings(_ http.ResponseWriter, r *http.Request) (any, error) {
 	min, _ := strconv.ParseUint(r.URL.Query().Get("minBytes"), 10, 64)
-	return s.app.Findings(r.URL.Query().Get("category"), min, r.URL.Query().Get("ignored") == "1")
+	out, err := s.app.Findings(r.URL.Query().Get("category"), min, r.URL.Query().Get("ignored") == "1")
+	if err != nil {
+		return nil, err
+	}
+	if last, err := s.app.Last(); err == nil {
+		out.Notes = report.Build(s.app.View(last), s.app.Links, s.version).Notes
+	}
+	if out.Notes == nil {
+		out.Notes = []string{}
+	}
+	return out, nil
 }
 
 func (s *Server) report(w http.ResponseWriter, r *http.Request) {

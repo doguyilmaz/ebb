@@ -110,6 +110,7 @@ type OpsResponse struct {
 type FindingsResponse struct {
 	Findings    []FindingView `json:"findings"`
 	Reclaimable uint64        `json:"reclaimable"`
+	Notes       []string      `json:"notes"` // what the numbers include and leave out
 }
 
 type HistoryResponse struct {

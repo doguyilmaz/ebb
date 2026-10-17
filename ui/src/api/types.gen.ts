@@ -52,7 +52,7 @@ export interface SliceNode {
   unique: number;
   files: number;
   other?: number;
-  children?: (SliceNode | null)[] | null;
+  children?: SliceNode[] | null;
 }
 
 export interface SliceResponse {
@@ -126,6 +126,7 @@ export interface FindingView {
 export interface FindingsResponse {
   findings: FindingView[] | null;
   reclaimable: number;
+  notes: string[] | null;
 }
 
 export interface HistoryResponse {
