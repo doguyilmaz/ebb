@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,5 +136,26 @@ func TestNormalizeOrigin(t *testing.T) {
 		if _, ok := NormalizeOrigin(bad); ok {
 			t.Errorf("%q must be rejected", bad)
 		}
+	}
+}
+
+func TestCorruptLastTreeMeansRescan(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(sys.StateDir(a.Env), "last.tree"), []byte("garbage"), 0o600)
+	fresh, _ := New(a.Env)
+	if _, err := fresh.Last(); !errors.Is(err, ErrNeverScanned) {
+		t.Fatalf("a damaged saved scan must ask for a rescan, got %v", err)
+	}
+}
+
+func TestConfigBadLargeFileFails(t *testing.T) {
+	a, _ := testApp(t)
+	os.MkdirAll(sys.ConfigDir(a.Env), 0o755)
+	os.WriteFile(filepath.Join(sys.ConfigDir(a.Env), "config.toml"), []byte("[scan]\nlarge_file = \"lots\"\n"), 0o600)
+	if _, err := New(a.Env); err == nil || !strings.Contains(err.Error(), "large_file") {
+		t.Fatalf("a typo must fail loudly instead of listing every file: %v", err)
 	}
 }

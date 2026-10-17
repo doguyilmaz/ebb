@@ -4,6 +4,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -43,7 +44,11 @@ type App struct {
 func New(env sys.Env) (*App, error) {
 	cfg, err := config.Load(env)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", config.Path(env), err)
+	}
+	var large rules.Size
+	if err := large.UnmarshalText([]byte(cfg.Scan.LargeFile)); err != nil || large < 1<<20 {
+		return nil, fmt.Errorf("%s: [scan] large_file = %q is not a size like \"1GiB\"", config.Path(env), cfg.Scan.LargeFile)
 	}
 	set, err := rules.Load(env, ebb.Rules)
 	if err != nil {

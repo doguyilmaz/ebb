@@ -1,6 +1,12 @@
 package tree
 
-import "testing"
+import (
+	"bytes"
+	"compress/gzip"
+	"encoding/binary"
+	"io"
+	"testing"
+)
 
 func build(t *testing.T) (*Tree, ID, ID) {
 	t.Helper()
@@ -172,4 +178,65 @@ func TestReclaimableNestedLinks(t *testing.T) {
 	if tr.Reclaimable(tr.Root()) != 1<<20 {
 		t.Fatalf("a write must invalidate the cached figures: %d", tr.Reclaimable(tr.Root()))
 	}
+}
+
+func TestReclaimableFileTarget(t *testing.T) {
+	tr := New("/r")
+	var f ID
+	tr.Write(func(w *Writer) {
+		d := w.AddDir(tr.Root(), []byte("d"), 1, 0)
+		e := w.AddDir(tr.Root(), []byte("e"), 1, 0)
+		f = w.AddFile(d, []byte("vm.img"), KindFile, 4<<20, 4<<20, 4<<20, 1, 0)
+		w.Link(9, 2, 4<<20, f)
+		g := w.AddFile(e, []byte("vm.img"), KindFile, 0, 0, 4<<20, 1, FlagShared)
+		w.Link(9, 2, 4<<20, g)
+	})
+	if got := tr.Reclaimable(f); got != 0 {
+		t.Fatalf("deleting one hardlink of a file frees nothing: %d", got)
+	}
+	if got := tr.Reclaimable(tr.Root()); got != 4<<20 {
+		t.Fatalf("root %d", got)
+	}
+}
+
+func TestLoadRejectsCorrupt(t *testing.T) {
+	tr := New("/r")
+	tr.Write(func(w *Writer) {
+		a := w.AddDir(tr.Root(), []byte("a"), 1, 0)
+		w.AddFile(a, []byte("f"), KindFile, 2<<20, 2<<20, 2<<20, 1, 0)
+	})
+	var good bytes.Buffer
+	tr.Save(&good)
+	raw := gunzip(t, good.Bytes())
+	corrupt := func(mut func([]byte) []byte) error {
+		_, err := Load(bytes.NewReader(gzipBytes(mut(append([]byte(nil), raw...)))))
+		return err
+	}
+	headLen := 4 + 4 + 4 + 2 // magic, version, root length, "/r"
+	if err := corrupt(func(b []byte) []byte { binary.LittleEndian.PutUint64(b[headLen:], 1<<40); return b }); err == nil {
+		t.Fatal("absurd node count accepted")
+	}
+	if err := corrupt(func(b []byte) []byte { binary.LittleEndian.PutUint32(b[headLen+8+4:], 999); return b }); err == nil {
+		t.Fatal("parent index out of range accepted")
+	}
+	if err := corrupt(func(b []byte) []byte { return b[:len(b)/2] }); err == nil {
+		t.Fatal("truncated file accepted")
+	}
+}
+
+func gunzip(t *testing.T, b []byte) []byte {
+	zr, err := gzip.NewReader(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _ := io.ReadAll(zr)
+	return out
+}
+
+func gzipBytes(b []byte) []byte {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	zw.Write(b)
+	zw.Close()
+	return buf.Bytes()
 }

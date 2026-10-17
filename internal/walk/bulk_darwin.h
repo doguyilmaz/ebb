@@ -10,5 +10,5 @@ typedef struct {
 } ebb_entry;
 
 int ebb_bulk(int fd, char *attrbuf, size_t attrcap, ebb_entry *out, int outcap,
-             char *names, size_t namecap, size_t *nameused);
+             char *names, size_t namecap, size_t *nameused, int want_clone);
 int ebb_set_iopolicy(int throttle);

@@ -49,7 +49,7 @@ func TestBuildReclaimableAndNotes(t *testing.T) {
 		t.Fatalf("only findings ebb can act on count as reclaimable: %d", r.Reclaimable)
 	}
 	notes := strings.Join(r.Notes, "\n")
-	for _, want := range []string{"Full Disk Access", "not visible", "shared", "3 folders could not be read", "purgeable", "Runtime images are mounted elsewhere."} {
+	for _, want := range []string{"Full Disk Access", "not visible", "shared", "3 folders or files could not be read", "purgeable", "Runtime images are mounted elsewhere."} {
 		if !strings.Contains(notes, want) {
 			t.Errorf("notes missing %q:\n%s", want, notes)
 		}
@@ -146,5 +146,18 @@ func TestTextStripsTerminalEscapes(t *testing.T) {
 	WriteText(&buf, Build(hostile(), volume.Firmlinks{}, "test"), 200)
 	if strings.ContainsAny(buf.String(), "\x1b\x07") {
 		t.Fatalf("control characters reached the terminal: %q", buf.String())
+	}
+}
+
+func TestNotesFDAWithProblemsAndErrors(t *testing.T) {
+	r := result()
+	r.Volume.NotVisible = 0
+	r.Errors = []string{"simulators: simctl failed"}
+	notes := strings.Join(Build(r, volume.Firmlinks{}, "t").Notes, "\n")
+	if !strings.Contains(notes, "Full Disk Access") || !strings.Contains(notes, "3 folders or files could not be read") {
+		t.Fatalf("unreadable folders must come with the FDA hint:\n%s", notes)
+	}
+	if !strings.Contains(notes, "simctl failed") {
+		t.Fatalf("detector errors must be visible:\n%s", notes)
 	}
 }

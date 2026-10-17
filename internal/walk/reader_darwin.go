@@ -9,6 +9,7 @@ import "C"
 import (
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
@@ -49,7 +50,13 @@ type scratch struct {
 
 type bulkReader struct {
 	scratch sync.Pool
+	// noClones is set when the kernel rejects the clone attributes (older
+	// macOS); scans then fall back to the basic attribute set.
+	noClones atomic.Bool
 }
+
+// oNoFollowAny refuses a symlink anywhere in the path (macOS 11+).
+const oNoFollowAny = 0x20000000
 
 func newBulkReader() *bulkReader {
 	r := &bulkReader{}
@@ -60,7 +67,7 @@ func newBulkReader() *bulkReader {
 }
 
 func (r *bulkReader) readDir(path string, b *batch) error {
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0)
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC|oNoFollowAny, 0)
 	if err != nil {
 		return &os.PathError{Op: "open", Path: path, Err: err}
 	}
@@ -69,8 +76,16 @@ func (r *bulkReader) readDir(path string, b *batch) error {
 	defer r.scratch.Put(sc)
 	for {
 		var used C.size_t
+		wantClone := C.int(1)
+		if r.noClones.Load() {
+			wantClone = 0
+		}
 		n := C.ebb_bulk(C.int(fd), (*C.char)(unsafe.Pointer(&sc.attr[0])), C.size_t(len(sc.attr)),
-			&sc.out[0], C.int(len(sc.out)), (*C.char)(unsafe.Pointer(&sc.names[0])), C.size_t(len(sc.names)), &used)
+			&sc.out[0], C.int(len(sc.out)), (*C.char)(unsafe.Pointer(&sc.names[0])), C.size_t(len(sc.names)), &used, wantClone)
+		if n == -C.int(syscall.EINVAL) && wantClone == 1 {
+			r.noClones.Store(true)
+			continue
+		}
 		if n < 0 {
 			return &os.PathError{Op: "getattrlistbulk", Path: path, Err: syscall.Errno(-n)}
 		}

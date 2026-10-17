@@ -277,3 +277,42 @@ func TestPlanArbitraryPathIsCautiousTrash(t *testing.T) {
 		t.Fatalf("%+v %v", p, err)
 	}
 }
+
+func TestGuardCaseVariants(t *testing.T) {
+	g := Guard{Home: "/Users/h", Roots: []string{"/"}}
+	for _, p := range []string{"/users/h/library/keychains/x", "/SYSTEM/Library/x", "/users/h/Documents", "/Users/H/Library/Mobile Documents/x", "/USR/bin/x"} {
+		if err := g.Check(p); err == nil {
+			t.Errorf("APFS ignores case, so %s is protected too", p)
+		}
+	}
+}
+
+func TestGuardSymlinkIntoProtected(t *testing.T) {
+	_, home := sandboxEnv(t)
+	keychains := filepath.Join(home, "Library", "Keychains")
+	mkfile(t, filepath.Join(keychains, "login.keychain-db"), 10)
+	os.MkdirAll(filepath.Join(home, "w"), 0o755)
+	if err := os.Symlink(keychains, filepath.Join(home, "w", "alias")); err != nil {
+		t.Fatal(err)
+	}
+	g := Guard{Home: home, Roots: []string{home}}
+	if err := g.Check(filepath.Join(home, "w", "alias", "login.keychain-db")); err == nil {
+		t.Fatal("a symlinked parent must not lead into a protected folder")
+	}
+}
+
+func TestExecuteDeleteRechecksAfterRename(t *testing.T) {
+	env, home := sandboxEnv(t)
+	target := filepath.Join(home, "w", "cache")
+	mkfile(t, filepath.Join(target, "f"), 1<<20)
+	res, err := executor(env).Execute(context.Background(), planFor(t, env, target, finding.Regenerable), nil)
+	if err != nil || res.Done != 1 || exists(target) {
+		t.Fatalf("%+v %v", res, err)
+	}
+	des, _ := os.ReadDir(filepath.Join(home, "w"))
+	for _, d := range des {
+		if strings.HasPrefix(d.Name(), ".ebb-delete-") {
+			t.Fatal("temporary name left behind")
+		}
+	}
+}

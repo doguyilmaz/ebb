@@ -40,6 +40,11 @@ type simRuntime struct {
 }
 
 func (simulators) Detect(ctx context.Context, c *Context) ([]finding.Finding, error) {
+	// Without simulator data there is nothing to ask about, and on a Mac
+	// without developer tools xcrun would offer to install them.
+	if _, ok := c.node(c.home("Library/Developer/CoreSimulator/Devices")); !ok {
+		return nil, nil
+	}
 	out, err := c.Env.Run(ctx, "", "xcrun", "simctl", "list", "devices", "-j")
 	if err != nil {
 		return nil, nil
@@ -69,7 +74,11 @@ func (simulators) Detect(ctx context.Context, c *Context) ([]finding.Finding, er
 			if d.State == "Booted" || d.DataPath == "" {
 				continue
 			}
-			t := c.deviceTarget(d)
+			id, ok := c.node(filepath.Dir(d.DataPath))
+			if !ok {
+				continue
+			}
+			t := c.target(id)
 			t.Command = []string{"xcrun", "simctl", "delete", d.UDID}
 			switch {
 			case !d.IsAvailable:
@@ -95,14 +104,6 @@ func (simulators) Detect(ctx context.Context, c *Context) ([]finding.Finding, er
 		fs = append(fs, f)
 	}
 	return fs, nil
-}
-
-func (c *Context) deviceTarget(d simDevice) finding.Target {
-	dir := filepath.Dir(d.DataPath)
-	if id, ok := c.node(dir); ok {
-		return c.target(id)
-	}
-	return finding.Target{Path: dir, Bytes: d.DataPathSize, Alloc: d.DataPathSize}
 }
 
 func runtimeName(id string) string {
@@ -138,6 +139,9 @@ func (c *Context) oldRuntimes(ctx context.Context, recent map[string]bool) (find
 		Actions: []finding.Action{{Kind: "command", Quit: []string{"Simulator"}}}}
 	for _, r := range rts {
 		if !r.Deletable || r.Version == newest[r.PlatformIdentifier] || recent[r.RuntimeIdentifier] || c.Now.Sub(r.LastUsedAt) < c.StaleAfter {
+			continue
+		}
+		if _, inScan := c.node(r.Path); !inScan {
 			continue
 		}
 		f.Targets = append(f.Targets, finding.Target{Path: c.Links.Display(r.Path), Bytes: r.SizeBytes, Alloc: r.SizeBytes,

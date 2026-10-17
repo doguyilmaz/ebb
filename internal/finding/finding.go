@@ -2,11 +2,6 @@
 // why it is large, what removing it costs and how safe that is.
 package finding
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-)
-
 type Safety string
 
 const (
@@ -48,7 +43,7 @@ type Target struct {
 }
 
 type Finding struct {
-	ID       string   `json:"id"`
+	ID       string   `json:"id"` // stable across scans: one finding per rule
 	RuleID   string   `json:"ruleId"`
 	Title    string   `json:"title"`
 	Category string   `json:"category"`
@@ -62,12 +57,6 @@ type Finding struct {
 	Evidence []string `json:"evidence,omitempty"`
 	Actions  []Action `json:"actions,omitempty"`
 	Notes    string   `json:"notes,omitempty"`
-}
-
-// ID is stable across scans for the same rule and first location.
-func ID(ruleID, firstPath string) string {
-	h := sha256.Sum256([]byte(firstPath))
-	return ruleID + ":" + hex.EncodeToString(h[:4])
 }
 
 // Total sums target bytes into the finding.

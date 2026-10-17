@@ -18,9 +18,13 @@ func (large) Pass() int  { return 2 }
 
 // bundles are folders macOS treats as one document; a large file inside is
 // reported as the whole bundle, because removing part of one breaks it.
-var bundles = []string{".xcresult", ".xcarchive", ".photoslibrary", ".bundle", ".framework", ".sparsebundle", ".band",
-	".logicx", ".fcpbundle", ".imovielibrary", ".musiclibrary", ".tvlibrary", ".playground", ".docset", ".vmwarevm",
-	".pvm", ".utm", ".avd"}
+var bundles = []string{".xcresult", ".xcarchive", ".bundle", ".framework", ".sparsebundle", ".playground", ".docset",
+	".vmwarevm", ".pvm", ".utm", ".avd"}
+
+// libraries hold the person's photos, music, films and projects: their space
+// is explained by user-data rules, never offered as one large file.
+var libraries = []string{".photoslibrary", ".photolibrary", ".musiclibrary", ".tvlibrary", ".imovielibrary", ".fcpbundle",
+	".logicx", ".band", ".aplibrary"}
 
 // Detect lists big files in the person's own folders that no other finding
 // explains. ~/Library, dot-folders, apps and system locations are left out:
@@ -32,14 +36,21 @@ func (large) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 		Impact:  "Check each one before removing it; they go to the Trash.",
 		Actions: []finding.Action{{Kind: "trash"}}}
 	seen := map[string]bool{}
-	for _, id := range c.Tree.Top(c.Tree.Root(), 400) {
+	homeID, ok := c.node(home)
+	if !ok {
+		return nil, nil
+	}
+	for _, id := range c.Tree.Top(homeID, 400) {
 		n := c.Tree.Node(id)
 		if n.Alloc < c.LargeFile {
 			break
 		}
 		path := c.Links.Display(c.Tree.Path(id))
 		rel, ok := strings.CutPrefix(path, home+"/")
-		if !ok || strings.HasPrefix(rel, "Library/") || strings.HasPrefix(rel, ".") || (c.Covered != nil && c.Covered(path)) {
+		if !ok || strings.HasPrefix(rel, "Library/") || strings.HasPrefix(rel, ".") || (c.Covered != nil && c.Covered(path)) ||
+			slices.ContainsFunc(strings.Split(rel, "/"), func(p string) bool {
+				return slices.ContainsFunc(libraries, func(ext string) bool { return strings.HasSuffix(p, ext) })
+			}) {
 			continue
 		}
 		target := id

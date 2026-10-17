@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/app"
@@ -82,10 +83,11 @@ func Build(r *app.ScanResult, links volume.Firmlinks, version string) *Report {
 func notes(r *app.ScanResult, root tree.Node) []string {
 	v := r.Volume
 	var out []string
+	fda := " Grant Full Disk Access to your terminal (System Settings → Privacy & Security → Full Disk Access) and scan again to see more."
 	if v.NotVisible > 0 {
-		n := fmt.Sprintf("%s of the data volume was not visible to this scan: system folders, other users' homes and apps' private data.", units.Bytes(v.NotVisible))
+		n := fmt.Sprintf("%s of the data volume was not visible to this scan: system folders, other users' homes, apps' private data and local snapshots.", units.Bytes(v.NotVisible))
 		if !v.FullDiskAccess {
-			n += " Grant Full Disk Access to your terminal (System Settings → Privacy & Security → Full Disk Access) and scan again to see more."
+			n += fda
 		}
 		out = append(out, n)
 	}
@@ -93,7 +95,14 @@ func notes(r *app.ScanResult, root tree.Node) []string {
 		out = append(out, fmt.Sprintf("Allocated sizes count every copy, the way du does; %s is shared between APFS clones or hardlinks, so unique and reclaimable figures are lower. Clones that were modified after copying still count fully, so reclaimable figures may be slightly high for them.", units.Bytes(root.Alloc-root.Unique)))
 	}
 	if r.ProblemCount > 0 {
-		out = append(out, fmt.Sprintf("%d folders could not be read; their contents are not counted.", r.ProblemCount))
+		n := fmt.Sprintf("%d folders or files could not be read; their contents are not counted.", r.ProblemCount)
+		if !v.FullDiskAccess && v.NotVisible == 0 {
+			n += fda
+		}
+		out = append(out, n)
+	}
+	if len(r.Errors) > 0 {
+		out = append(out, "Some checks could not run: "+strings.Join(r.Errors, "; ")+".")
 	}
 	if n := len(v.Snapshots); n > 0 {
 		out = append(out, fmt.Sprintf("%d local Time Machine snapshots exist; their space shows as used or purgeable until macOS removes them.", n))

@@ -94,7 +94,7 @@ func compareVersions(a, b string) int {
 
 func finish(f finding.Finding) finding.Finding {
 	slices.SortFunc(f.Targets, func(a, b finding.Target) int { return cmp.Compare(b.Alloc, a.Alloc) })
-	f.ID = finding.ID(f.RuleID, f.Targets[0].Path)
+	f.ID = f.RuleID
 	f.Total()
 	return f
 }
@@ -112,9 +112,17 @@ func All() []Detector {
 
 func Run(ctx context.Context, c *Context) ([]finding.Finding, []error) { return RunWith(ctx, c, All()) }
 
+// RunWith runs detectors in order, pass 1 before pass 2. A location claimed
+// by an earlier finding (or by a data rule that matched it) is dropped from
+// later findings, so no byte is counted twice; growth findings only explain
+// and are exempt.
 func RunWith(ctx context.Context, c *Context, ds []Detector) ([]finding.Finding, []error) {
 	var out []finding.Finding
 	var errs []error
+	c.claimed, c.covered = c.claimed[:0], c.covered[:0]
+	c.Covered = func(p string) bool {
+		return slices.ContainsFunc(c.covered, func(t string) bool { return within(p, t) })
+	}
 	run := func(pass int) {
 		for _, d := range ds {
 			if d.Pass() != pass {
@@ -124,23 +132,37 @@ func RunWith(ctx context.Context, c *Context, ds []Detector) ([]finding.Finding,
 			if err != nil {
 				errs = append(errs, fmt.Errorf("%s: %w", d.ID(), err))
 			}
-			out = append(out, fs...)
+			var claims []string
+			for _, f := range fs {
+				if f.Category != "growth" && len(f.Targets) > 0 {
+					kept := slices.DeleteFunc(slices.Clone(f.Targets), func(t finding.Target) bool {
+						return slices.ContainsFunc(c.covered, func(p string) bool { return overlaps(p, t.Path) })
+					})
+					if len(kept) == 0 {
+						continue
+					}
+					f.Targets = kept
+					f.Total()
+					for _, t := range kept {
+						claims = append(claims, t.Path)
+					}
+				}
+				out = append(out, f)
+			}
+			c.covered = append(append(c.covered, claims...), c.claimed...)
+			c.claimed = c.claimed[:0]
 		}
 	}
-	c.claimed = c.claimed[:0]
 	run(1)
-	c.covered = append(c.covered[:0], c.claimed...)
-	for _, f := range out {
-		for _, t := range f.Targets {
-			c.covered = append(c.covered, t.Path)
-		}
-	}
-	c.Covered = func(p string) bool {
-		return slices.ContainsFunc(c.covered, func(t string) bool { return within(p, t) })
-	}
 	run(2)
 	// A finding whose locations add up to almost nothing is noise.
-	out = slices.DeleteFunc(out, func(f finding.Finding) bool { return len(f.Targets) > 0 && f.Alloc < 1<<20 })
+	out = slices.DeleteFunc(out, func(f finding.Finding) bool {
+		var alloc uint64
+		for _, t := range f.Targets {
+			alloc += t.Alloc
+		}
+		return len(f.Targets) > 0 && alloc < 1<<20
+	})
 	slices.SortStableFunc(out, func(a, b finding.Finding) int { return cmp.Compare(b.Bytes, a.Bytes) })
 	return out, errs
 }

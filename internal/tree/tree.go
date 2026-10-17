@@ -397,3 +397,7 @@ func (t *Tree) computeKept() []uint64 {
 	}
 	return kept
 }
+
+// Linked and Cloned report whether a hardlinked inode or clone ID was seen.
+func (w *Writer) Linked(ino uint64) bool     { _, ok := w.t.links[ino]; return ok }
+func (w *Writer) Cloned(cloneID uint64) bool { _, ok := w.t.clones[cloneID]; return ok }

@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -36,7 +37,7 @@ func (a *App) Last() (*ScanResult, error) {
 		if state.IsNotExist(err) {
 			return nil, ErrNeverScanned
 		}
-		return nil, err
+		return nil, fmt.Errorf("%w (the saved scan could not be read: %v)", ErrNeverScanned, err)
 	}
 	f, err := os.Open(a.statePath("last.tree"))
 	if err != nil {
@@ -44,7 +45,7 @@ func (a *App) Last() (*ScanResult, error) {
 	}
 	defer f.Close()
 	if r.Tree, err = tree.Load(f); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w (the saved scan could not be read: %v)", ErrNeverScanned, err)
 	}
 	a.mu.Lock()
 	a.cur = &r

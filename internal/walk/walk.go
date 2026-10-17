@@ -151,10 +151,11 @@ type Session struct {
 	dirs, files, bytes, nproblems atomic.Uint64
 	current                       atomic.Pointer[string]
 
-	pending  int
-	problems []Problem
-	done     chan struct{}
-	elapsed  time.Duration
+	root, ioRoot string
+	pending      int
+	problems     []Problem
+	done         chan struct{}
+	elapsed      time.Duration
 }
 
 // Start validates the root and begins scanning in the background.
@@ -166,6 +167,12 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 	st, err := os.Stat(root)
 	if err != nil {
 		return nil, err
+	}
+	// Reads go through the resolved root so no path component is a symlink;
+	// the tree keeps the name the caller used.
+	ioRoot := root
+	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+		ioRoot = resolved
 	}
 	if !st.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", root)
@@ -193,7 +200,8 @@ func Start(ctx context.Context, opt Options) (*Session, error) {
 		close(s.batches)
 	}()
 	s.pending = 1
-	s.q.push(job{root, s.t.Root()})
+	s.root, s.ioRoot = root, ioRoot
+	s.q.push(job{ioRoot, s.t.Root()})
 	go s.build()
 	return s, nil
 }
@@ -239,7 +247,14 @@ func childPath(dir string, name []byte) string {
 }
 
 func (s *Session) problem(path string, err error) {
-	s.problems = append(s.problems, Problem{Path: path, Err: err.Error()})
+	if rest, ok := strings.CutPrefix(path, s.ioRoot); ok && s.ioRoot != s.root {
+		path = s.root + rest
+	}
+	msg := err.Error()
+	if pe, ok := err.(*os.PathError); ok {
+		msg = pe.Op + ": " + pe.Err.Error()
+	}
+	s.problems = append(s.problems, Problem{Path: path, Err: msg})
 	s.nproblems.Add(1)
 }
 
@@ -253,6 +268,9 @@ func (s *Session) apply(b *batch) {
 		return
 	}
 	p := b.path
+	if rest, ok := strings.CutPrefix(p, s.ioRoot); ok && s.ioRoot != s.root {
+		p = s.root + rest
+	}
 	s.current.Store(&p)
 	var files, bytes uint64
 	s.t.Write(func(w *tree.Writer) {
@@ -275,6 +293,12 @@ func (s *Session) apply(b *batch) {
 				if n := string(name); strings.HasSuffix(n, ".xcodeproj") || strings.HasSuffix(n, ".xcworkspace") {
 					markers |= tree.MarkerXcode
 				}
+				if e.flags&sfDataless != 0 {
+					// An iCloud folder whose contents are not on this Mac:
+					// listing it would download it.
+					w.AddDir(b.dir, name, e.mtime, 0)
+					continue
+				}
 				id := w.AddDir(b.dir, name, e.mtime, 0)
 				s.pending++
 				s.dirs.Add(1)
@@ -288,21 +312,34 @@ func (s *Session) apply(b *batch) {
 				alloc = 0
 			}
 			big := e.alloc >= s.threshold
-			if e.nlink > 1 && e.kind == tree.KindFile && !w.Link(e.ino, e.nlink, alloc, b.dir) {
+			linked := e.nlink > 1 && e.kind == tree.KindFile
+			if linked && w.Linked(e.ino) {
 				alloc = 0
 				flags |= tree.FlagShared
 			}
 			unique := alloc
+			cloned := e.ext&efMayShareBlocks != 0 && alloc > 0 && e.cloneRefs > 1
 			if e.ext&efMayShareBlocks != 0 && alloc > 0 {
 				flags |= tree.FlagClone
-				if e.cloneRefs > 1 && !w.Clone(e.cloneID, e.cloneRefs, alloc, b.dir) {
-					unique = 0
-				}
+			}
+			if cloned && w.Cloned(e.cloneID) {
+				unique = 0
 			}
 			files++
 			bytes += alloc
+			// Shared data is charged to the file's own node when it has one,
+			// so a single file's reclaimable size accounts for its other copies.
+			at := b.dir
 			if big {
-				w.AddFile(b.dir, name, e.kind, alloc, unique, e.logical, e.mtime, flags)
+				at = w.AddFile(b.dir, name, e.kind, alloc, unique, e.logical, e.mtime, flags)
+			}
+			if linked {
+				w.Link(e.ino, e.nlink, e.alloc, at)
+			}
+			if cloned {
+				w.Clone(e.cloneID, e.cloneRefs, e.alloc, at)
+			}
+			if big {
 				continue
 			}
 			smallN++

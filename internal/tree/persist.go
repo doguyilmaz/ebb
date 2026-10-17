@@ -81,16 +81,16 @@ func Load(r io.Reader) (*Tree, error) {
 	if err := get(&ver); err != nil || ver != version {
 		return nil, errors.New("unsupported tree file version")
 	}
-	if err := get(&rootLen); err != nil {
-		return nil, err
+	if err := get(&rootLen); err != nil || rootLen > 4096 {
+		return nil, errors.New("corrupt tree file: root path")
 	}
 	root := make([]byte, rootLen)
 	if _, err := io.ReadFull(br, root); err != nil {
 		return nil, err
 	}
 	var n uint64
-	if err := get(&n); err != nil {
-		return nil, err
+	if err := get(&n); err != nil || n == 0 || n > maxNodes {
+		return nil, errors.New("corrupt tree file: node count")
 	}
 	t := &Tree{rootPath: string(root), links: map[uint64]*group{}, clones: map[uint64]*group{},
 		parent: make([]uint32, n), first: make([]uint32, n), next: make([]uint32, n), nameOff: make([]uint32, n),
@@ -103,16 +103,17 @@ func Load(r io.Reader) (*Tree, error) {
 			return nil, err
 		}
 	}
-	if err := get(&n); err != nil {
-		return nil, err
+	nodes := n
+	if err := get(&n); err != nil || n > maxNames {
+		return nil, errors.New("corrupt tree file: names")
 	}
 	t.names = make([]byte, n)
 	if _, err := io.ReadFull(br, t.names); err != nil {
 		return nil, err
 	}
 	for _, m := range []map[uint64]*group{t.links, t.clones} {
-		if err := get(&n); err != nil {
-			return nil, err
+		if err := get(&n); err != nil || n > nodes*64 {
+			return nil, errors.New("corrupt tree file: shared groups")
 		}
 		for range n {
 			var key uint64
@@ -122,8 +123,37 @@ func Load(r io.Reader) (*Tree, error) {
 					return nil, err
 				}
 			}
+			if uint64(g.first) >= nodes || uint64(g.lca) >= nodes {
+				return nil, errors.New("corrupt tree file: shared group location")
+			}
 			m[key] = g
 		}
 	}
+	if _, err := io.Copy(io.Discard, br); err != nil {
+		return nil, err
+	}
+	if err := t.validate(); err != nil {
+		return nil, err
+	}
 	return t, nil
+}
+
+const (
+	maxNodes = 1 << 31
+	maxNames = 1 << 34
+)
+
+// validate checks every index a reader will follow, so a damaged file fails
+// to load instead of crashing a query later.
+func (t *Tree) validate() error {
+	n := uint32(len(t.parent))
+	none := uint32(None)
+	for i := range n {
+		if (i == 0) != (t.parent[i] == none) || (t.parent[i] != none && t.parent[i] >= i) ||
+			(t.first[i] != none && t.first[i] >= n) || (t.next[i] != none && t.next[i] >= n) ||
+			uint64(t.nameOff[i])+uint64(t.nameLen[i]) > uint64(len(t.names)) || t.kind[i] > KindSmall {
+			return errors.New("corrupt tree file: node links")
+		}
+	}
+	return nil
 }

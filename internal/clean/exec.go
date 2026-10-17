@@ -130,7 +130,11 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 			return "", refuse("Quit %s first", name)
 		}
 	}
-	parent, err := os.OpenRoot(filepath.Dir(real))
+	dir, err := filepath.EvalSymlinks(filepath.Dir(real))
+	if err != nil {
+		return "", refuse("no longer exists")
+	}
+	parent, err := os.OpenRoot(dir)
 	if err != nil {
 		return "", refuse("no longer exists")
 	}
@@ -140,14 +144,26 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 	if err != nil {
 		return "", refuse("no longer exists")
 	}
-	if st, ok := fi.Sys().(*syscall.Stat_t); !ok || int64(st.Dev) != it.Dev || st.Ino != it.Ino {
+	if !same(fi, it) {
 		return "", refuse("changed since the plan was made")
 	}
 	switch it.Action.Kind {
 	case "delete":
-		return "", parent.RemoveAll(name)
+		// Move the verified entry to a private name first, then check that
+		// what moved is still the planned object: nothing swapped in after
+		// the check above can be deleted by mistake.
+		tmp := ".ebb-delete-" + newID()
+		if err := parent.Rename(name, tmp); err != nil {
+			return "", err
+		}
+		moved, err := parent.Lstat(tmp)
+		if err != nil || !same(moved, it) {
+			_ = parent.Rename(tmp, name)
+			return "", refuse("changed while being removed")
+		}
+		return "", parent.RemoveAll(tmp)
 	case "trash":
-		return e.Trash.Trash(real)
+		return e.Trash.Trash(filepath.Join(dir, name))
 	case "empty-trash":
 		return "", e.emptyTrash(real)
 	case "command":
@@ -184,4 +200,9 @@ func (e *Executor) emptyTrash(dir string) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func same(fi os.FileInfo, it Item) bool {
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	return ok && int64(st.Dev) == it.Dev && st.Ino == it.Ino
 }

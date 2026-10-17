@@ -130,3 +130,17 @@ func TestExpand(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestAppleCachesInformational(t *testing.T) {
+	set, _ := Load(fakeEnv(t), ebb.Rules)
+	r, ok := set.Rule("apple.caches")
+	if !ok || r.Action.Kind != "" || r.Safety != finding.System {
+		t.Fatalf("macOS service caches must not be offered for deletion: %+v", r)
+	}
+	gen, _ := set.Rule("app.caches")
+	ai := slices.IndexFunc(set.Rules, func(x Rule) bool { return x.ID == "apple.caches" })
+	gi := slices.IndexFunc(set.Rules, func(x Rule) bool { return x.ID == gen.ID })
+	if ai > gi {
+		t.Fatal("apple.caches must claim its folders before the generic rule")
+	}
+}

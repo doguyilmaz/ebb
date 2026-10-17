@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -48,6 +49,9 @@ func newDiffCmd(g *globals) *cobra.Command {
 		Short: "What grew or shrank between two scans (default: the last two of the same folder)",
 		Args:  cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if n < 0 {
+				return errors.New("-n must be 0 or more")
+			}
 			a, err := g.app()
 			if err != nil {
 				return err

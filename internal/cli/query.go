@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -32,6 +33,9 @@ func newTopCmd(g *globals) *cobra.Command {
 		Short: "Largest folders (or files) under a path of the last scan",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if n < 0 {
+				return errors.New("-n must be 0 or more")
+			}
 			a, err := g.app()
 			if err != nil {
 				return err
@@ -84,6 +88,9 @@ func newFindCmd(g *globals) *cobra.Command {
 		Short: "Find folders and large files by name (glob or substring)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if n < 0 {
+				return errors.New("-n must be 0 or more")
+			}
 			a, err := g.app()
 			if err != nil {
 				return err

@@ -36,3 +36,4 @@ The walk is kernel-bound: ~165 s of system CPU across 8 workers, and 16 workers 
 sooner, so 8 stays the default. Detectors and persistence take ~2 s. The tree holds 1.07M nodes (~100 MB) plus 225k
 APFS clone groups. `Reclaimable` used to scan every shared group per call (36 s spent in the stale-project
 detector); it now reads a per-node cache computed once per write in O(groups × depth): 1.4 s → 0.9 ms per 1,000 calls.
+| `GOGC=50` instead of the fixed memory limit (scales with disk size) | 41.6 s | 43.4 s | 345 MB |

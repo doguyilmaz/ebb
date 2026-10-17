@@ -53,7 +53,7 @@ func (rulesDetector) Detect(_ context.Context, c *Context) ([]finding.Finding, e
 		}
 		slices.SortFunc(targets, func(a, b finding.Target) int { return cmp.Compare(b.Alloc, a.Alloc) })
 		f := finding.Finding{
-			ID: finding.ID(r.ID, targets[0].Path), RuleID: r.ID, Title: r.Title, Category: r.Category, Owner: r.Owner,
+			ID: r.ID, RuleID: r.ID, Title: r.Title, Category: r.Category, Owner: r.Owner,
 			Safety: r.Safety, Targets: targets, Why: r.Why, Impact: r.Impact, Evidence: evidence(c, targets),
 		}
 		if r.Action.Kind != "" {

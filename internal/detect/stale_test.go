@@ -185,3 +185,49 @@ func TestStaleOnlyInPersonalProjects(t *testing.T) {
 		t.Fatalf("apps, editor extensions and tool folders must never be offered: %+v", nm)
 	}
 }
+
+func TestRunNoDoubleCounting(t *testing.T) {
+	c := ctxFor(t, home(t, "a/b/x=10", "c/y=10"))
+	outer := stub{1, func(*Context) []finding.Finding {
+		return []finding.Finding{{RuleID: "outer", Alloc: 10 << 20, Bytes: 10 << 20, Targets: []finding.Target{{Path: "/h/a", Bytes: 10 << 20, Alloc: 10 << 20}}}}
+	}}
+	inner := stub{1, func(*Context) []finding.Finding {
+		return []finding.Finding{{RuleID: "inner", Targets: []finding.Target{{Path: "/h/a/b", Bytes: 10 << 20, Alloc: 10 << 20}, {Path: "/h/c", Bytes: 10 << 20, Alloc: 10 << 20}}}}
+	}}
+	later := stub{2, func(*Context) []finding.Finding {
+		return []finding.Finding{{RuleID: "later", Targets: []finding.Target{{Path: "/h/c/y", Bytes: 10 << 20, Alloc: 10 << 20}}}}
+	}}
+	grow := stub{2, func(*Context) []finding.Finding {
+		return []finding.Finding{{RuleID: "growth", Category: "growth", Targets: []finding.Target{{Path: "/h/a", Bytes: 5 << 20, Alloc: 10 << 20}}}}
+	}}
+	fs, _ := RunWith(context.Background(), c, []Detector{outer, inner, later, grow})
+	in := byRule(fs, "inner")
+	if in == nil || len(in.Targets) != 1 || in.Targets[0].Path != "/h/c" || in.Bytes != 10<<20 {
+		t.Fatalf("a location already claimed must not count twice: %+v", in)
+	}
+	if byRule(fs, "later") != nil {
+		t.Fatal("pass-2 findings inside claimed locations must go")
+	}
+	if byRule(fs, "growth") == nil {
+		t.Fatal("growth is informational and may point anywhere")
+	}
+}
+
+func TestLargeFilesSkipLibraries(t *testing.T) {
+	tr := home(t, "Pictures/Old/Family.photoslibrary/originals/a.heic=2000", "Movies/Trip.fcpbundle/media/clip.mov=3000",
+		"Music/Band.logicx/audio/take.wav=2500", "Movies/raw.mov=2200")
+	c := ctxFor(t, tr)
+	c.Covered = func(string) bool { return false }
+	fs, _ := large{}.Detect(context.Background(), c)
+	if len(fs) != 1 || !slices.Equal(paths(&fs[0]), []string{"/h/Movies/raw.mov"}) {
+		t.Fatalf("libraries are the person's own data: %+v", fs)
+	}
+}
+
+func TestFindingIDsStable(t *testing.T) {
+	a := finish(finding.Finding{RuleID: "x", Targets: []finding.Target{{Path: "/h/a", Alloc: 2}, {Path: "/h/b", Alloc: 1}}})
+	b := finish(finding.Finding{RuleID: "x", Targets: []finding.Target{{Path: "/h/a", Alloc: 1}, {Path: "/h/b", Alloc: 2}}})
+	if a.ID != b.ID || a.ID == "" {
+		t.Fatalf("IDs must not depend on target order or sizes: %q %q", a.ID, b.ID)
+	}
+}

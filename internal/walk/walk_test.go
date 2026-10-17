@@ -209,3 +209,39 @@ func TestScanRootMustBeDir(t *testing.T) {
 		t.Fatal("a file root must be rejected")
 	}
 }
+
+func TestScanHardlinkedFileTargetReclaimable(t *testing.T) {
+	root := t.TempDir()
+	mkfile(t, filepath.Join(root, "a", "vm.img"), 4<<20)
+	os.MkdirAll(filepath.Join(root, "b"), 0o755)
+	if err := os.Link(filepath.Join(root, "a", "vm.img"), filepath.Join(root, "b", "vm.img")); err != nil {
+		t.Fatal(err)
+	}
+	for _, opt := range []Options{generic, {}} {
+		res := scan(t, root, opt)
+		for _, p := range []string{"a/vm.img", "b/vm.img"} {
+			id, _ := res.Tree.Lookup(filepath.Join(root, p))
+			if got := res.Tree.Reclaimable(id); got != 0 {
+				t.Fatalf("reader %q: deleting %s alone frees nothing while the other link lives, got %d", opt.Reader, p, got)
+			}
+		}
+		if got := res.Tree.Reclaimable(res.Tree.Root()); got < 4<<20 {
+			t.Fatalf("both links inside the root: %d", got)
+		}
+	}
+}
+
+func TestScanThroughSymlinkedRoot(t *testing.T) {
+	real := t.TempDir()
+	mkfile(t, filepath.Join(real, "d", "f"), 2<<20)
+	link := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, opt := range []Options{generic, {}} {
+		res := scan(t, link, opt)
+		if _, ok := res.Tree.Lookup(filepath.Join(link, "d", "f")); !ok || res.Files != 1 {
+			t.Fatalf("reader %q: root given as a symlink must still scan under its own name: files=%d problems=%v", opt.Reader, res.Files, res.Problems)
+		}
+	}
+}

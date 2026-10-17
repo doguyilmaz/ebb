@@ -3,6 +3,7 @@
 package walk
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -80,5 +81,20 @@ func TestDuMatches(t *testing.T) {
 	diff := float64(int64(gotKB)-int64(duKB)) / float64(duKB)
 	if diff > 0.01 || diff < -0.01 {
 		t.Fatalf("ebb %d KB vs du %d KB (%.2f%%)", gotKB, duKB, diff*100)
+	}
+}
+
+func TestBulkPermissionDenied(t *testing.T) {
+	root := t.TempDir()
+	locked := filepath.Join(root, "locked")
+	mkfile(t, filepath.Join(locked, "x"), 2<<20)
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	res := scan(t, root, Options{})
+	id, ok := res.Tree.Lookup(locked)
+	if !ok || res.Tree.Node(id).Flags&tree.FlagDenied == 0 || len(res.Problems) != 1 || res.Problems[0].Path != locked {
+		t.Fatalf("bulk reader: %v %+v", ok, res.Problems)
 	}
 }

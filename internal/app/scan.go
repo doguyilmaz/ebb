@@ -27,6 +27,7 @@ type ScanResult struct {
 	Findings     []finding.Finding `json:"findings"`
 	Problems     []walk.Problem    `json:"problems,omitempty"`
 	ProblemCount int               `json:"problemCount"`
+	Errors       []string          `json:"errors,omitempty"` // checks that could not run
 }
 
 const keepProblems = 1000
@@ -65,22 +66,29 @@ func (a *App) scan(ctx context.Context, opt ScanOptions, progress func(walk.Prog
 		return nil, err
 	}
 	vol, _ := volume.Inspect(ctx, a.Env, root)
-	scanned := res.Tree.Node(res.Tree.Root()).Alloc
+	rootNode := res.Tree.Node(res.Tree.Root())
+	scanned := rootNode.Alloc
+	// Attribution uses unique bytes: allocated sizes count every clone copy,
+	// which would hide part of what the scan could not see.
 	if root == dataVolume || root == "/" {
-		vol.Attribute(scanned)
+		vol.Attribute(rootNode.Unique)
 	} else {
-		vol.Scanned = scanned
+		vol.Scanned = rootNode.Unique
 	}
 	var large rules.Size
 	_ = large.UnmarshalText([]byte(a.Config.Scan.LargeFile))
 	dc := &detect.Context{Tree: res.Tree, Volume: vol, Env: a.Env, Rules: a.Rules, History: a.History, Links: a.Links,
 		Now: started, StaleAfter: time.Duration(a.Config.Scan.StaleDays) * 24 * time.Hour, LargeFile: uint64(large)}
-	findings, _ := detect.Run(ctx, dc)
+	findings, errs := detect.Run(ctx, dc)
+	var errText []string
+	for _, e := range errs {
+		errText = append(errText, e.Error())
+	}
 
 	out := &ScanResult{
 		Meta: history.Meta{Time: started, Root: a.Links.Display(root), Used: vol.Used, Free: vol.Free, Scanned: scanned,
 			Elapsed: res.Elapsed, Dirs: res.Dirs, Files: res.Files},
-		Tree: res.Tree, Volume: vol, Findings: findings, Problems: res.Problems, ProblemCount: len(res.Problems),
+		Tree: res.Tree, Volume: vol, Findings: findings, Problems: res.Problems, ProblemCount: len(res.Problems), Errors: errText,
 	}
 	if len(out.Problems) > keepProblems {
 		out.Problems = out.Problems[:keepProblems]

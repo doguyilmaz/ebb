@@ -17,3 +17,5 @@ stdout 'Reclaimable'
 stderr 'no scan yet'
 ! exec ebb top $WORK/elsewhere
 stderr 'not in the last scan'
+! exec ebb top $WORK/tree -n -1
+stderr 'must be 0 or more'

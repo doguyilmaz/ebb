@@ -37,11 +37,13 @@ func paths(f *finding.Finding) []string {
 }
 
 func simContext(t *testing.T) *Context {
-	tr := home(t,
-		"Library/Developer/CoreSimulator/Devices/AAAA/data/x=900",
-		"Library/Developer/CoreSimulator/Devices/BBBB/data/x=400",
-		"Library/Developer/CoreSimulator/Devices/CCCC/data/x=300",
-		"Library/Developer/CoreSimulator/Devices/DDDD/data/x=200")
+	tr := treeAt(t, "/",
+		"h/Library/Developer/CoreSimulator/Devices/AAAA/data/x=900",
+		"h/Library/Developer/CoreSimulator/Devices/BBBB/data/x=400",
+		"h/Library/Developer/CoreSimulator/Devices/CCCC/data/x=300",
+		"h/Library/Developer/CoreSimulator/Devices/DDDD/data/x=200",
+		"System/Library/AssetsV2/a/26.dmg=8000", "System/Library/AssetsV2/b/18.dmg=8400", "System/Library/AssetsV2/c/17.dmg=6600",
+		"System/Library/AssetsV2/d/w10.dmg=3800")
 	c := ctxFor(t, tr)
 	c.Env.(*sys.Fake).RunFn = runner(t, map[string]string{
 		"xcrun simctl list devices -j": "@testdata/simctl-devices.json",
@@ -193,4 +195,29 @@ func TestXcodeIgnoresOtherAppsNamedLikeXcode(t *testing.T) {
 	if old == nil || !slices.Equal(paths(old), []string{"/Applications/Xcode-16.4.app"}) {
 		t.Fatalf("only real Xcode apps may be offered: %+v", old)
 	}
+}
+
+func TestSimulatorsSkipDevicesOutsideScan(t *testing.T) {
+	tr := home(t, "Library/Developer/CoreSimulator/Devices/BBBB/data/x=400")
+	c := ctxFor(t, tr)
+	c.Env.(*sys.Fake).RunFn = runner(t, map[string]string{
+		"xcrun simctl list devices -j": "@testdata/simctl-devices.json",
+		"xcrun simctl runtime list -j": "@testdata/simctl-runtimes.json",
+	})
+	fs, _ := simulators{}.Detect(context.Background(), c)
+	if un := byRule(fs, "simulators.unavailable"); un != nil {
+		t.Fatalf("devices not in the scanned tree must not be offered: %+v", un)
+	}
+	if rt := byRule(fs, "simulators.runtimes"); rt != nil {
+		t.Fatalf("runtime images outside the scan must not count: %+v", rt)
+	}
+}
+
+func TestSimulatorsSkipWithoutCoreSimulator(t *testing.T) {
+	c := ctxFor(t, home(t, "Documents/x=1"))
+	c.Env.(*sys.Fake).RunFn = func(string, string, ...string) ([]byte, error) {
+		t.Fatal("xcrun must not run on a Mac without simulators (it would offer to install developer tools)")
+		return nil, nil
+	}
+	simulators{}.Detect(context.Background(), c)
 }

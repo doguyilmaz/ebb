@@ -1,0 +1,11 @@
+# macOS manages these itself; they explain space but are never offered for deletion.
+
+[[rule]]
+id = "apple.caches"
+title = "macOS service caches"
+owner = "macOS"
+category = "app-cache"
+paths = ["~/Library/Caches/com.apple.*"]
+safety = "system"
+why = "macOS services (iCloud, Spotlight, Photos, Safari and others) keep caches here and trim them themselves when space runs low."
+impact = "Removing them by hand can make iCloud and other services re-sync or rebuild. Leave them to macOS."
