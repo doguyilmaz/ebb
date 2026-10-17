@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/finding"
@@ -100,6 +101,59 @@ func (a *App) Ages(path string) (api.AgesResponse, error) {
 		out.Buckets[i].Bytes = got[i]
 	}
 	return out, nil
+}
+
+// Explain gathers what ebb knows about one path for people and agents alike.
+func (a *App) Explain(path string) (api.Explain, error) {
+	r, id, err := a.Resolve(path)
+	if err != nil {
+		return api.Explain{}, err
+	}
+	notes := a.Notes()
+	out := api.Explain{Item: a.item(r, id, notes), Findings: []api.FindingView{}, Biggest: []api.Item{}}
+	display := out.Item.Path
+	ig := a.ignores()
+	for _, f := range r.Findings {
+		if slices.ContainsFunc(f.Targets, func(tg finding.Target) bool { return within(tg.Path, display) || within(display, tg.Path) }) {
+			f.UserNote = notes["finding:"+f.ID]
+			out.Findings = append(out.Findings, api.FindingView{Finding: f, Ignored: ignored(ig, f)})
+		}
+	}
+	kids := r.Tree.Children(id)
+	for _, c := range kids[:min(10, len(kids))] {
+		out.Biggest = append(out.Biggest, a.item(r, c, notes))
+	}
+	return out, nil
+}
+
+// Files lists the largest stored files under path, optionally only those
+// untouched for olderThanDays before the scan.
+func (a *App) Files(path string, minSize uint64, olderThanDays, limit int) (api.FilesResponse, error) {
+	r, id, err := a.Resolve(path)
+	if err != nil {
+		return api.FilesResponse{}, err
+	}
+	cutoff := r.Meta.Time.Add(-time.Duration(olderThanDays) * 24 * time.Hour).Unix()
+	keep := func(alloc uint64, mtime int64) bool {
+		return alloc >= minSize && (olderThanDays <= 0 || mtime < cutoff)
+	}
+	notes := a.Notes()
+	out := api.FilesResponse{Path: a.Links.Display(r.Tree.Path(id)), Items: []api.Item{}}
+	for _, f := range r.Tree.TopFunc(id, limit, keep) {
+		out.Items = append(out.Items, a.item(r, f, notes))
+	}
+	return out, nil
+}
+
+// Status is what the UI and agents see first: version, scan state, the last scan and what changed since.
+func (a *App) Status(version string) api.Status {
+	st := api.Status{Version: version, Scan: a.ScanState(), DefaultRoot: a.Links.Display(a.DefaultRoot()),
+		FullDiskAccess: volume.HasFullDiskAccess(a.Env.Home()), Sandboxed: sys.Sandboxed(a.Env), Changes: a.Changes()}
+	if last, err := a.Last(); err == nil {
+		m := last.Meta
+		st.Last = &m
+	}
+	return st
 }
 
 // Children lists a folder's stored children and, when asked, the small files

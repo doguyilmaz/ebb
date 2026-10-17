@@ -229,3 +229,45 @@ func TestDiffWithoutEarlierScan(t *testing.T) {
 		t.Fatalf("a single scan compares with nothing yet: %+v %v", d, err)
 	}
 }
+
+func TestExplainAndFiles(t *testing.T) {
+	a, root := testApp(t)
+	rule := "[[rule]]\nid = \"bun.cache\"\ntitle = \"Bun install cache\"\ncategory = \"package-cache\"\npaths = [\"" + filepath.Join(root, ".bun", "install", "cache") +
+		"\"]\nsafety = \"regenerable\"\nwhy = \"w\"\nimpact = \"i\"\nmin_size = \"1MB\"\nmin_target = \"1MB\"\naction = { kind = \"delete\" }\n"
+	if err := os.MkdirAll(filepath.Join(a.Env.Home(), ".config", "ebb", "rules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(a.Env.Home(), ".config", "ebb", "rules", "t.toml"), []byte(rule), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "docs", "old.iso"), 3<<20)
+	old := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(root, "docs", "old.iso"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	ex, err := a.Explain(filepath.Join(root, ".bun", "install", "cache"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ex.Item.Alloc < 6<<20 || len(ex.Findings) == 0 || ex.Findings[0].RuleID != "bun.cache" {
+		t.Fatalf("explain %+v", ex)
+	}
+	if _, err := a.Explain("/etc"); !errors.Is(err, ErrOutsideRoot) {
+		t.Fatalf("outside the scan: %v", err)
+	}
+	all, err := a.Files("", 1<<20, 0, 10)
+	if err != nil || len(all.Items) != 2 || all.Items[0].Alloc < all.Items[1].Alloc {
+		t.Fatalf("files %+v %v", all.Items, err)
+	}
+	stale, _ := a.Files("", 1<<20, 365, 10)
+	if len(stale.Items) != 1 || stale.Items[0].Name != "old.iso" {
+		t.Fatalf("old files %+v", stale.Items)
+	}
+}

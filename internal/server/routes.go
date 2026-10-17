@@ -14,7 +14,6 @@ import (
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/report"
 	"github.com/doguyilmaz/ebb/internal/sys"
-	"github.com/doguyilmaz/ebb/internal/volume"
 )
 
 func (s *Server) dataRoutes() {
@@ -35,6 +34,16 @@ func (s *Server) dataRoutes() {
 		return out, pathError(err)
 	})
 	s.api("GET /api/v1/children", s.children)
+	s.api("GET /api/v1/explain", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		out, err := s.app.Explain(r.URL.Query().Get("path"))
+		return out, pathError(err)
+	})
+	s.api("GET /api/v1/files", func(_ http.ResponseWriter, r *http.Request) (any, error) {
+		q := r.URL.Query()
+		min, _ := strconv.ParseUint(q.Get("minSize"), 10, 64)
+		out, err := s.app.Files(q.Get("path"), max(min, 1<<20), intParam(r, "olderThanDays", 0, 0, 36500), intParam(r, "limit", 200, 1, 5000))
+		return out, pathError(err)
+	})
 	s.api("GET /api/v1/search", s.search)
 	s.api("GET /api/v1/findings", s.findings)
 	s.mux.HandleFunc("GET /api/v1/report", s.auth(s.report))
@@ -81,13 +90,7 @@ func intParam(r *http.Request, name string, def, lo, hi int) int {
 }
 
 func (s *Server) status(_ http.ResponseWriter, _ *http.Request) (any, error) {
-	st := api.Status{Version: s.version, Scan: s.app.ScanState(), DefaultRoot: s.app.Links.Display(s.app.DefaultRoot()),
-		FullDiskAccess: volume.HasFullDiskAccess(s.app.Env.Home()), Sandboxed: sys.Sandboxed(s.app.Env), Changes: s.app.Changes()}
-	if last, err := s.app.Last(); err == nil {
-		m := last.Meta
-		st.Last = &m
-	}
-	return st, nil
+	return s.app.Status(s.version), nil
 }
 
 func (s *Server) startScan(w http.ResponseWriter, r *http.Request) (any, error) {

@@ -18,6 +18,8 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/volume` | — | `Breakdown` | 409 `never-scanned` |
 | GET | `/tree?path&depth&minShare&maxNodes` | — | `SliceResponse` | 400 `outside-root`, 409 `never-scanned` |
 | GET | `/ages?path` | — | `AgesResponse` (bytes by last-modified bucket, relative to the scan time) | 400 `outside-root`, 409 `never-scanned` |
+| GET | `/explain?path` | — | `Explain {item, findings, biggest}` | 400 `outside-root`, 404 |
+| GET | `/files?path&minSize&olderThanDays&limit` | — | `FilesResponse` (stored files ≥ 1 MB, largest first, optionally untouched for N days) | 400 `outside-root` |
 | GET | `/children?path&limit&small=1` | — | `ChildrenResponse` | 400 `outside-root` |
 | GET | `/search?q&limit` | — | `SearchResponse` | — |
 | GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |

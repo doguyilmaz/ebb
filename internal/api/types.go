@@ -105,6 +105,20 @@ type SmallFile struct {
 	Modified int64  `json:"modified"`
 }
 
+// Explain is everything ebb knows about one path: its sizes, the findings
+// covering it (with why and what removing costs) and what is biggest inside.
+type Explain struct {
+	Item     Item          `json:"item"`
+	Findings []FindingView `json:"findings"`
+	Biggest  []Item        `json:"biggest"`
+}
+
+// FilesResponse lists stored files (1 MB and up) under a path, largest first.
+type FilesResponse struct {
+	Path  string `json:"path"`
+	Items []Item `json:"items"`
+}
+
 type ChildrenResponse struct {
 	Path  string      `json:"path"`
 	Items []Item      `json:"items"`
@@ -231,7 +245,7 @@ const (
 
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
-	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
+	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }

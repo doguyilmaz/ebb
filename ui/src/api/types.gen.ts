@@ -84,14 +84,6 @@ export interface AgesResponse {
   buckets: AgeBucket[] | null;
 }
 
-export interface ChooseRequest {
-  purpose: string;
-}
-
-export interface ChooseResponse {
-  path: string;
-}
-
 export interface Item {
   path: string;
   name: string;
@@ -102,22 +94,6 @@ export interface Item {
   modified: number;
   findings?: string[] | null;
   note?: string;
-}
-
-export interface SmallFile {
-  name: string;
-  size: number;
-  modified: number;
-}
-
-export interface ChildrenResponse {
-  path: string;
-  items: Item[] | null;
-  small?: SmallFile[] | null;
-}
-
-export interface SearchResponse {
-  items: Item[] | null;
 }
 
 export interface Target {
@@ -153,6 +129,41 @@ export interface FindingView {
   notes?: string;
   userNote?: string;
   ignored?: boolean;
+}
+
+export interface Explain {
+  item: Item;
+  findings: FindingView[] | null;
+  biggest: Item[] | null;
+}
+
+export interface FilesResponse {
+  path: string;
+  items: Item[] | null;
+}
+
+export interface ChooseRequest {
+  purpose: string;
+}
+
+export interface ChooseResponse {
+  path: string;
+}
+
+export interface SmallFile {
+  name: string;
+  size: number;
+  modified: number;
+}
+
+export interface ChildrenResponse {
+  path: string;
+  items: Item[] | null;
+  small?: SmallFile[] | null;
+}
+
+export interface SearchResponse {
+  items: Item[] | null;
 }
 
 export interface FindingsResponse {

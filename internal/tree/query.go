@@ -8,7 +8,11 @@ import (
 )
 
 // Top returns the n largest stored files under id, largest first.
-func (t *Tree) Top(id ID, n int) []ID {
+func (t *Tree) Top(id ID, n int) []ID { return t.TopFunc(id, n, nil) }
+
+// TopFunc is Top over the files keep accepts (nil keeps all), given their
+// allocated size and last change.
+func (t *Tree) TopFunc(id ID, n int, keep func(alloc uint64, mtime int64) bool) []ID {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	h := &idHeap{t: t}
@@ -21,6 +25,9 @@ func (t *Tree) Top(id ID, n int) []ID {
 			case KindDir:
 				stack = append(stack, c)
 			case KindFile:
+				if keep != nil && !keep(t.alloc[c], t.ownMtime[c]) {
+					continue
+				}
 				if h.Len() < n {
 					heap.Push(h, c)
 				} else if n > 0 && t.alloc[c] > t.alloc[h.ids[0]] {
