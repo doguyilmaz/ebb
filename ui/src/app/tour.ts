@@ -65,3 +65,31 @@ export const useTour = create<Tour>((set, get) => ({
     set({ step: null });
   },
 }));
+
+export interface Box {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+const MARGIN = 12;
+const GAP = 16;
+
+/**
+ * Where the step's card goes: below or above a short target, beside a tall
+ * one, and only inside a target that leaves no room around it. The card never
+ * covers what it is talking about when there is any space left.
+ */
+export function placeCard(b: Box, card: { w: number; h: number }, view: { w: number; h: number }): { top: number; left: number } {
+  const fits = (top: number, left: number) => top >= MARGIN && left >= MARGIN && top + card.h <= view.h - MARGIN && left + card.w <= view.w - MARGIN;
+  const clampX = (x: number) => Math.max(MARGIN, Math.min(view.w - card.w - MARGIN, x));
+  const clampY = (y: number) => Math.max(MARGIN, Math.min(view.h - card.h - MARGIN, y));
+  const below = { top: b.top + b.height + GAP, left: clampX(b.left) };
+  const above = { top: b.top - GAP - card.h, left: clampX(b.left) };
+  const right = { top: clampY(b.top + 24), left: b.left + b.width + GAP };
+  const left = { top: clampY(b.top + 24), left: b.left - GAP - card.w };
+  const tall = b.height > view.h * 0.45;
+  for (const p of tall ? [right, left, below, above] : [below, above, right, left]) if (fits(p.top, p.left)) return p;
+  return { top: clampY(b.top + b.height - card.h - GAP), left: clampX(b.left + b.width - card.w - GAP) };
+}

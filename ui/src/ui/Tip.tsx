@@ -30,7 +30,9 @@ function content(el: HTMLElement): { value?: string; title?: string; body: strin
  * has shown, neighbours open at once, so scanning a row of them feels instant.
  */
 export function TipHost() {
+  // The last tip stays rendered while it fades out, so the bubble never empties before it is gone.
   const [shown, setShown] = useState<Shown | null>(null);
+  const [visible, setVisible] = useState(false);
   const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function TipHost() {
       current = target;
       target.setAttribute("aria-describedby", "ebb-tip");
       setShown({ ...c, target, instant });
+      setVisible(true);
     };
     const hide = () => {
       clearTimeout(timer);
@@ -54,7 +57,7 @@ export function TipHost() {
       current = null;
       pinned = false;
       lastHide = performance.now();
-      setShown(null);
+      setVisible(false);
     };
     const over = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
@@ -107,7 +110,7 @@ export function TipHost() {
   useLayoutEffect(() => {
     const tip = el.current;
     if (!tip) return;
-    if (!shown) {
+    if (!shown || !visible) {
       if (tip.matches(":popover-open")) tip.hidePopover();
       return;
     }
@@ -121,7 +124,7 @@ export function TipHost() {
     tip.style.left = `${left}px`;
     tip.style.top = `${top}px`;
     tip.style.transformOrigin = `${r.left + r.width / 2 - left}px ${below ? "0" : "100%"}`;
-  }, [shown]);
+  }, [shown, visible]);
 
   return (
     <div ref={el} id="ebb-tip" role="tooltip" popover="manual" className="tip" data-instant={shown?.instant || undefined}>

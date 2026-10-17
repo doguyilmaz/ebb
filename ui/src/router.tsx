@@ -43,7 +43,13 @@ const settingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, activityRoute, settingsRoute]);
 
-export const router = createRouter({ routeTree, context: { queryClient: undefined! }, defaultPreload: "intent" });
+export const router = createRouter({
+  routeTree,
+  context: { queryClient: undefined! },
+  defaultPreload: "intent",
+  // Pages cross-fade; a change of search params only (Explore zooming, filters) keeps its own animation.
+  defaultViewTransition: { types: ({ pathChanged }) => (pathChanged ? ["page"] : false) },
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

@@ -65,7 +65,8 @@ kbd { border: 1px solid var(--line-strong); border-bottom-width: 2px; border-rad
 
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .topbar { position: relative; z-index: 3; display: flex; align-items: center; gap: 12px; height: 56px; flex: none; padding: 0 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.4) blur(10px); }
-.topbar-title { font-weight: 600; font-size: 15px; }
+/* A fixed slot: page names differ in width, and the scan pill beside them must not move. */
+.topbar-title { flex: none; width: 84px; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-search { width: 300px; justify-content: flex-start; color: var(--text-3); font-weight: 400; }
 .topbar-search > span { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; }
 .scan-pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
@@ -78,8 +79,15 @@ kbd { border: 1px solid var(--line-strong); border-bottom-width: 2px; border-rad
 .pill-track.known > i { width: 100%; animation: none; transform-origin: left; transition: transform 300ms linear; }
 .scan-pill .btn { height: 24px; border-radius: 999px; }
 .pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tide); animation: pulse 1.6s var(--ease-out) infinite; }
-.content { flex: 1; overflow: auto; min-height: 0; }
-.page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 56px; display: flex; flex-direction: column; gap: 28px; animation: fade 180ms ease-out; }
+/* The scrollbar's room is kept whether or not the page scrolls, so nothing shifts sideways when content grows or the tray opens. */
+.content { flex: 1; overflow: auto; min-height: 0; scrollbar-gutter: stable; }
+.page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 56px; display: flex; flex-direction: column; gap: 28px; view-transition-name: page; }
+@supports not (view-transition-name: none) { .page { animation: fade 180ms ease-out; } }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-old(page) { animation: fade-out 110ms ease-out both; }
+::view-transition-new(page) { animation: page-in 260ms var(--ease-out) both; }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
 .page.wide { max-width: none; height: 100%; padding-bottom: 20px; gap: 14px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-sub { color: var(--text-2); max-width: 72ch; }
@@ -138,7 +146,7 @@ textarea.input { height: auto; padding: 8px 11px; resize: vertical; width: 100%;
 .info { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--text-3); cursor: help; vertical-align: middle; flex: none; transition: color 150ms ease, background-color 150ms ease; }
 .info:hover, .info[aria-describedby] { color: var(--text); background: var(--surface-3); }
 .tip { position: fixed; inset: auto; margin: 0; max-width: 300px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-2); background: var(--surface); color: var(--text); box-shadow: var(--shadow-2); font-size: 12.5px; line-height: 1.45; display: flex; flex-direction: column; gap: 2px; pointer-events: none; opacity: 1; transform: scale(1); transition: opacity 140ms var(--ease-out), transform 140ms var(--ease-out), display 140ms allow-discrete, overlay 140ms allow-discrete; }
-.tip:not(:popover-open) { display: none; }
+.tip:not(:popover-open) { display: none; opacity: 0; transform: scale(0.97); transition-duration: 100ms; }
 .tip strong { font-weight: 600; font-size: 13px; }
 .tip-value { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .tip span { color: var(--text-2); }
@@ -506,6 +514,7 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
   .cmd code { white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
   .pill-track:not(.known) > i { animation: none; width: 100%; opacity: 0.5; }
   *, ::backdrop { animation-duration: 1ms !important; animation-delay: 0ms !important; }
   .btn:active, .seg button:active, .icon-btn:active, .preset:active { transform: none; }

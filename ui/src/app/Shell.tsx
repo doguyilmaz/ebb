@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Activity, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
@@ -19,8 +19,13 @@ const nav = [
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const wide = pathname.startsWith("/explore");
+  const content = useRef<HTMLDivElement>(null);
+  // A new page starts at its top; one opened at an anchor scrolls there itself.
+  useEffect(() => {
+    if (!hash && content.current) content.current.scrollTop = 0;
+  }, [pathname]);
   const hasScan = !!useStatus().data?.last;
   const startTour = useTour((s) => s.start);
   // The tour starts by itself once, on the overview, as soon as there is a scan to show; it never pulls
@@ -50,7 +55,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       <div className="main">
         <TopBar title={nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)))?.label ?? ""} />
-        <div className="content">
+        <div className="content" ref={content}>
           <div className={wide ? "page wide" : "page"}>{children}</div>
         </div>
         <SelectionTray />

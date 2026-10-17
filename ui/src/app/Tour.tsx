@@ -1,17 +1,10 @@
 import { useNavigate, useLocation } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { reducedMotion } from "#/lib/motion.ts";
-import { steps, useTour } from "./tour.ts";
+import { glideTo } from "#/lib/scroll.ts";
+import { placeCard, steps, useTour, type Box } from "./tour.ts";
 
 const PAD = 8;
-const CARD_W = 340;
-
-interface Box {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-}
+const CARD_W = 320;
 
 /**
  * The guided tour: dims the page, lights up one element per step and explains
@@ -39,15 +32,12 @@ export function Tour() {
     setMoving(true);
     const settle = setTimeout(() => setMoving(false), 450);
     let raf = 0;
-    let scrolled = false;
+    let stopGlide: (() => void) | null = null;
     const started = performance.now();
     const track = () => {
       const el = document.querySelector<HTMLElement>(`[data-tour="${s.target}"]`);
       if (el) {
-        if (!scrolled) {
-          el.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
-          scrolled = true;
-        }
+        stopGlide ??= glideTo(el);
         const r = el.getBoundingClientRect();
         setBox((b) => (b && b.top === r.top && b.left === r.left && b.width === r.width && b.height === r.height ? b : { top: r.top, left: r.left, width: r.width, height: r.height }));
       } else if (performance.now() - started > 4000) return setBox({ top: innerHeight / 2, left: innerWidth / 2, width: 0, height: 0 });
@@ -57,24 +47,14 @@ export function Tour() {
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(settle);
+      stopGlide?.();
     };
   }, [s]);
 
   useLayoutEffect(() => {
     if (!box || !cardEl.current) return;
-    const h = cardEl.current.offsetHeight;
-    const below = box.top + box.height + PAD + 12 + h < innerHeight - 12;
-    const right = box.left + box.width + PAD + 16 + CARD_W < innerWidth - 12;
-    let top: number;
-    let left: number;
-    if (box.height > innerHeight * 0.55 && right) {
-      top = Math.max(12, Math.min(innerHeight - h - 12, box.top + 24));
-      left = box.left + box.width + PAD + 16;
-    } else {
-      top = below ? box.top + box.height + PAD + 12 : Math.max(12, box.top - PAD - 12 - h);
-      left = Math.max(12, Math.min(innerWidth - CARD_W - 12, box.left));
-    }
-    setCard({ top, left });
+    const lit = { top: box.top - PAD, left: box.left - PAD, width: box.width + PAD * 2, height: box.height + PAD * 2 };
+    setCard(box.width ? placeCard(lit, { w: CARD_W, h: cardEl.current.offsetHeight }, { w: innerWidth, h: innerHeight }) : { top: innerHeight / 2 - 100, left: innerWidth / 2 - CARD_W / 2 });
   }, [box]);
 
   const ready = !!box;
