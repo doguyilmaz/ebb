@@ -179,3 +179,27 @@ func TestConfirmNeedsTheCode(t *testing.T) {
 		t.Fatal("request must stay unconfirmed")
 	}
 }
+
+func TestPageTokenCannotRemoveProtections(t *testing.T) {
+	c := newClient(t)
+	if code, _ := c.post("/api/v1/settings", "", true, `{"protect":["~/Work/**"]}`); code != 200 {
+		t.Fatalf("local add %d", code)
+	}
+	tok := pairedToken(t, c)
+	send := func(body string) int {
+		r, _ := http.NewRequest("POST", c.srv.URL+"/api/v1/settings", strings.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := send(`{"protect":[]}`); code != 403 {
+		t.Fatalf("a paired page dropped a protection: %d", code)
+	}
+	if code := send(`{"protect":["~/Work/**","~/Photos/**"]}`); code != 200 {
+		t.Fatalf("adding protection from a page must work: %d", code)
+	}
+}

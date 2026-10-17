@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -179,9 +180,19 @@ func (s *Server) diff(_ http.ResponseWriter, r *http.Request) (any, error) {
 }
 
 func (s *Server) saveSettings(_ http.ResponseWriter, r *http.Request) (any, error) {
-	st := s.app.Settings()
+	before := s.app.Settings()
+	st := before
+	st.Protect = nil
 	if err := decode(r, &st); err != nil {
 		return nil, err
+	}
+	if st.Protect == nil {
+		st.Protect = before.Protect
+	}
+	// A paired page may add protections but only this machine may lift one,
+	// so a compromised page cannot unprotect a folder and then clean it.
+	if !s.master(r) && slices.ContainsFunc(before.Protect, func(p string) bool { return !slices.Contains(st.Protect, p) }) {
+		return nil, coded(http.StatusForbidden, "local-only", "only ebb on this machine can remove a protection")
 	}
 	out, err := s.app.SaveSettings(st)
 	if err != nil {
