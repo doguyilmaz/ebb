@@ -45,6 +45,7 @@ func newServeCmd(g *globals) *cobra.Command {
 			defer stop()
 			s := server.New(a, Version, token)
 			defer server.RemoveStatus(a.Env)
+			go a.Watch(ctx)
 			return server.Serve(ctx, s, fmt.Sprintf("127.0.0.1:%d", port), func(url string) {
 				_ = server.WriteStatus(a.Env, server.Status{PID: os.Getpid(), Port: port, Version: Version, Started: a.Env.Now()})
 				fmt.Fprintf(cmd.OutOrStdout(), "ebb is running: %s\nPress Ctrl-C to stop.\n", url)

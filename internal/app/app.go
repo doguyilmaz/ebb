@@ -38,6 +38,8 @@ type App struct {
 	mu       sync.Mutex
 	running  bool
 	stop     context.CancelFunc
+	watch    *watcher
+	watchCtx context.Context
 	scanRoot string
 	scanErr  string
 	progress *api.Progress

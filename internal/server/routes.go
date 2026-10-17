@@ -82,7 +82,7 @@ func intParam(r *http.Request, name string, def, lo, hi int) int {
 
 func (s *Server) status(_ http.ResponseWriter, _ *http.Request) (any, error) {
 	st := api.Status{Version: s.version, Scan: s.app.ScanState(), DefaultRoot: s.app.Links.Display(s.app.DefaultRoot()),
-		FullDiskAccess: volume.HasFullDiskAccess(s.app.Env.Home()), Sandboxed: sys.Sandboxed(s.app.Env)}
+		FullDiskAccess: volume.HasFullDiskAccess(s.app.Env.Home()), Sandboxed: sys.Sandboxed(s.app.Env), Changes: s.app.Changes()}
 	if last, err := s.app.Last(); err == nil {
 		m := last.Meta
 		st.Last = &m
@@ -99,7 +99,7 @@ func (s *Server) startScan(w http.ResponseWriter, r *http.Request) (any, error) 
 	}
 	var mu sync.Mutex
 	var last time.Time
-	err := s.app.StartScan(app.ScanOptions{Root: req.Root, Threads: req.Threads, Gentle: req.Gentle},
+	err := s.app.StartScan(app.ScanOptions{Root: req.Root, Threads: req.Threads, Gentle: req.Gentle, Full: req.Full},
 		func(p api.Progress) {
 			mu.Lock()
 			defer mu.Unlock()

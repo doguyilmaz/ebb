@@ -26,6 +26,16 @@ export interface Meta {
   elapsed: number;
   dirs: number;
   files: number;
+  eventId?: number;
+  fseventsUuid?: string;
+  incremental?: boolean;
+  changed?: number;
+}
+
+export interface Changes {
+  folders: number;
+  lost: boolean;
+  ready: boolean;
 }
 
 export interface Status {
@@ -36,12 +46,14 @@ export interface Status {
   fullDiskAccess: boolean;
   askAvailable: boolean;
   sandboxed: boolean;
+  changes: Changes | null;
 }
 
 export interface ScanRequest {
   root?: string;
   threads?: number;
   gentle?: boolean;
+  full?: boolean;
 }
 
 export interface SliceNode {

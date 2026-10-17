@@ -48,8 +48,13 @@ func newScanCmd(g *globals) *cobra.Command {
 					"reclaimable": rep.Reclaimable, "problems": res.ProblemCount})
 			}
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Scanned %s: %s files in %s folders, %s, in %s\n", units.Printable(res.Meta.Root), thousands(res.Meta.Files), thousands(res.Meta.Dirs),
-				units.Bytes(res.Meta.Scanned), res.Meta.Elapsed.Round(1e8))
+			if res.Meta.Incremental {
+				fmt.Fprintf(out, "Updated %s: listed %s changed folders again in %s (%s files, %s)\n", units.Printable(res.Meta.Root), thousands(res.Meta.Changed),
+					res.Meta.Elapsed.Round(1e7), thousands(res.Meta.Files), units.Bytes(res.Meta.Scanned))
+			} else {
+				fmt.Fprintf(out, "Scanned %s: %s files in %s folders, %s, in %s\n", units.Printable(res.Meta.Root), thousands(res.Meta.Files), thousands(res.Meta.Dirs),
+					units.Bytes(res.Meta.Scanned), res.Meta.Elapsed.Round(1e8))
+			}
 			fmt.Fprintf(out, "%d findings, %s reclaimable. Next: ebb findings · ebb report\n", len(res.Findings), units.Bytes(rep.Reclaimable))
 			if res.ProblemCount > 0 {
 				fmt.Fprintf(cmd.ErrOrStderr(), "note: %d folders could not be read (see ebb report)\n", res.ProblemCount)
@@ -60,6 +65,7 @@ func newScanCmd(g *globals) *cobra.Command {
 	f := cmd.Flags()
 	f.IntVar(&opt.Threads, "threads", 0, "parallel readers (default: min(8, CPUs))")
 	f.BoolVar(&opt.Gentle, "gentle", false, "throttle disk I/O so other work stays fast")
+	f.BoolVar(&opt.Full, "full", false, "read every folder, even when ebb knows which changed since the last scan")
 	f.StringVar(&profile, "profile", "", "write a CPU profile to FILE")
 	return cmd
 }

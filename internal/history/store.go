@@ -33,6 +33,12 @@ type Meta struct {
 	Elapsed time.Duration `json:"elapsed"`
 	Dirs    uint64        `json:"dirs"`
 	Files   uint64        `json:"files"`
+	// EventID and FSEvents (the volume's FSEvents history UUID) mark where the
+	// scan stands in the volume's change history, for incremental updates.
+	EventID     uint64 `json:"eventId,omitempty"`
+	FSEvents    string `json:"fseventsUuid,omitempty"`
+	Incremental bool   `json:"incremental,omitempty"`
+	Changed     uint64 `json:"changed,omitempty"` // folders listed again by an incremental update
 }
 
 type Dir struct {

@@ -39,12 +39,24 @@ type Status struct {
 	FullDiskAccess bool          `json:"fullDiskAccess"`
 	AskAvailable   bool          `json:"askAvailable"`
 	Sandboxed      bool          `json:"sandboxed"`
+	Changes        *Changes      `json:"changes"`
+}
+
+// Changes counts folders that changed on disk since the last scan, while ebb
+// watches. Lost means the next scan has to be complete; Ready that the replay
+// of history since the scan is over.
+type Changes struct {
+	Folders int  `json:"folders"`
+	Lost    bool `json:"lost"`
+	Ready   bool `json:"ready"`
 }
 
 type ScanRequest struct {
 	Root    string `json:"root,omitempty"`
 	Threads int    `json:"threads,omitempty"`
 	Gentle  bool   `json:"gentle,omitempty"`
+	// Full reads every folder; otherwise only folders changed since the last scan are listed again when that is known.
+	Full bool `json:"full,omitempty"`
 }
 
 type SliceResponse struct {

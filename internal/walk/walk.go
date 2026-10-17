@@ -524,6 +524,11 @@ func Scan(ctx context.Context, opt Options, every time.Duration, fn func(Progres
 	if err != nil {
 		return nil, err
 	}
+	return s.follow(every, fn)
+}
+
+// follow waits for the session, reporting progress every interval when fn is set.
+func (s *Session) follow(every time.Duration, fn func(Progress)) (*Result, error) {
 	if fn != nil && every > 0 {
 		tick := time.NewTicker(every)
 		defer tick.Stop()

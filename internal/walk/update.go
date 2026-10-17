@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/doguyilmaz/ebb/internal/tree"
 )
@@ -14,6 +15,11 @@ import (
 // path the tree does not know yet stands for its nearest known folder, whose
 // listing finds it.
 func Update(ctx context.Context, t *tree.Tree, dirs, subtrees []string, opt Options) (*Result, error) {
+	return UpdateWith(ctx, t, dirs, subtrees, opt, 0, nil)
+}
+
+// UpdateWith is Update reporting progress every interval, like Scan.
+func UpdateWith(ctx context.Context, t *tree.Tree, dirs, subtrees []string, opt Options, every time.Duration, fn func(Progress)) (*Result, error) {
 	root := t.RootPath()
 	ioRoot := root
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
@@ -47,7 +53,7 @@ func Update(ctx context.Context, t *tree.Tree, dirs, subtrees []string, opt Opti
 	}
 	s := newSession(ctx, opt, t, root, ioRoot)
 	s.run(jobs)
-	res, err := s.Wait()
+	res, err := s.follow(every, fn)
 	if s.removed {
 		t.Compact()
 	}
