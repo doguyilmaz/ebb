@@ -4,6 +4,7 @@ import { usePresets, useSearch, useStartScan } from "#/api/hooks.ts";
 import { bytes } from "#/lib/format.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
+import { useTour } from "./tour.ts";
 
 interface Command {
   id: string;
@@ -21,6 +22,7 @@ export function Palette() {
   const dialog = useRef<HTMLDialogElement>(null);
   const navigate = useNavigate();
   const scan = useStartScan();
+  const startTour = useTour((s) => s.start);
   const presets = usePresets();
   const found = useSearch(open ? term.trim() : "");
 
@@ -49,6 +51,7 @@ export function Palette() {
       { id: "activity", label: "Activity", run: go("/activity") },
       { id: "settings", label: "Settings", run: go("/settings") },
       { id: "scan", label: "Scan again", run: () => (close(), scan.mutate({})) },
+      { id: "tour", label: "Take the tour", run: () => (close(), startTour()) },
       ...(presets.data ?? [])
         .filter((p) => p.bytes > 0)
         .map((p) => ({ id: `preset-${p.id}`, label: `Clean: ${p.title}`, hint: bytes(p.bytes), run: () => (close(), openSheet({ preset: p.id })) })),
@@ -62,7 +65,7 @@ export function Palette() {
       run: () => (close(), navigate({ to: "/explore", search: { path: it.kind === "dir" ? it.path : it.path.slice(0, it.path.lastIndexOf("/")), view: "sunburst" } })),
     }));
     return [...matching, ...paths];
-  }, [term, presets.data, found.data, navigate, scan, openSheet]);
+  }, [term, presets.data, found.data, navigate, scan, openSheet, startTour, setOpen]);
 
   useEffect(() => setActive(0), [term]);
 

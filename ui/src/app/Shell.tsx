@@ -1,11 +1,14 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
-import type { ReactNode } from "react";
+import { Activity, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { SelectionTray } from "./SelectionTray.tsx";
+import { tourSeen, useTour } from "./tour.ts";
+
+let offered = false;
 
 const nav = [
   { to: "/", label: "Overview", icon: Gauge },
@@ -18,6 +21,15 @@ const nav = [
 export function Shell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const wide = pathname.startsWith("/explore");
+  const hasScan = !!useStatus().data?.last;
+  const startTour = useTour((s) => s.start);
+  // The tour starts by itself once, as soon as there is a scan to show.
+  useEffect(() => {
+    if (hasScan && !offered && !tourSeen()) {
+      offered = true;
+      startTour();
+    }
+  }, [hasScan, startTour]);
   return (
     <div className="shell">
       <aside className="side">
@@ -77,6 +89,7 @@ function TopBar({ title }: { title: string }) {
   const stop = useStopScan();
   const live = useLive((s) => s.scan);
   const openPalette = usePalette((s) => s.setOpen);
+  const startTour = useTour((s) => s.start);
   const running = status.data?.scan.running || start.isPending || !!live;
   const last = status.data?.last;
   // A rescan reads about as many files as the last one did; that is the best estimate there is.
@@ -105,6 +118,9 @@ function TopBar({ title }: { title: string }) {
         <Search size={14} aria-hidden />
         <span>Go to, find a folder, clean…</span>
         <kbd>⌘K</kbd>
+      </button>
+      <button className="icon-btn" onClick={startTour} aria-label="Take the tour" data-tip="Take the tour" data-tour="help">
+        <CircleHelp size={17} />
       </button>
       {!running && (
         <button className="btn primary" onClick={() => start.mutate({})}>

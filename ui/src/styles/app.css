@@ -367,6 +367,40 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .chips li { display: flex; align-items: center; gap: 8px; }
 .pairing { padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--r-2); background: var(--surface-2); }
 
+/* ---------- first run ---------- */
+.loading { display: flex; align-items: center; gap: 10px; padding: 24px 0; animation: fade 300ms 150ms ease-out both; }
+.welcome { max-width: 860px; width: 100%; margin: 4vh auto 0; display: flex; flex-direction: column; gap: 28px; }
+.welcome > * { animation: rise 520ms var(--ease-out) both; }
+.welcome > :nth-child(2) { animation-delay: 60ms; }
+.welcome > :nth-child(3) { animation-delay: 120ms; }
+.welcome > :nth-child(4) { animation-delay: 180ms; }
+.welcome-kicker { color: var(--tide); font-weight: 600; font-size: 13px; letter-spacing: 0.02em; }
+.welcome-title { font-size: 34px; line-height: 1.12; letter-spacing: -0.025em; max-width: 20ch; }
+.welcome-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.welcome-steps li { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); }
+.welcome-n { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--tide-soft); color: var(--tide); margin-bottom: 4px; }
+.welcome-fda { display: flex; align-items: center; gap: 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface-2); }
+.welcome-go { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 0; }
+.readout > div { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); }
+.readout dt { color: var(--text-2); font-size: 13px; }
+.readout dd { margin: 4px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.readout-path { display: block; background: none; border: 0; padding: 0; font-size: 12px; }
+.welcome-tip { padding: 14px 16px; border-radius: var(--r-3); background: var(--surface-2); display: flex; flex-direction: column; gap: 4px; animation: rise 400ms var(--ease-out) both; }
+@media (max-width: 760px) {
+  .welcome-steps, .readout { grid-template-columns: 1fr; }
+  .welcome-fda { flex-direction: column; align-items: flex-start; }
+  .welcome-title { font-size: 28px; }
+}
+
+/* ---------- tour ---------- */
+.tour { position: fixed; inset: 0; z-index: 50; }
+.tour-spot { position: fixed; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--tide) 70%, transparent), 0 0 0 9999px rgba(10, 10, 12, 0.55); transition: top 380ms var(--ease-in-out), left 380ms var(--ease-in-out), width 380ms var(--ease-in-out), height 380ms var(--ease-in-out), opacity 200ms ease; }
+.tour-card { position: fixed; z-index: 51; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); box-shadow: var(--shadow-3); animation: rise 260ms var(--ease-out) both; }
+.tour-dots { display: flex; gap: 4px; margin: 2px 0 4px; }
+.tour-dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--line-strong); transition: width 220ms var(--ease-out), background-color 220ms ease; }
+.tour-dots i[data-on] { width: 16px; background: var(--text); }
+
 /* ---------- palette ---------- */
 .palette { max-width: 620px; margin-top: 12vh; }
 .palette-input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 16px 18px; font-size: 16px; outline: none; }

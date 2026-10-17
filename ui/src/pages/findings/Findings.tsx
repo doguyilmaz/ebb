@@ -90,7 +90,7 @@ function FindingCard({ f }: { f: FindingView }) {
     <article id={`f-${f.id}`} className={`finding ${f.ignored ? "ignored" : ""}`} data-selected={selected || undefined} data-tour="finding">
       <header className="finding-head">
         {actionable ? (
-          <button className="icon-btn" aria-pressed={selected} aria-label={selected ? "Remove from cleanup" : "Add to cleanup"} data-tip={selected ? "In the cleanup tray" : "Add to the cleanup tray"} onClick={() => toggle(f.id)}>
+          <button className="icon-btn" aria-pressed={selected} aria-label={selected ? "Remove from cleanup" : "Add to cleanup"} data-tip={selected ? "In the cleanup tray" : "Add to the cleanup tray"} data-tour="select" onClick={() => toggle(f.id)}>
             {selected ? <SquareCheck size={18} /> : <Square size={18} />}
           </button>
         ) : (
