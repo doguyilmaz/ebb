@@ -43,11 +43,13 @@ export function Palette() {
 
   const commands = useMemo<Command[]>(() => {
     const close = () => (setOpen(false), setTerm(""));
-    const go = (to: "/" | "/explore" | "/findings" | "/history" | "/activity" | "/settings") => () => (close(), navigate({ to }));
+    const go = (to: "/" | "/explore" | "/findings" | "/apps" | "/duplicates" | "/history" | "/activity" | "/settings") => () => (close(), navigate({ to }));
     const base: Command[] = [
       { id: "overview", label: "Overview", run: go("/") },
       { id: "explore", label: "Explore the disk", run: go("/explore") },
       { id: "findings", label: "Findings", run: go("/findings") },
+      { id: "apps", label: "Apps and uninstall", run: go("/apps") },
+      { id: "duplicates", label: "Find duplicates", run: go("/duplicates") },
       { id: "history", label: "History", run: go("/history") },
       { id: "activity", label: "Activity", run: go("/activity") },
       { id: "settings", label: "Settings", run: go("/settings") },

@@ -1,6 +1,6 @@
 import type { FetchQueryOptions, QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
-import { appsQuery, findingsQuery, historyQuery, opsQuery, settingsQuery, sliceQuery, statusQuery, volumeQuery } from "./api/hooks.ts";
+import { appsQuery, duplicatesQuery, findingsQuery, historyQuery, opsQuery, settingsQuery, sliceQuery, statusQuery, volumeQuery } from "./api/hooks.ts";
 import { Root } from "./app/Root.tsx";
 import { readPrefs } from "./lib/prefs.ts";
 import { budgetFor, depthFor } from "./pages/explore/params.ts";
@@ -56,6 +56,12 @@ const appsRoute = createRoute({
   loader: preload(appsQuery),
   component: lazyRouteComponent(() => import("./pages/apps/Apps.tsx")),
 });
+const duplicatesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/duplicates",
+  loader: preload(duplicatesQuery),
+  component: lazyRouteComponent(() => import("./pages/duplicates/Duplicates.tsx")),
+});
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/history",
@@ -75,7 +81,7 @@ const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/settings/Settings.tsx")),
 });
 
-const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, appsRoute, historyRoute, activityRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, appsRoute, duplicatesRoute, historyRoute, activityRoute, settingsRoute]);
 
 export const router = createRouter({
   routeTree,

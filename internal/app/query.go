@@ -252,7 +252,8 @@ func (a *App) Reveal(path string) error {
 	return exec.Command("open", "-R", r.Tree.Path(id)).Run()
 }
 
-var choosePrompts = map[string]string{"scan": "Choose a folder for ebb to scan", "protect": "Choose a folder ebb must never touch"}
+var choosePrompts = map[string]string{"scan": "Choose a folder for ebb to scan", "protect": "Choose a folder ebb must never touch",
+	"duplicates": "Choose a folder to search for duplicates"}
 
 // ChooseFolder shows the macOS folder chooser on this Mac and returns the
 // picked folder, or "" when the person cancels. A browser cannot hand a page

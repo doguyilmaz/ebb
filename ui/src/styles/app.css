@@ -441,6 +441,27 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .pending { display: flex; align-items: center; gap: 10px; margin: 16px auto 0; max-width: 1144px; width: calc(100% - 56px); padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--surface); box-shadow: var(--shadow-1); animation: fade 200ms ease-out; }
 .pending > span { flex: 1; min-width: 0; }
 
+/* ---------- duplicates ---------- */
+.dupes-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 14px 18px; }
+.dupes-progress .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.dupes-progress .bar > i { display: block; height: 100%; background: var(--tide); transform-origin: left; transition: transform 300ms var(--ease-out); }
+.dupes-sum { margin: 0; }
+.dupes { padding: 4px 0; }
+.dupes > ul { list-style: none; margin: 0; padding: 0; }
+.dupes-head { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.dupe { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 4px 12px; padding: 4px 16px; }
+.dupe + .dupe { border-top: 1px solid var(--line); }
+.dupe-main { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto 84px; align-items: center; gap: 10px; min-width: 0; padding: 6px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 150ms ease; }
+.dupe-main:hover { background: var(--surface-2); }
+.dupe-main .chev { color: var(--text-3); transition: transform 180ms var(--ease-out); }
+.dupe[data-open="true"] .chev { transform: rotate(90deg); }
+.dupe-main > .num:last-child { text-align: right; }
+.dupe-copies { grid-column: 2; list-style: none; margin: 0 0 6px 22px; padding: 0 0 0 12px; border-left: 1px solid var(--line); animation: fade 160ms ease-out; }
+.dupe-copies li { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto 28px; align-items: center; gap: 10px; padding: 3px 0; }
+.dupe-copies label { gap: 6px; cursor: pointer; }
+.dupe-copies input[type="radio"] { accent-color: var(--text); }
+.dupes-tray[data-raised] { bottom: 82px; }
+
 /* ---------- apps ---------- */
 .apps-sum { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; }
 .apps-sum .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }

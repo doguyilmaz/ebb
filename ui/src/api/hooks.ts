@@ -6,6 +6,8 @@ import type {
   Breakdown,
   ChildrenResponse,
   Daemon,
+  DuplicatesRequest,
+  DuplicatesState,
   DiffResponse,
   FindingsResponse,
   HistoryResponse,
@@ -77,6 +79,26 @@ export const useSettings = () => useQuery(settingsQuery);
 export const usePendingPlans = () => useQuery({ queryKey: ["plans", "pending"], queryFn: () => api.get<PendingPlans>("/plans"), refetchInterval: 30_000 });
 export const appsQuery = queryOptions({ queryKey: ["apps"], queryFn: () => api.get<AppsResponse>("/apps"), retry: false });
 export const useApps = () => useQuery(appsQuery);
+/** The duplicate search: polled while it runs, so progress shows even without the event stream. */
+export const duplicatesQuery = queryOptions({
+  queryKey: ["duplicates"],
+  queryFn: () => api.get<DuplicatesState>("/duplicates"),
+  refetchInterval: (q) => (q.state.data?.running ? 700 : false),
+});
+export const useDuplicates = () => useQuery(duplicatesQuery);
+
+export function useFindDuplicates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: DuplicatesRequest) => api.post<DuplicatesState>("/duplicates", req),
+    onSuccess: (st) => qc.setQueryData(["duplicates"], st),
+  });
+}
+
+export function useStopDuplicates() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => api.del<DuplicatesState>("/duplicates/current"), onSettled: () => qc.invalidateQueries({ queryKey: ["duplicates"] }) });
+}
 export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web"), retry: false });
 export const useDaemon = () => useQuery({ queryKey: ["daemon"], queryFn: () => api.get<Daemon>("/daemon"), refetchInterval: 15_000 });
 export const historyQuery = queryOptions({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
@@ -87,7 +109,7 @@ export const useDiff = (from: string, to: string) =>
   useQuery({ queryKey: ["diff", from, to], queryFn: () => api.get<DiffResponse>(`/history/diff?from=${q(from)}&to=${q(to)}`), enabled: !!from && !!to, retry: false });
 
 /** Everything that shows scan results; refreshed after a scan or a cleanup. */
-export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"]];
+export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"], ["duplicates"]];
 
 export function useRefreshResults() {
   const qc = useQueryClient();

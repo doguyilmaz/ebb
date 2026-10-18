@@ -1,4 +1,4 @@
-import { Check, ChevronRight, EyeOff, FolderSearch, Hand, Minus, Terminal, Trash2, Wand2 } from "lucide-react";
+import { ChevronRight, EyeOff, FolderSearch, Hand, Terminal, Trash2, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFindings, useIgnore, useReveal, useSetNote } from "#/api/hooks.ts";
 import type { Action, FindingView } from "#/api/types.gen.ts";
@@ -8,6 +8,7 @@ import { useSelection } from "#/lib/selection.ts";
 import { useSheet } from "#/lib/sheet.ts";
 import { AskPanel } from "#/app/AskPanel.tsx";
 import { Presets } from "#/pages/overview/Overview.tsx";
+import { Check } from "#/ui/Check.tsx";
 import { CountUp } from "#/ui/CountUp.tsx";
 import { PageHead } from "#/ui/PageHead.tsx";
 import { Safety } from "#/ui/Safety.tsx";
@@ -110,7 +111,7 @@ function Group({ cat, list, open, onOpen }: { cat: string; list: FindingView[]; 
     <section id={`cat-${cat}`} className="group" aria-labelledby={`h-${cat}`}>
       <header className="group-head">
         {ids.length > 0 ? (
-          <Check3 state={state} label={`Select all ${categoryTitle(cat)}`} onClick={() => setMany(ids, state !== "all")} />
+          <Check state={state} label={`Select all ${categoryTitle(cat)}`} onClick={() => setMany(ids, state !== "all")} />
         ) : (
           <span className="check-space" />
         )}
@@ -134,13 +135,6 @@ function Group({ cat, list, open, onOpen }: { cat: string; list: FindingView[]; 
   );
 }
 
-function Check3({ state, label, onClick, tour }: { state: "none" | "some" | "all"; label: string; onClick: () => void; tour?: string }) {
-  return (
-    <button className="check" role="checkbox" aria-checked={state === "all" ? true : state === "some" ? "mixed" : false} aria-label={label} onClick={onClick} data-state={state} data-tour={tour}>
-      {state === "all" ? <Check size={13} strokeWidth={3} /> : state === "some" ? <Minus size={13} strokeWidth={3} /> : null}
-    </button>
-  );
-}
 
 const ActionIcon = ({ a }: { a: Action }) => (a.kind === "manual" ? <Hand size={13} aria-hidden /> : a.kind === "command" ? <Terminal size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />);
 const actionText = (a: Action) =>
@@ -159,7 +153,7 @@ function Row({ f, open, onToggle }: { f: FindingView; open: boolean; onToggle: (
   return (
     <li id={`f-${f.id}`} className="frow" data-open={open || undefined} data-selected={selected || undefined} data-ignored={f.ignored || undefined} data-tour="finding">
       <div className="frow-main">
-        {can ? <Check3 state={selected ? "all" : "none"} label={`Select ${f.title}`} onClick={() => toggle(f.id)} tour="select" /> : <span className="check-space" data-tip="ebb shows what to do; you do this one yourself." />}
+        {can ? <Check state={selected ? "all" : "none"} label={`Select ${f.title}`} onClick={() => toggle(f.id)} tour="select" /> : <span className="check-space" data-tip="ebb shows what to do; you do this one yourself." />}
         <button className="frow-open" aria-expanded={open} aria-controls={`d-${f.id}`} onClick={onToggle}>
           <span className="num frow-size">{bytes(f.bytes)}</span>
           <span className="frow-text">

@@ -133,7 +133,7 @@ await scenario("a page change shows the whole page at once", async () => {
 await scenario("every page renders in light and dark", async () => {
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });
-    for (const [label, text] of [["Overview", "Where the space is"], ["Explore", "Biggest inside"], ["Findings", "Can be cleaned"], ["Apps", "Library data"], ["Activity", "Activity"], ["Settings", "Never touch"]]) {
+    for (const [label, text] of [["Overview", "Where the space is"], ["Explore", "Biggest inside"], ["Findings", "Can be cleaned"], ["Apps", "Library data"], ["Duplicates", "Find duplicates"], ["Activity", "Activity"], ["Settings", "Never touch"]]) {
       await nav(label);
       await page.getByText(text).first().waitFor({ timeout: 8000 });
       await shot(`${label.toLowerCase()}-${scheme}`);
@@ -231,6 +231,28 @@ await scenario("apps list their Library data and uninstall to the Trash", async 
   await sheet.locator(".sheet-foot .btn.primary").click();
   await settle();
   check((await page.locator(".app-row", { hasText: "Sketchpad" }).count()) === 0, "gone from the list");
+});
+
+await scenario("duplicates are found and the extra copy goes to the Trash", async () => {
+  await nav("Duplicates");
+  await page.getByRole("button", { name: "Find duplicates" }).click();
+  const row = page.locator(".dupe", { hasText: "trip" });
+  await row.waitFor({ timeout: 15000 });
+  await row.locator(".dupe-main").click();
+  await row.getByText("Keep").waitFor({ timeout: 2000 });
+  await row.getByRole("checkbox").click();
+  await page.locator(".dupes-tray").getByRole("button", { name: "Review" }).click();
+  const sheet = page.locator("dialog.sheet[open]");
+  await sheet.locator(".plan-items li").first().waitFor({ timeout: 8000 });
+  check((await sheet.locator(".plan-items li").count()) === 1, "one extra copy planned");
+  const confirm = sheet.locator(".confirm input");
+  if (await confirm.count()) await confirm.check();
+  await sheet.locator(".sheet-foot .btn.primary").click();
+  await sheet.getByText("Cleanup finished").waitFor({ timeout: 20000 });
+  const kept = [join(HOME, "Movies", "trip.mov"), join(HOME, "Desktop", "old", "trip copy.mov")].filter(existsSync);
+  check(kept.length === 1, `one copy stays: ${kept}`);
+  await sheet.locator(".sheet-foot .btn.primary").click();
+  await page.locator(".dupe", { hasText: "trip" }).waitFor({ state: "detached", timeout: 6000 });
 });
 
 await scenario("an assistant's plan waits in the window and is only approved there", async () => {

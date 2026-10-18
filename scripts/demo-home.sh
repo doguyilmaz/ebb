@@ -12,6 +12,10 @@ mk "$home/Library/Logs/DiagnosticReports/Example.ips" $((3 << 20))
 mk "$home/Downloads/Setup-2.3.dmg" $((7 << 20))
 mk "$home/.Trash/old-notes.txt" $((2 << 20))
 mk "$home/Documents/thesis.pdf" $((3 << 20))
+# The same video twice, with its own content so it matches nothing else.
+mkdir -p "$home/Movies" "$home/Desktop/old"
+head -c $((4 << 20)) /dev/urandom >"$home/Movies/trip.mov"
+cp "$home/Movies/trip.mov" "$home/Desktop/old/trip copy.mov"
 
 app="$home/Applications/Sketchpad.app"
 mk "$app/Contents/MacOS/Sketchpad" $((8 << 20))
