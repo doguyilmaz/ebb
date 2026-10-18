@@ -145,8 +145,8 @@ function InstallGuide({ serve }: { serve: string }) {
           <Command value="brew install doguyilmaz/tap/ebb" />
           <p className="faint small-text">
             No Homebrew? Get it at{" "}
-            <a href="https://brew.sh" target="_blank" rel="noreferrer">brew.sh</a>, or download the <code>darwin</code> archive (<code>arm64</code> for Apple
-            silicon, <code>amd64</code> for Intel) from the{" "}
+            <a href="https://brew.sh" target="_blank" rel="noreferrer">brew.sh</a>, or download the <code>darwin</code> archive (one binary for Apple
+            silicon and Intel) from the{" "}
             <a href={RELEASES} target="_blank" rel="noreferrer">latest release</a> and put <code>ebb</code> on your PATH.
           </p>
         </Step>

@@ -1,0 +1,55 @@
+# ebb is macOS-only and needs cgo, so releases build on a macOS runner and ship
+# one universal binary.
+version: 2
+
+before:
+  hooks:
+    - sh -c "cd ui && bun install --frozen-lockfile && bun run build"
+
+builds:
+  - main: ./cmd/ebb
+    binary: ebb
+    env:
+      - CGO_ENABLED=1
+    goos: [darwin]
+    goarch: [arm64, amd64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/doguyilmaz/ebb/internal/cli.Version={{ .Version }}
+
+universal_binaries:
+  - replace: true
+    hooks:
+      # Ad-hoc signature over both slices; an unsigned arm64 binary does not run.
+      post: codesign --force --sign - {{ .Path }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_universal"
+    files: [README.md, LICENSE]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs", "^test"]
+
+brews:
+  - repository:
+      owner: doguyilmaz
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_msg_template: "ebb {{ .Tag }}"
+    homepage: https://github.com/doguyilmaz/ebb
+    description: See where your Mac's disk space went and win it back safely
+    license: MIT
+    install: |
+      bin.install "ebb"
+    test: |
+      system "#{bin}/ebb", "version"
+
+release:
+  github:
+    owner: doguyilmaz
+    name: ebb

@@ -1,0 +1,43 @@
+name: CI
+
+# ebb needs cgo against macOS frameworks, so everything runs on macOS. The e2e
+# pass drives the preinstalled Chrome and runs after merges only.
+on:
+  pull_request:
+    paths-ignore: ["**.md", "docs/**", "LICENSE", "assets/**"]
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", "LICENSE", "assets/**"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: oven-sh/setup-bun@v2
+      - run: cd ui && bun install --frozen-lockfile && bun run build
+      - run: make check
+      - run: GOOS=linux CGO_ENABLED=0 go build -o /dev/null ./cmd/ebb-web
+
+  e2e:
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: oven-sh/setup-bun@v2
+      - run: cd ui && bun install --frozen-lockfile
+      - run: scripts/e2e.sh
