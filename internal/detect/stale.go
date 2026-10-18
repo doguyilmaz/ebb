@@ -3,6 +3,7 @@ package detect
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ type artifact struct {
 	// markers lists the project files that make this folder build output; a
 	// "build" folder next to only a package.json, say, may hold real sources.
 	markers []string
-	// git: some projects commit this folder (a library's dist); skip it when Git tracks files in it.
+	// git: some projects commit this folder (a library's dist); inside a repository it needs a .gitignore entry.
 	git bool
 }
 
@@ -75,7 +76,7 @@ func (stale) ID() string { return "stale" }
 // skipped, so their contents are never reported a second time.
 func (stale) Pass() int { return 2 }
 
-func (stale) Detect(ctx context.Context, c *Context) ([]finding.Finding, error) {
+func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 	type hit struct{ artifact, project tree.ID }
 	var hits []hit
 	claimed := c.coveredIDs()
@@ -124,7 +125,7 @@ func (stale) Detect(ctx context.Context, c *Context) ([]finding.Finding, error) 
 			continue
 		}
 		name := c.Tree.Node(h.artifact).Name
-		if artifacts[name].git && tracked(ctx, c, h.project, name) {
+		if artifacts[name].git && tracked(c, h.project, name) {
 			continue
 		}
 		f, ok := groups[name]
@@ -155,19 +156,34 @@ func (stale) Detect(ctx context.Context, c *Context) ([]finding.Finding, error) 
 	return fs, nil
 }
 
-// tracked reports whether Git tracks files in a project's folder, looking for
-// a repository in the project or any folder above it. Not being able to ask
-// Git counts as tracked: the folder stays.
-func tracked(ctx context.Context, c *Context, project tree.ID, name string) bool {
-	inRepo := false
-	for p := project; p != tree.None && !inRepo; p = c.Tree.Node(p).Parent {
-		inRepo = slices.ContainsFunc(c.Tree.Children(p), func(id tree.ID) bool { return c.Tree.Node(id).Name == ".git" })
+// tracked reports whether a project's folder may hold files Git tracks:
+// inside a repository it counts as untracked only when a .gitignore from the
+// project up to the repository root ignores it. Git itself never runs: a
+// cloned repository's config can make it execute commands.
+func tracked(c *Context, project tree.ID, name string) bool {
+	ignored := false
+	for p := project; p != tree.None; p = c.Tree.Node(p).Parent {
+		ignored = ignored || ignores(c, p, name)
+		if slices.ContainsFunc(c.Tree.Children(p), func(id tree.ID) bool { return c.Tree.Node(id).Name == ".git" }) {
+			return !ignored
+		}
 	}
-	if !inRepo {
+	return false
+}
+
+// ignores reads dir's .gitignore for a plain entry naming the folder
+// (name, /name, name/ or /name/); patterns are left alone.
+func ignores(c *Context, dir tree.ID, name string) bool {
+	b, err := c.readFile(filepath.Join(c.Tree.Path(dir), ".gitignore"))
+	if err != nil || len(b) > 1<<20 {
 		return false
 	}
-	out, err := c.Env.Run(ctx, c.Tree.Path(project), "git", "ls-files", "--", name)
-	return err != nil || len(strings.TrimSpace(string(out))) > 0
+	for line := range strings.Lines(string(b)) {
+		if strings.Trim(strings.TrimSpace(line), "/") == name {
+			return true
+		}
+	}
+	return false
 }
 
 // staleID names the finding after the folder; ".build" next to "build" (or

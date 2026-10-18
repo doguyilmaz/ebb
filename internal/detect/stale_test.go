@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -232,7 +233,7 @@ func TestFindingIDsStable(t *testing.T) {
 	}
 }
 
-func TestStaleDistOnlyWhenGitDoesNotTrackIt(t *testing.T) {
+func TestStaleDistOnlyWhenGitIgnoresIt(t *testing.T) {
 	tr := home(t,
 		"code/app/package.json=0@"+old, "code/app/dist/bundle.js=120@"+old,
 		"code/lib/package.json=0@"+old, "code/lib/.git/HEAD=0@"+old, "code/lib/dist/index.js=110@"+old,
@@ -244,31 +245,31 @@ func TestStaleDistOnlyWhenGitDoesNotTrackIt(t *testing.T) {
 	markers(tr, "/h/code/swift", "Package.swift")
 	c := ctxFor(t, tr)
 	c.Covered = func(string) bool { return false }
-	var asked []string
-	c.Env.(*sys.Fake).RunFn = func(dir, name string, args ...string) ([]byte, error) {
-		asked = append(asked, dir)
-		if strings.HasSuffix(dir, "/lib") {
-			return []byte("dist/index.js\n"), nil
-		}
+	c.Env.(*sys.Fake).RunFn = func(string, string, ...string) ([]byte, error) {
+		t.Fatal("Git never runs in someone else's repository")
 		return nil, nil
+	}
+	c.ReadFile = func(p string) ([]byte, error) {
+		if p == "/h/code/mono/.gitignore" {
+			return []byte("# build\nnode_modules\n/dist/\n"), nil
+		}
+		return nil, os.ErrNotExist
 	}
 	fs, err := stale{}.Detect(context.Background(), c)
 	if err != nil {
 		t.Fatal(err)
 	}
 	dist := byRule(fs, "stale.dist")
-	if dist == nil || len(dist.Targets) != 2 || slices.ContainsFunc(dist.Targets, func(t finding.Target) bool { return strings.Contains(t.Path, "/lib/") }) {
-		t.Fatalf("a dist Git tracks stays; untracked ones go: %+v", dist)
+	var got []string
+	for _, tg := range dist.Targets {
+		got = append(got, strings.TrimPrefix(tg.Path, "/h/code/"))
 	}
-	if len(asked) != 2 {
-		t.Fatalf("Git is asked only inside repositories (the monorepo's root counts): %q", asked)
+	slices.Sort(got)
+	// Outside a repository it goes; inside one only when a .gitignore up to the root lists it.
+	if want := []string{"app/dist", "mono/packages/ui/dist"}; !slices.Equal(got, want) {
+		t.Fatalf("dist targets %q, want %q", got, want)
 	}
 	if byRule(fs, "stale.dot-build") == nil {
 		t.Fatal("Swift packages' .build is build output, with an ID of its own")
-	}
-	c.Env.(*sys.Fake).RunFn = func(string, string, ...string) ([]byte, error) { return nil, sys.ErrSandbox }
-	fs, _ = stale{}.Detect(context.Background(), c)
-	if d := byRule(fs, "stale.dist"); d == nil || len(d.Targets) != 1 {
-		t.Fatalf("without Git, only folders outside repositories: %+v", d)
 	}
 }
