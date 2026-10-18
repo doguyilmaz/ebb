@@ -19,7 +19,7 @@ Measured on the reference Mac (Apple Silicon, 10 cores, macOS 26). Update with e
 | getattrlistbulk + private-size post-pass on 121k clones | +8.1 s, does not scale with threads (rejected) |
 
 Clone IDs (`ATTR_CMNEXT_CLONEID` + `CLONE_REFCNT`) cost ≈ 19 % over the plain bulk pass and let pure clones be
-deduplicated like hardlinks. CPU profile: ~90 % of time is kernel work — directory `open` by full path (~45 %) and
+deduplicated like hardlinks. CPU profile: ~90 % of time is kernel work: directory `open` by full path (~45 %) and
 `getattrlistbulk` (~30 %); Go-side work is negligible. Next lever: open children with `openat` relative to the
 parent descriptor (Task 13).
 
@@ -27,9 +27,9 @@ parent descriptor (Task 13).
 
 - Opening subfolders with `openat` relative to the parent's descriptor (kept open while its children are queued,
   budget half the process fd limit, path fallback beyond it): 8.6 → 8.0 s on `~/Library` (880k files, warm, back to
-  back). Profile afterwards: `openat` ~49 %, `getattrlistbulk` ~41 %, Go ~2 % — the cost is the kernel's per-vnode
+  back). Profile afterwards: `openat` ~49 %, `getattrlistbulk` ~41 %, Go ~2 %. The cost is the kernel's per-vnode
   work, not path lookup, so no language or FFI change helps.
-- `searchfs(2)` catalog scan, as a read-only probe: works without root and returns sizes, but runs on one thread —
+- `searchfs(2)` catalog scan, as a read-only probe: works without root and returns sizes but runs on one thread:
   117 s for the whole data volume (7.06M entries) versus ~45 s for the parallel walk. Not worth pursuing.
 - Worker count is not settled: runs at 8/10/14 workers swung between 14 and 19 s with the cache state; measure
   interleaved, several rounds, before changing the default. The real lever for repeat scans is FSEvents (Task 30).
@@ -55,7 +55,7 @@ FSEvents replay after ebb was off: ~3.6 h of changes = 30k folder events in 11 s
 | same, `--threads 16` | 43.7 s | 45.1 s | 406 MB |
 | after detector fixes (run-to-run variance) | 50.4 s | 52.3 s | 411 MB |
 
-The walk is kernel-bound: ~165 s of system CPU across 8 workers, and 16 workers add kernel CPU without finishing
+The walk is kernel-bound: ~165 s of system CPU across 8 workers. 16 workers add kernel CPU without finishing
 sooner, so 8 stays the default. Detectors and persistence take ~2 s. The tree holds 1.07M nodes (~100 MB) plus 225k
 APFS clone groups. `Reclaimable` used to scan every shared group per call (36 s spent in the stale-project
 detector); it now reads a per-node cache computed once per write in O(groups × depth): 1.4 s → 0.9 ms per 1,000 calls.

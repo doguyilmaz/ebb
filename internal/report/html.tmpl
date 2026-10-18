@@ -88,7 +88,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
     <p>{{.Why}}</p>
     <p class="muted">{{.Impact}}</p>
     {{if .Evidence}}<ul>{{range .Evidence}}<li>{{.}}</li>{{end}}</ul>{{end}}
-    <ul>{{range .Targets}}<li><code>{{.Path}}</code> — {{bytes .Bytes}}</li>{{end}}</ul>
+    <ul>{{range .Targets}}<li><code>{{.Path}}</code> ({{bytes .Bytes}})</li>{{end}}</ul>
     {{range .Actions}}{{if .Hint}}<p class="muted">Run: <code>{{.Hint}}</code></p>{{end}}{{end}}
   </div>
   {{else}}<p class="muted">Nothing stands out.</p>{{end}}

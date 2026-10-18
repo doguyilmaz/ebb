@@ -45,6 +45,7 @@ checksum:
 
 changelog:
   sort: asc
+  format: "{{ .Message }}"
   filters:
     exclude: ["^docs", "^test"]
 
@@ -69,3 +70,5 @@ release:
   github:
     owner: doguyilmaz
     name: ebb
+  header: |
+    Install with `brew install doguyilmaz/tap/ebb`. The macOS binary is universal (Apple silicon and Intel), signed with a Developer ID and notarized.

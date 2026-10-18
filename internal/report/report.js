@@ -87,7 +87,7 @@
     const b = canvas.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
     const hit = shapes.filter((s) => x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h).pop();
     if (!hit) { tip.style.display = "none"; return; }
-    tip.textContent = `${hit.path} — ${fmt(hit.node.alloc)} · ${(100 * hit.node.alloc / root.alloc).toFixed(1)}% · ${hit.node.files} files`;
+    tip.textContent = `${hit.path}: ${fmt(hit.node.alloc)} · ${(100 * hit.node.alloc / root.alloc).toFixed(1)}% · ${hit.node.files} files`;
     tip.style.display = "block";
     tip.style.left = Math.min(x + 14, b.width - tip.offsetWidth - 8) + "px";
     tip.style.top = Math.min(y + 14, b.height - tip.offsetHeight - 8) + "px";

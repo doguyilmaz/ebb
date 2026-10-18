@@ -25,7 +25,7 @@ import (
 const dataVolume = "/System/Volumes/Data"
 
 var (
-	ErrNeverScanned = errors.New("no scan yet — run: ebb scan")
+	ErrNeverScanned = errors.New("no scan yet; run: ebb scan")
 	ErrScanRunning  = errors.New("a scan is already running")
 	ErrScanStopped  = errors.New("the scan was stopped")
 	ErrCleaning     = errors.New("a cleanup is running: try again when it is done")

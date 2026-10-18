@@ -192,8 +192,8 @@ func (a *App) PendingPair() (*PendingPair, error) {
 	return &p, nil
 }
 
-// ConfirmPair is the yes. It is deliberately only reachable from this machine —
-// the CLI or the local interface — never from the page that is asking. It
+// ConfirmPair is the yes. It is deliberately only reachable from this machine
+// (the CLI or the local interface), never from the page that is asking. It
 // approves the open request; the page then claims its token with its nonce.
 //
 // The code is required: comparing it with the one the page shows is what
