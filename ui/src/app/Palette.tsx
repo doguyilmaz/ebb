@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePresets, useSearch, useStartScan } from "#/api/hooks.ts";
+import { useDisks, usePresets, useSearch, useStartScan, useStatus } from "#/api/hooks.ts";
 import { bytes } from "#/lib/format.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
@@ -24,6 +24,9 @@ export function Palette() {
   const scan = useStartScan();
   const startTour = useTour((s) => s.start);
   const presets = usePresets();
+  // Disks are only looked up while the palette is open.
+  const disks = useDisks(open);
+  const lastRoot = useStatus().data?.last?.root;
   const found = useSearch(open ? term.trim() : "");
 
   useEffect(() => {
@@ -53,8 +56,11 @@ export function Palette() {
       { id: "history", label: "History", run: go("/history") },
       { id: "activity", label: "Activity", run: go("/activity") },
       { id: "settings", label: "Settings", run: go("/settings") },
-      { id: "scan", label: "Scan again", hint: "only what changed", run: () => (close(), scan.mutate({})) },
-      { id: "scan-full", label: "Scan everything again", hint: "every folder", run: () => (close(), scan.mutate({ full: true })) },
+      { id: "scan", label: "Scan again", hint: "only what changed", run: () => (close(), scan.mutate({ root: lastRoot })) },
+      { id: "scan-full", label: "Scan everything again", hint: "every folder", run: () => (close(), scan.mutate({ root: lastRoot, full: true })) },
+      ...(disks.data ?? [])
+        .filter((d) => d.path !== lastRoot)
+        .map((d) => ({ id: `disk-${d.path}`, label: `Scan ${d.name}`, hint: `${bytes(d.free)} free of ${bytes(d.capacity)}`, run: () => (close(), scan.mutate({ root: d.path })) })),
       { id: "tour", label: "Take the tour", run: () => (close(), startTour()) },
       ...(presets.data ?? [])
         .filter((p) => p.bytes > 0)
@@ -69,7 +75,7 @@ export function Palette() {
       run: () => (close(), navigate({ to: "/explore", search: { path: it.kind === "dir" ? it.path : it.path.slice(0, it.path.lastIndexOf("/")), view: "sunburst" } })),
     }));
     return [...matching, ...paths];
-  }, [term, presets.data, found.data, navigate, scan, openSheet, startTour, setOpen]);
+  }, [term, presets.data, disks.data, lastRoot, found.data, navigate, scan, openSheet, startTour, setOpen]);
 
   useEffect(() => setActive(0), [term]);
 

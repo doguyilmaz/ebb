@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -246,5 +247,17 @@ func TestOldIDEVersions(t *testing.T) {
 	}
 	if jb := byRule(fs, "jetbrains.caches"); jb == nil || slices.ContainsFunc(jb.Targets, func(t finding.Target) bool { return strings.Contains(t.Path, "2024.3") }) {
 		t.Fatalf("the current version's caches stay with the cache rule: %+v", jb)
+	}
+}
+
+func TestTrashOnAnotherDisk(t *testing.T) {
+	uid := strconv.Itoa(os.Getuid())
+	tr := treeAt(t, "/Volumes/Backup", ".Trashes/"+uid+"/old.mov=300", ".Trashes/0/other=300", "Photos/a.jpg=50")
+	fs, err := volumeTrash{}.Detect(context.Background(), ctxFor(t, tr))
+	if err != nil || len(fs) != 1 || fs[0].Targets[0].Path != "/Volumes/Backup/.Trashes/"+uid || fs[0].Actions[0].Kind != "empty-trash" {
+		t.Fatalf("%+v %v", fs, err)
+	}
+	if fs, _ := (volumeTrash{}).Detect(context.Background(), ctxFor(t, home(t, ".Trashes/"+uid+"/x=300"))); len(fs) != 0 {
+		t.Fatal("only a disk's own root has its Trash there")
 	}
 }

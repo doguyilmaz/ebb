@@ -307,7 +307,7 @@ const (
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PendingPlans{}, DuplicatesRequest{}, DuplicatesState{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
-	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
+	Error{}, volume.Breakdown{}, volume.Disk{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 
 // Names gives types from other packages their API name in TypeScript.

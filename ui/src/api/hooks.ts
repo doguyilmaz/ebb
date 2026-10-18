@@ -5,10 +5,12 @@ import type {
   AppsResponse,
   Breakdown,
   ChildrenResponse,
+  Disk,
   Daemon,
   DuplicatesRequest,
   DuplicatesState,
   DiffResponse,
+  FilesResponse,
   FindingsResponse,
   HistoryResponse,
   OpsResponse,
@@ -67,6 +69,14 @@ export const useChildren = (path: string | undefined, small = false) =>
     retry: false,
   });
 
+export const useFiles = (path: string | undefined, minSize: number, olderThanDays: number) =>
+  useQuery({
+    queryKey: ["files", path ?? "", minSize, olderThanDays],
+    queryFn: () => api.get<FilesResponse>(`/files?limit=2000&minSize=${minSize}&olderThanDays=${olderThanDays}${path ? `&path=${q(path)}` : ""}`),
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+
 export const useSearch = (term: string) =>
   useQuery({ queryKey: ["search", term], queryFn: () => api.get<SearchResponse>(`/search?limit=30&q=${q(term)}`), enabled: term.length > 1 });
 
@@ -99,17 +109,20 @@ export function useStopDuplicates() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: () => api.del<DuplicatesState>("/duplicates/current"), onSettled: () => qc.invalidateQueries({ queryKey: ["duplicates"] }) });
 }
+export const useDisks = (enabled = true) => useQuery({ queryKey: ["disks"], queryFn: () => api.get<Disk[]>("/volumes"), staleTime: 10_000, enabled });
 export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web"), retry: false });
 export const useDaemon = () => useQuery({ queryKey: ["daemon"], queryFn: () => api.get<Daemon>("/daemon"), refetchInterval: 15_000 });
 export const historyQuery = queryOptions({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
 export const useHistory = () => useQuery(historyQuery);
 /** The newest scan against the one before it of the same folder; fails while there is only one. */
-export const useLatestDiff = () => useQuery({ queryKey: ["diff", "latest"], queryFn: () => api.get<DiffResponse>("/history/diff"), retry: false });
-export const useDiff = (from: string, to: string) =>
-  useQuery({ queryKey: ["diff", from, to], queryFn: () => api.get<DiffResponse>(`/history/diff?from=${q(from)}&to=${q(to)}`), enabled: !!from && !!to, retry: false });
+export const latestDiffQuery = queryOptions({ queryKey: ["diff", "latest"], queryFn: () => api.get<DiffResponse>("/history/diff"), retry: false });
+export const useLatestDiff = () => useQuery(latestDiffQuery);
+export const diffQuery = (from: string, to: string) =>
+  queryOptions({ queryKey: ["diff", from, to], queryFn: () => api.get<DiffResponse>(`/history/diff?from=${q(from)}&to=${q(to)}`), enabled: !!from && !!to, retry: false });
+export const useDiff = (from: string, to: string) => useQuery(diffQuery(from, to));
 
 /** Everything that shows scan results; refreshed after a scan or a cleanup. */
-export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"], ["duplicates"]];
+export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"], ["duplicates"], ["files"]];
 
 export function useRefreshResults() {
   const qc = useQueryClient();

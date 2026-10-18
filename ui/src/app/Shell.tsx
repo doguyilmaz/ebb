@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Activity, AppWindow, Bot, ChartLine, Copy, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePendingPlans, useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
-import { ago, bytes, count, percent } from "#/lib/format.ts";
+import { ago, bytes, count, diskName, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
@@ -100,7 +100,7 @@ function DiskMeter() {
   return (
     <div className="disk-meter" data-low={low || undefined}>
       <div className="row between small-text">
-        <span className="medium">This Mac</span>
+        <span className="medium ellipsis">{diskName(last.root)}</span>
         <span className="num faint">{percent(used)} full</span>
       </div>
       <div className="meter" role="img" aria-label={`${percent(used)} of the disk used, ${bytes(last.free)} free`}>
@@ -163,7 +163,7 @@ function TopBar({ title }: { title: string }) {
       {!running && (
         <button
           className="btn primary"
-          onClick={() => start.mutate({})}
+          onClick={() => start.mutate({ root: status.data?.last?.root })}
           data-tip={last ? (quick ? "Reads again only the folders that changed since the last scan, usually in seconds. ⌘K has “Scan everything again”." : "Reads every folder; ebb does not know yet what changed.") : undefined}
         >
           <RefreshCw size={14} aria-hidden />

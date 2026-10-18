@@ -32,3 +32,6 @@ export function count(n: number): string {
 
 /** The last path component, for labels. */
 export const baseName = (p: string) => p.slice(p.lastIndexOf("/") + 1) || p;
+
+/** The disk a scan covers, as people call it: an external disk's name, or this Mac. */
+export const diskName = (root: string | undefined) => (root?.startsWith("/Volumes/") ? root.split("/")[2] : "This Mac");

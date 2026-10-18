@@ -1,12 +1,13 @@
 import type { FetchQueryOptions, QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
-import { appsQuery, duplicatesQuery, findingsQuery, historyQuery, opsQuery, settingsQuery, sliceQuery, statusQuery, volumeQuery } from "./api/hooks.ts";
+import { appsQuery, diffQuery, duplicatesQuery, findingsQuery, historyQuery, latestDiffQuery, opsQuery, settingsQuery, sliceQuery, statusQuery, volumeQuery } from "./api/hooks.ts";
 import { Root } from "./app/Root.tsx";
 import { readPrefs } from "./lib/prefs.ts";
 import { budgetFor, depthFor } from "./pages/explore/params.ts";
+import { baseline, widest } from "./pages/overview/since.ts";
 
-export type View = "sunburst" | "treemap" | "icicle" | "list";
-const views: View[] = ["sunburst", "treemap", "icicle", "list"];
+export type View = "sunburst" | "treemap" | "icicle" | "list" | "files";
+const views: View[] = ["sunburst", "treemap", "icicle", "list", "files"];
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({ component: Root });
 
@@ -32,7 +33,7 @@ export const exploreRoute = createRoute({
   loader: ({ context, deps }) => {
     const view = deps.view ?? readPrefs().view ?? "sunburst";
     const qs: FetchQueryOptions<any, any, any, any>[] = [statusQuery, volumeQuery];
-    if (view !== "list") qs.push(sliceQuery(deps.path, depthFor(view), budgetFor(view)));
+    if (view !== "list" && view !== "files") qs.push(sliceQuery(deps.path, depthFor(view), budgetFor(view)));
     return preload(...qs)({ context });
   },
   component: lazyRouteComponent(() => import("./pages/explore/Explore.tsx")),
@@ -41,7 +42,13 @@ export const exploreRoute = createRoute({
 const overviewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  loader: preload(statusQuery, volumeQuery, findingsQuery(), sliceQuery(undefined, 1, 60)),
+  loader: async ({ context }) => {
+    await preload(statusQuery, volumeQuery, findingsQuery(), sliceQuery(undefined, 1, 60), latestDiffQuery, historyQuery)({ context });
+    // The "What changed" card's comparison too, so it does not arrive after the page.
+    const snaps = context.queryClient.getQueryData(historyQuery.queryKey)?.snapshots ?? [];
+    const pair = baseline(snaps, readPrefs().since ?? widest(snaps));
+    if (pair) await preload(diffQuery(pair.from.id, pair.to.id))({ context });
+  },
   component: lazyRouteComponent(() => import("./pages/overview/Overview.tsx")),
 });
 const findingsRoute = createRoute({

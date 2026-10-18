@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, CircleAlert, Lightbulb } from "lucide-react";
 import { useFindings, useLatestDiff, usePresets, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
 import type { PresetView } from "#/api/types.gen.ts";
-import { bytes, percent } from "#/lib/format.ts";
+import { bytes, diskName, percent } from "#/lib/format.ts";
 import { useSheet } from "#/lib/sheet.ts";
 import { CountUp } from "#/ui/CountUp.tsx";
 import { Safety } from "#/ui/Safety.tsx";
@@ -36,7 +36,7 @@ export default function Overview() {
       <section className="hero">
         <div>
           <span className="hero-label">
-            Free on this Mac <Info term="segment.free" />
+            Free on {diskName(status.data.last?.root).replace("This Mac", "this Mac")} <Info term="segment.free" />
             {low && (
               <span className="chip-low">
                 <CircleAlert size={13} aria-hidden /> Low on space

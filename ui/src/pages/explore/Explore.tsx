@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { ChartPie, LayoutGrid, List, Rows3 } from "lucide-react";
+import { ChartPie, FileStack, LayoutGrid, List, Rows3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { sliceQuery, useAges, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
 import { ageColor } from "#/lib/ages.ts";
@@ -12,6 +12,7 @@ import { Loading, Problem } from "#/ui/states.tsx";
 import { Info } from "#/ui/Tip.tsx";
 import { Breadcrumb } from "./Breadcrumb.tsx";
 import { Chart } from "./canvas/Chart.tsx";
+import { FilesView } from "./FilesView.tsx";
 import { ListView } from "./ListView.tsx";
 import { Search } from "./Search.tsx";
 import { SidePanel, type Focus } from "./SidePanel.tsx";
@@ -21,6 +22,7 @@ const views: { id: View; label: string; icon: typeof ChartPie; hint: string }[] 
   { id: "treemap", label: "Treemap", icon: LayoutGrid, hint: "Click a box to open it" },
   { id: "icicle", label: "Icicle", icon: Rows3, hint: "Click a column to open it" },
   { id: "list", label: "List", icon: List, hint: "" },
+  { id: "files", label: "Files", icon: FileStack, hint: "" },
 ];
 
 
@@ -62,7 +64,7 @@ export default function Explore() {
   const up = () => open(atTop ? undefined : parent);
   const metric = unique ? "unique" : "alloc";
   const current = views.find((v) => v.id === view)!;
-  const prefetch = (p: string) => view !== "list" && qc.prefetchQuery(sliceQuery(p, depthFor(view), budgetFor(view)));
+  const prefetch = (p: string) => view !== "list" && view !== "files" && qc.prefetchQuery(sliceQuery(p, depthFor(view), budgetFor(view)));
 
   return (
     <div className="explore">
@@ -76,7 +78,7 @@ export default function Explore() {
             <button aria-pressed={unique} onClick={() => choose({ unique: true })} data-term="unique">Unique</button>
           </div>
         </div>
-        {view !== "list" && (
+        {view !== "list" && view !== "files" && (
           <div className="seg" role="group" aria-label="Colour">
             <button aria-pressed={color === "folder"} onClick={() => choose({ color: "folder" })} data-term="color.folder">Folders</button>
             <button aria-pressed={color === "age"} onClick={() => choose({ color: "age" })} data-term="color.age">Age</button>
@@ -94,6 +96,8 @@ export default function Explore() {
       <div className="explore-body">
         {view === "list" ? (
           <ListView path={here} onOpen={open} onPick={setPicked} />
+        ) : view === "files" ? (
+          <FilesView path={here} onPick={setPicked} />
         ) : (
           <div className="chart-card">
             <Chart

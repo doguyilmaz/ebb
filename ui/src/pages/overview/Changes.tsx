@@ -1,21 +1,40 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useLatestDiff } from "#/api/hooks.ts";
+import { useState } from "react";
+import { useDiff, useHistory } from "#/api/hooks.ts";
 import { ago, baseName, bytes } from "#/lib/format.ts";
+import { readPrefs, savePrefs } from "#/lib/prefs.ts";
+import { baseline, widest, type Since } from "./since.ts";
 
-/** What grew and what shrank since the scan before: growth is how a disk fills up unnoticed. */
+const labels: Record<Since, string> = { scan: "Last scan", day: "A day", week: "A week", month: "A month" };
+
+/** What grew and what shrank over a span: growth is how a disk fills up unnoticed. */
 export function Changes() {
-  const diff = useLatestDiff();
-  const d = diff.data;
+  const history = useHistory();
+  const snaps = history.data?.snapshots ?? [];
+  const [chosen, setChosen] = useState<Since | undefined>(() => readPrefs().since);
+  const since = chosen ?? widest(snaps);
+  const pair = baseline(snaps, since);
+  const diff = useDiff(pair?.from.id ?? "", pair?.to.id ?? "");
+  const d = pair ? diff.data : undefined;
   const rows = (d?.changes ?? []).filter((c) => c.path !== d?.to.root && c.delta !== 0).slice(0, 6);
   const max = Math.max(1, ...rows.map((c) => Math.abs(c.delta)));
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Changed since the scan before</h2>
+        <h2>What changed</h2>
+        <div className="seg small" role="group" aria-label="Over">
+          {(Object.keys(labels) as Since[]).map((s) => (
+            <button key={s} aria-pressed={since === s} disabled={!baseline(snaps, s)} onClick={() => (setChosen(s), savePrefs({ since: s }))}>
+              {labels[s]}
+            </button>
+          ))}
+        </div>
       </div>
-      {!d?.from ? (
-        <p className="muted">{diff.isLoading ? "Comparing…" : "After your next scan, this shows what grew and what shrank."}</p>
+      {!pair ? (
+        <p className="muted">{history.isLoading ? "Comparing…" : since === "scan" ? "After your next scan, this shows what grew and what shrank." : `History does not reach back ${labels[since].toLowerCase()} yet.`}</p>
+      ) : !d?.from ? (
+        <p className="muted">Comparing…</p>
       ) : rows.length === 0 ? (
         <p className="muted">Nothing changed by more than 10 MB since {ago(d.from.time)}.</p>
       ) : (

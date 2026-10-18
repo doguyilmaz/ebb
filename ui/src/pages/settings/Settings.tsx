@@ -2,9 +2,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FolderOpen, Plus, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "#/api/client.ts";
-import { useDaemon, useDaemonAction, useFindings, useIgnore, useSaveSettings, useSettings, useStatus, useWebAccess } from "#/api/hooks.ts";
+import { useDaemon, useDaemonAction, useDisks, useFindings, useIgnore, useSaveSettings, useSettings, useStatus, useWebAccess } from "#/api/hooks.ts";
 import type { ChooseResponse, Settings as S } from "#/api/types.gen.ts";
-import { ago } from "#/lib/format.ts";
+import { ago, bytes } from "#/lib/format.ts";
 import type { TermId } from "#/lib/glossary.ts";
 import { PageHead } from "#/ui/PageHead.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
@@ -62,6 +62,7 @@ function Scan() {
   const settings = useSettings();
   const save = useSaveSettings();
   const picker = useChooseFolder();
+  const disks = useDisks();
   const [draft, setDraft] = useState<S | null>(null);
   useEffect(() => setDraft(settings.data ?? null), [settings.data]);
   if (settings.error) return <Problem error={settings.error} />;
@@ -86,6 +87,19 @@ function Scan() {
           </button>
         </span>
       </Field>
+      {(disks.data?.length ?? 0) > 1 && (
+        <div className="suggest">
+          <span className="faint small-text">Disks</span>
+          {disks.data!.map((d) => {
+            const root = d.boot ? "" : d.path;
+            return (
+              <button key={d.path} className="btn small" aria-pressed={draft.root === root} onClick={() => set("root", root)} data-tip={`${d.path} · ${d.fs}${d.readOnly ? " · read-only" : ""}`}>
+                {d.name} <span className="faint">{bytes(d.free)} free</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       {picker.error && <p className="error small-text">{picker.error}</p>}
       <div className="fields">
         <Field label="Parallel readers" help="Folders read at once. Empty picks what suits this Mac.">

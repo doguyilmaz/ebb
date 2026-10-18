@@ -18,6 +18,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/scans/current` | — | `ScanState` | — |
 | DELETE | `/scans/current` | — | `ScanState` (202; `scan.done` follows with `stopped: true`, the last result stays) | 409 `no-scan` |
 | GET | `/volume` | — | `Breakdown` | 409 `never-scanned` |
+| GET | `/volumes` | — | `Disk[]` (the startup disk first, scanned through its data volume, then every disk the Finder shows; scan one with `POST /scans {root: path}`) | — |
 | GET | `/tree?path&depth&minShare&maxNodes` | — | `SliceResponse` | 400 `outside-root`, 409 `never-scanned` |
 | GET | `/ages?path` | — | `AgesResponse` (bytes by last-modified bucket, relative to the scan time) | 400 `outside-root`, 409 `never-scanned` |
 | GET | `/explain?path` | — | `Explain {item, findings, biggest}` | 400 `outside-root`, 404 |

@@ -390,6 +390,17 @@ export interface Breakdown {
   fullDiskAccess: boolean;
 }
 
+export interface Disk {
+  name: string;
+  path: string;
+  capacity: number;
+  free: number;
+  boot: boolean;
+  readOnly: boolean;
+  network: boolean;
+  fs: string;
+}
+
 export interface PlanRequest {
   findingIds?: string[] | null;
   paths?: string[] | null;

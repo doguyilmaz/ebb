@@ -159,6 +159,22 @@ await scenario("explore switches every view and remembers the choice", async () 
   await page.getByRole("button", { name: "Folders", exact: true }).click();
 });
 
+await scenario("the Files view filters by size and age, and disks are listed", async () => {
+  await nav("Explore");
+  await page.locator("[data-tour=views]").getByRole("button", { name: "Files" }).click();
+  const view = page.locator(".filesview");
+  await view.waitFor({ timeout: 4000 });
+  await view.getByRole("button", { name: "1 MB+" }).click();
+  await view.locator(".fv-row", { hasText: "trip.mov" }).waitFor({ timeout: 4000 });
+  await view.getByRole("button", { name: "1 year+" }).click();
+  await view.locator(".fv-row", { hasText: "big-lib" }).waitFor({ timeout: 4000 });
+  await view.locator(".fv-row", { hasText: "trip.mov" }).waitFor({ state: "detached", timeout: 4000 });
+  await view.getByRole("button", { name: "Any age" }).click();
+  await page.locator("[data-tour=views]").getByRole("button", { name: "Sunburst" }).click();
+  const disks = (await api("/volumes")).body;
+  check(Array.isArray(disks) && disks[0]?.boot && disks[0].capacity > 0, `startup disk first: ${JSON.stringify(disks?.[0])}`);
+});
+
 await scenario("a finding row opens its details and selection floats without moving the page", async () => {
   await nav("Findings");
   await page.locator(".frow").first().waitFor({ timeout: 8000 });

@@ -55,6 +55,7 @@ const terms = {
   "view.treemap": ["Treemap", "Each rectangle's area is its size, and folders hold their contents. Good for spotting single huge files."],
   "view.icicle": ["Icicle", "Columns by depth from left to right; each column splits its parent by size."],
   "view.list": ["List", "Every item in this folder, sortable, with what ebb found about it."],
+  "view.files": ["Files", "The biggest files anywhere below this folder, however deep. Filter by size, or by how long nobody changed them."],
   "color.folder": ["Colour by folder", "Each top folder gets its own colour, and everything inside it shares that hue, lighter as it goes deeper."],
   "color.age": ["Colour by age", "Light means changed recently, dark means untouched for a long time. Big dark areas are old data worth a look."],
   other: ["Other", "Many small items merged so the chart stays readable. The List shows them one by one."],

@@ -6,6 +6,9 @@ export interface Prefs {
   unique?: boolean;
   color?: "folder" | "age";
   appSort?: "total" | "library" | "name";
+  filesMin?: number;
+  filesAge?: number;
+  since?: "scan" | "day" | "week" | "month";
 }
 
 const KEY = "ebb.prefs";

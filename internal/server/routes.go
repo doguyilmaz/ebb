@@ -14,6 +14,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/report"
 	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/volume"
 )
 
 func (s *Server) dataRoutes() {
@@ -26,6 +27,7 @@ func (s *Server) dataRoutes() {
 		}
 		return accepted{s.app.ScanState()}, nil
 	})
+	s.api("GET /api/v1/volumes", func(http.ResponseWriter, *http.Request) (any, error) { return volume.Disks(), nil })
 	s.api("GET /api/v1/apps", func(_ http.ResponseWriter, r *http.Request) (any, error) { return s.app.Apps(r.Context()) })
 	s.api("GET /api/v1/volume", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.Volume() })
 	s.api("GET /api/v1/tree", s.tree)
