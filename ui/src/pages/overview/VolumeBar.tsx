@@ -49,7 +49,7 @@ export function VolumeBar({ volume, apps, reclaimable }: { volume: Breakdown; ap
             <div
               key={s.key}
               className={`vseg ${s.key}`}
-              style={{ flexGrow: s.bytes / total, background: s.color }}
+              style={{ flex: `${s.bytes / total} 1 0`, background: s.color }}
               data-term={`segment.${s.key}`}
               data-value={`${bytes(s.bytes)} · ${percent(s.bytes / total)}`}
             >

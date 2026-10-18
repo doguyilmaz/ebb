@@ -42,7 +42,7 @@ export default function Apps() {
         </p>
       )}
       {list.length > 0 ? (
-        <ul className="apps card" data-tour="apps">
+        <ul className="app-list card" data-tour="apps">
           {list.map((a) => (
             <Row key={a.path} app={a} scale={scale} />
           ))}

@@ -205,9 +205,9 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .vbar { display: flex; gap: 2px; height: 76px; border-radius: 12px; overflow: hidden; }
 .vbar.enter { animation: reveal 900ms var(--ease-out) both; }
 @keyframes reveal { from { clip-path: inset(0 100% 0 0 round 12px); } to { clip-path: inset(0 0 0 0 round 12px); } }
-.vseg { position: relative; min-width: 3px; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 10px 9px; overflow: hidden; cursor: help; transition: filter 150ms ease; }
+.vseg { position: relative; min-width: 3px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: help; transition: filter 150ms ease; }
 .vseg:hover { filter: brightness(1.06) saturate(1.05); }
-.vseg-label { font-size: 12px; line-height: 1.25; white-space: nowrap; }
+.vseg-label { padding: 0 10px 9px; font-size: 12px; line-height: 1.25; white-space: nowrap; }
 .vseg-label b { display: block; font-weight: 600; font-size: 13px; }
 .vseg.hidden { background: repeating-linear-gradient(135deg, var(--other) 0 6px, color-mix(in srgb, var(--other) 40%, transparent) 6px 12px) !important; }
 .vseg.free { background: linear-gradient(180deg, color-mix(in srgb, var(--tide) 26%, var(--surface)) 0 22%, color-mix(in srgb, var(--tide) 12%, var(--surface)) 22%) !important; }
@@ -514,7 +514,7 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .apps-sum .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .key.app, .app-bar .app { background: var(--text); }
 .key.lib, .app-bar .lib { background: var(--tide); }
-.apps { list-style: none; margin: 0; padding: 0; }
+.app-list { list-style: none; margin: 0; padding: 0; }
 .app-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 16px 8px 8px; }
 .app-row + .app-row { border-top: 1px solid var(--line); }
 .app-main { display: grid; grid-template-columns: 16px 30px minmax(140px, 1.1fr) minmax(80px, 2fr) 84px; align-items: center; gap: 10px; min-width: 0; padding: 4px 6px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 150ms ease; }
