@@ -19,11 +19,23 @@ builds:
 
 universal_binaries:
   - replace: true
-    hooks:
-      # Ad-hoc signature over both slices (an unsigned arm64 binary does not
-      # run), with the hardened runtime: the binary may hold Full Disk Access,
-      # so it must not load libraries injected through DYLD_* variables.
-      post: codesign --force --sign - --options runtime {{ .Path }}
+
+# Developer ID signature with the hardened runtime, then notarization, so
+# Gatekeeper opens it without a prompt. Releases fail without the secrets;
+# snapshots skip it.
+notarize:
+  macos:
+    - enabled: "{{ not .IsSnapshot }}"
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        # The cask points at the archive right away; Gatekeeper must find the ticket.
+        wait: true
+        timeout: 20m
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_universal"
@@ -37,19 +49,22 @@ changelog:
   filters:
     exclude: ["^docs", "^test"]
 
-brews:
-  - repository:
+homebrew_casks:
+  - name: ebb
+    binaries: [ebb]
+    repository:
       owner: doguyilmaz
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    commit_msg_template: "ebb {{ .Tag }}"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_msg_template: "{{ .ProjectName }} {{ .Tag }}"
     homepage: https://github.com/doguyilmaz/ebb
     description: See where your Mac's disk space went and win it back safely
     license: MIT
-    install: |
-      bin.install "ebb"
-    test: |
-      system "#{bin}/ebb", "version"
+    # The background service runs this binary; it must stop with it.
+    uninstall:
+      launchctl: [com.doguyilmaz.ebb]
+    zap:
+      trash: ["~/.config/ebb", "~/.local/state/ebb"]
 
 release:
   github:
