@@ -1,7 +1,7 @@
 import type { Plan, PlanResult } from "#/api/types.gen.ts";
 
 export interface SheetState {
-  phase: "planning" | "review" | "running" | "done";
+  phase: "planning" | "review" | "running" | "done" | "approved";
   plan: Plan | null;
   confirmed: boolean;
   result: PlanResult | null;
@@ -13,6 +13,7 @@ export type SheetAction =
   | { type: "confirm"; value: boolean }
   | { type: "run" }
   | { type: "done"; result: PlanResult }
+  | { type: "approved" }
   | { type: "error"; message: string };
 
 export const initial: SheetState = { phase: "planning", plan: null, confirmed: false, result: null, error: null };
@@ -27,6 +28,8 @@ export function reduce(s: SheetState, a: SheetAction): SheetState {
       return { ...s, phase: "running", error: null };
     case "done":
       return { ...s, phase: "done", result: a.result };
+    case "approved":
+      return { ...s, phase: "approved", error: null };
     case "error":
       return { ...s, phase: s.plan ? "review" : "planning", error: a.message };
   }

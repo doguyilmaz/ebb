@@ -29,7 +29,7 @@ func runOverview(g *globals, cmd *cobra.Command) error {
 		rep.Findings = rep.Findings[:10]
 	}
 	rep.Breakdown = rep.Breakdown[:1]
-	if err := report.WriteText(cmd.OutOrStdout(), rep, 100); err != nil {
+	if err := report.WriteText(cmd.OutOrStdout(), rep, report.Width); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(cmd.OutOrStdout(), "\nMore: ebb serve --open (visual explorer) · ebb findings · ebb report --format html -o ebb.html")

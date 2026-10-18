@@ -1,13 +1,14 @@
 package cli
 
 import (
-	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"slices"
 
 	"github.com/spf13/cobra"
 
+	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/remote"
 	"github.com/doguyilmaz/ebb/internal/sys"
@@ -19,17 +20,29 @@ func cleanPath(p string) string { return filepath.Clean(p) }
 func newApproveCmd(g *globals) *cobra.Command {
 	return &cobra.Command{
 		Use:   "approve <plan>",
-		Short: "Approve a plan an AI agent made through the running ebb",
+		Short: "Review and approve a plan an AI agent made through the running ebb",
+		Long:  "Shows every item of the plan as ebb sees it now and asks at the terminal. The agent runs it afterwards.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := remote.Discover(sys.Real())
 			if err != nil {
 				return err
 			}
-			if err := c.Do(context.Background(), "POST", "/plans/"+args[0]+"/approve", nil, nil); err != nil {
+			var p clean.Plan
+			if err := c.Do(cmd.Context(), "GET", "/plans/"+url.PathEscape(args[0]), nil, &p); err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "approved %s\n", args[0])
+			// What gets approved is the plan as ebb holds it, never an agent's account of it.
+			if printPlan(cmd.OutOrStdout(), &p) == 0 {
+				return fmt.Errorf("nothing in this plan can be done (see the reasons above)")
+			}
+			if !confirm(cmd.InOrStdin(), cmd.ErrOrStderr()) {
+				return fmt.Errorf("not approved")
+			}
+			if err := c.Do(cmd.Context(), "POST", "/plans/"+url.PathEscape(args[0])+"/approve", nil, nil); err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Approved %s. The agent can run it now.\n", args[0])
 			return err
 		},
 	}

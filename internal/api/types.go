@@ -199,6 +199,11 @@ type Settings struct {
 	LowSpaceGB      int      `json:"lowSpaceGb"`
 }
 
+// PendingPlans wait for the person's approval: made by an agent or the CLI.
+type PendingPlans struct {
+	Plans []Plan `json:"plans"`
+}
+
 type AppsResponse struct {
 	Apps []apps.App `json:"apps"`
 	Note string     `json:"note,omitempty"`
@@ -280,12 +285,13 @@ const (
 	EventPlanProgress    = "plan.progress"
 	EventPlanDone        = "plan.done"
 	EventHistoryChanged  = "history.changed"
+	EventPlansChanged    = "plans.changed" // a plan waits for approval, or no longer does
 )
 
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
-	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
+	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PendingPlans{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 
@@ -299,4 +305,4 @@ var Names = map[reflect.Type]string{
 	reflect.TypeFor[clean.Op]():      "Op",
 }
 
-var Events = []string{EventHello, EventScanProgress, EventScanDone, EventFindingsChanged, EventPlanProgress, EventPlanDone, EventHistoryChanged}
+var Events = []string{EventHello, EventScanProgress, EventScanDone, EventFindingsChanged, EventPlanProgress, EventPlanDone, EventHistoryChanged, EventPlansChanged}

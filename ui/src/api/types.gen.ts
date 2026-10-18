@@ -244,6 +244,33 @@ export interface AppsResponse {
   note?: string;
 }
 
+export interface PlanItem {
+  path: string;
+  title?: string;
+  bytes: number;
+  safety: string;
+  action: Action;
+  command?: string[] | null;
+  findingId?: string;
+  warnings?: string[] | null;
+  blocked?: string;
+}
+
+export interface Plan {
+  id: string;
+  created: string;
+  expires: string;
+  source: string;
+  items: PlanItem[] | null;
+  bytes: number;
+  needsApproval: boolean;
+  approved: boolean;
+}
+
+export interface PendingPlans {
+  plans: Plan[] | null;
+}
+
 export interface PresetView {
   id: string;
   title: string;
@@ -332,29 +359,6 @@ export interface PlanRequest {
   source?: string;
 }
 
-export interface PlanItem {
-  path: string;
-  title?: string;
-  bytes: number;
-  safety: string;
-  action: Action;
-  command?: string[] | null;
-  findingId?: string;
-  warnings?: string[] | null;
-  blocked?: string;
-}
-
-export interface Plan {
-  id: string;
-  created: string;
-  expires: string;
-  source: string;
-  items: PlanItem[] | null;
-  bytes: number;
-  needsApproval: boolean;
-  approved: boolean;
-}
-
 export interface PlanEvent {
   item: number;
   path: string;
@@ -398,5 +402,5 @@ export interface OpsResponse {
   ops: Op[] | null;
 }
 
-export const EVENTS = ["hello", "scan.progress", "scan.done", "findings.changed", "plan.progress", "plan.done", "history.changed"] as const;
+export const EVENTS = ["hello", "scan.progress", "scan.done", "findings.changed", "plan.progress", "plan.done", "history.changed", "plans.changed"] as const;
 export type EventName = (typeof EVENTS)[number];

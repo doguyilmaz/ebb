@@ -10,6 +10,7 @@ import type {
   FindingsResponse,
   HistoryResponse,
   OpsResponse,
+  PendingPlans,
   Plan,
   PlanRequest,
   PlanResult,
@@ -67,6 +68,8 @@ export const useSearch = (term: string) =>
 export const usePresets = () => useQuery({ queryKey: ["presets"], queryFn: () => api.get<PresetView[]>("/presets") });
 export const useOps = () => useQuery({ queryKey: ["ops"], queryFn: () => api.get<OpsResponse>("/ops?limit=500") });
 export const useSettings = () => useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
+/** Plans an assistant or the CLI made that wait for the person here. */
+export const usePendingPlans = () => useQuery({ queryKey: ["plans", "pending"], queryFn: () => api.get<PendingPlans>("/plans"), refetchInterval: 30_000 });
 export const useApps = () => useQuery({ queryKey: ["apps"], queryFn: () => api.get<AppsResponse>("/apps"), retry: false });
 export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web"), retry: false });
 export const useDaemon = () => useQuery({ queryKey: ["daemon"], queryFn: () => api.get<Daemon>("/daemon"), refetchInterval: 15_000 });

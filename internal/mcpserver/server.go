@@ -6,10 +6,12 @@ package mcpserver
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
-	"strings"
+	"sync"
 )
 
 const protocolVersion = "2025-06-18"
@@ -17,7 +19,8 @@ const protocolVersion = "2025-06-18"
 const instructions = "ebb explains what takes space on this Mac and cleans it safely. Start with ebb_overview, " +
 	"then ebb_findings or ebb_explain for a path. To clean, always make a plan with ebb_cleanup_plan and show it to " +
 	"the person before ebb_cleanup_execute. Plans with anything beyond rebuildable caches need the person's approval " +
-	"(ebb approve <id> or ebb's window); never try to work around that, and never remove the person's own files " +
+	"(ebb's window shows them the plan, or they run ebb approve <id>); never try to work around that, never approve or " +
+	"confirm on their behalf, and never remove the person's own files " +
 	"without their explicit consent."
 
 type request struct {
@@ -51,30 +54,103 @@ func New(b Backend, version string) *Server {
 	return s
 }
 
-// Serve speaks newline-delimited JSON-RPC on r/w until r closes.
+const maxLine = 16 << 20
+
+var errTooLong = errors.New("request too large")
+
+// Serve speaks newline-delimited JSON-RPC on r/w until r closes, then lets
+// calls in flight finish. Tool calls run side by side, each stopped by
+// notifications/cancelled or ctx; everything else is answered in order.
 func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 1<<20), 16<<20)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	var mu sync.Mutex
 	enc := json.NewEncoder(w)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
-			continue
-		}
-		var req request
-		if err := json.Unmarshal([]byte(line), &req); err != nil {
-			if err := enc.Encode(response{JSONRPC: "2.0", Error: &rpcError{-32700, "parse error"}}); err != nil {
+	send := func(res *response) error {
+		mu.Lock()
+		defer mu.Unlock()
+		return enc.Encode(res)
+	}
+	calls := map[string]context.CancelFunc{}
+	var cmu sync.Mutex
+	br := bufio.NewReaderSize(r, 64<<10)
+	for {
+		line, err := readLine(br)
+		if errors.Is(err, errTooLong) {
+			if err := send(&response{JSONRPC: "2.0", ID: null, Error: &rpcError{-32600, err.Error()}}); err != nil {
 				return err
 			}
 			continue
 		}
-		if res := s.handle(ctx, req); res != nil {
-			if err := enc.Encode(res); err != nil {
-				return err
+		if len(bytes.TrimSpace(line)) > 0 {
+			var req request
+			if jerr := json.Unmarshal(line, &req); jerr != nil {
+				if err := send(&response{JSONRPC: "2.0", ID: null, Error: &rpcError{-32700, "parse error"}}); err != nil {
+					return err
+				}
+			} else if req.Method == "notifications/cancelled" {
+				var p struct {
+					RequestID json.RawMessage `json:"requestId"`
+				}
+				_ = json.Unmarshal(req.Params, &p)
+				cmu.Lock()
+				if stop, ok := calls[string(p.RequestID)]; ok {
+					stop()
+				}
+				cmu.Unlock()
+			} else if req.Method == "tools/call" && req.ID != nil {
+				cctx, stop := context.WithCancel(ctx)
+				key := string(req.ID)
+				cmu.Lock()
+				calls[key] = stop
+				cmu.Unlock()
+				wg.Go(func() {
+					res := s.handle(cctx, req)
+					cmu.Lock()
+					delete(calls, key)
+					cmu.Unlock()
+					// A cancelled request gets no answer.
+					if cctx.Err() == nil {
+						_ = send(res)
+					}
+					stop()
+				})
+			} else if res := s.handle(ctx, req); res != nil {
+				if err := send(res); err != nil {
+					return err
+				}
 			}
+		}
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
 		}
 	}
-	return sc.Err()
+}
+
+var null = json.RawMessage("null")
+
+// readLine reads one line; a longer one than maxLine is skipped to its end.
+func readLine(br *bufio.Reader) ([]byte, error) {
+	var line []byte
+	for {
+		chunk, err := br.ReadSlice('\n')
+		if len(line)+len(chunk) > maxLine {
+			for errors.Is(err, bufio.ErrBufferFull) {
+				_, err = br.ReadSlice('\n')
+			}
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+			return nil, errTooLong
+		}
+		line = append(line, chunk...)
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			return line, err
+		}
+	}
 }
 
 // handle answers one request; nil for notifications.
@@ -84,7 +160,7 @@ func (s *Server) handle(ctx context.Context, req request) *response {
 	case "initialize":
 		res.Result = map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{"tools": map[string]any{}},
 			"serverInfo": map[string]any{"name": "ebb", "version": s.version}, "instructions": instructions}
-	case "notifications/initialized", "notifications/cancelled":
+	case "notifications/initialized":
 		return nil
 	case "ping":
 		res.Result = map[string]any{}

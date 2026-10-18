@@ -1,10 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Activity, AppWindow, ChartLine, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
+import { Activity, AppWindow, Bot, ChartLine, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
-import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
+import { usePendingPlans, useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { usePalette } from "#/lib/palette.ts";
+import { useSheet } from "#/lib/sheet.ts";
 import { SelectionTray } from "./SelectionTray.tsx";
 import { tourSeen, useTour } from "./tour.ts";
 
@@ -58,10 +59,30 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="main">
         <TopBar title={nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)))?.label ?? ""} />
         <div className="content" ref={content}>
+          <Pending />
           <div className={wide ? "page wide" : "page"}>{children}</div>
         </div>
         <SelectionTray />
       </div>
+    </div>
+  );
+}
+
+/** A plan an assistant or the terminal made waits for the person: the window is where they see it. */
+function Pending() {
+  const pending = usePendingPlans();
+  const open = useSheet((s) => s.open);
+  const plan = pending.data?.plans?.[0];
+  if (!plan) return null;
+  const items = (plan.items ?? []).filter((i) => !i.blocked && i.action.kind !== "manual").length;
+  const who = plan.source === "mcp" ? "An assistant" : "The terminal";
+  return (
+    <div className="pending" role="status">
+      <Bot size={16} aria-hidden />
+      <span>
+        {who} asks to clean {items} {items === 1 ? "item" : "items"}, about <strong>{bytes(plan.bytes)}</strong>. Nothing happens until you approve it.
+      </span>
+      <button className="btn small primary" onClick={() => open({ planId: plan.id })}>Review</button>
     </div>
   );
 }

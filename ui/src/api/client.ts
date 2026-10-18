@@ -171,8 +171,6 @@ export const api = {
   del: <T>(path: string) => call<T>("DELETE", path),
 };
 
-/** URL for a download (report export) that carries the token. */
-
 /** Listens to ebb's server-sent events. */
 export function subscribe(on: (name: string, data: unknown) => void, names: readonly string[]): () => void {
   const es = new EventSource(`${apiBase()}/api/v1/events?token=${tok}`);

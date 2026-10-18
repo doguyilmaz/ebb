@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/finding"
@@ -16,7 +17,12 @@ func (a *App) Notes() map[string]string {
 }
 
 // SetNote stores a note; empty text removes it.
+var ErrBadNote = errors.New("a note needs a key and at most 4000 characters")
+
 func (a *App) SetNote(key, text string) error {
+	if key == "" || len(text) > 4000 {
+		return ErrBadNote
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	m := a.Notes()

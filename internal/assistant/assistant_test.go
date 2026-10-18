@@ -33,7 +33,8 @@ func TestInstallPrefersLockstep(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err != nil {
 		t.Fatal("lockstep installs the skill from ebb's own copy")
 	}
-	want := []string{"lockstep skill add " + dir, "lockstep mcp add ebb -- /usr/local/bin/ebb mcp"}
+	// An earlier registration may point at an old path: it goes first.
+	want := []string{"lockstep skill add " + dir, "lockstep mcp rm ebb", "lockstep mcp add ebb -- /usr/local/bin/ebb mcp"}
 	if strings.Join(*ran, "|") != strings.Join(want, "|") {
 		t.Fatalf("ran %q", *ran)
 	}
@@ -56,7 +57,7 @@ func TestInstallFallsBackToClaude(t *testing.T) {
 			t.Fatalf("%s: %v", p, err)
 		}
 	}
-	if strings.Join(*ran, "|") != "claude mcp add --scope user ebb -- /opt/ebb mcp" {
+	if strings.Join(*ran, "|") != "claude mcp remove --scope user ebb|claude mcp add --scope user ebb -- /opt/ebb mcp" {
 		t.Fatalf("ran %q", *ran)
 	}
 }

@@ -11,12 +11,18 @@ import (
 
 func (s *Server) cleanRoutes() {
 	s.api("POST /api/v1/plans", s.makePlan)
+	s.api("GET /api/v1/plans", func(http.ResponseWriter, *http.Request) (any, error) {
+		return api.PendingPlans{Plans: s.app.Pending()}, nil
+	})
 	s.api("GET /api/v1/plans/{id}", func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		p, err := s.app.GetPlan(r.PathValue("id"))
 		return p, planError(err)
 	})
 	s.api("POST /api/v1/plans/{id}/approve", func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		p, err := s.app.Approve(r.PathValue("id"))
+		if err == nil && p.Source != "ui" {
+			s.Notify(api.EventPlansChanged, nil)
+		}
 		return p, planError(err)
 	})
 	s.api("POST /api/v1/plans/{id}/execute", s.execute)
@@ -38,10 +44,13 @@ func (s *Server) cleanRoutes() {
 		if err := decode(r, &req); err != nil {
 			return nil, err
 		}
-		if req.Key == "" || len(req.Text) > 4000 {
-			return nil, badRequest("a note needs a key and at most 4000 characters")
+		if err := s.app.SetNote(req.Key, req.Text); err != nil {
+			if errors.Is(err, app.ErrBadNote) {
+				return nil, badRequest(err.Error())
+			}
+			return nil, err
 		}
-		return s.app.Notes(), s.app.SetNote(req.Key, req.Text)
+		return s.app.Notes(), nil
 	})
 	s.api("GET /api/v1/ignores", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.Ignores(), nil })
 	s.api("POST /api/v1/ignores", func(_ http.ResponseWriter, r *http.Request) (any, error) {
@@ -90,6 +99,9 @@ func (s *Server) makePlan(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if err != nil && !errors.Is(err, app.ErrNeverScanned) {
 		return nil, badRequest(err.Error())
 	}
+	if err == nil && p.NeedsApproval && p.Source != "ui" {
+		s.Notify(api.EventPlansChanged, nil)
+	}
 	return p, err
 }
 
@@ -102,5 +114,6 @@ func (s *Server) execute(_ http.ResponseWriter, r *http.Request) (any, error) {
 	}
 	s.Notify(api.EventPlanDone, res)
 	s.Notify(api.EventFindingsChanged, nil)
+	s.Notify(api.EventPlansChanged, nil)
 	return res, planError(err)
 }

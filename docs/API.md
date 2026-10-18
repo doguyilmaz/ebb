@@ -35,8 +35,9 @@ callers must be on the allowed origins list and paired (see Pairing).
 | POST | `/daemon/install\|restart\|uninstall` | — | `Daemon` (202 when the server answering is the service itself; it acts right after) | 400, 409 `unsupported` |
 | GET | `/presets` | — | `PresetView[]` | — |
 | POST | `/plans` | `PlanRequest {findingIds?, paths?, preset?, app?, source?}` (`app`: name or bundle ID to uninstall; Apple's apps are refused) | `Plan` | 400, 409 `never-scanned` |
+| GET | `/plans` | — | `PendingPlans {plans}` (made by an agent or the CLI, waiting for the person's approval, oldest first) | — |
 | GET | `/plans/{id}` | — | `Plan` | 404 `no-plan` |
-| POST | `/plans/{id}/approve` | — | `Plan` | 404 `no-plan` |
+| POST | `/plans/{id}/approve` | — | `Plan` (approval only; whoever made the plan runs it) | 404 `no-plan` |
 | POST | `/plans/{id}/execute` | — | `PlanResult` (events `plan.progress` per item, `plan.done`) | 404, 409 `needs-approval`, 409 `scan-running`, 409 `cleaning`, 410 `plan-expired` |
 | GET | `/ops?limit` | — | `OpsResponse` | — |
 | POST | `/ops/{id}/undo` | — | 204 | 400 |
@@ -64,7 +65,8 @@ inside the scanned root.
 ## Events
 
 `event: <name>` with JSON `data`: `hello`, `scan.progress` (`Progress`), `scan.done` (`Meta`), `findings.changed`,
-`plan.progress`, `plan.done`, `history.changed`. A `: ping` comment is sent every 25 s.
+`plan.progress`, `plan.done`, `history.changed`, `plans.changed` (a plan from an agent or the CLI waits for approval,
+or no longer does). A `: ping` comment is sent every 25 s.
 
 ## Pairing (hosted web app)
 

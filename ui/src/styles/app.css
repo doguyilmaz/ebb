@@ -436,6 +436,9 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .ops li { display: grid; grid-template-columns: 110px 180px 90px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 16px; }
 .ops li + li { border-top: 1px solid var(--line); }
 
+.pending { display: flex; align-items: center; gap: 10px; margin: 16px auto 0; max-width: 1144px; width: calc(100% - 56px); padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: var(--r-3); background: var(--surface); box-shadow: var(--shadow-1); animation: fade 200ms ease-out; }
+.pending > span { flex: 1; min-width: 0; }
+
 /* ---------- apps ---------- */
 .apps-sum { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; }
 .apps-sum .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }

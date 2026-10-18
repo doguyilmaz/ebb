@@ -25,6 +25,9 @@ export function listen(qc: QueryClient): () => void {
       case "plan.progress":
         live.addPlanEvent(data as PlanEvent);
         break;
+      case "plans.changed":
+        qc.invalidateQueries({ queryKey: ["plans"] });
+        break;
     }
   }, EVENTS);
 }

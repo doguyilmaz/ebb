@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -41,7 +40,8 @@ func Live(env sys.Env) (Status, bool) {
 	if err := state.LoadJSON(statusPath(env), &s); err != nil || s.PID <= 0 {
 		return s, false
 	}
-	if err := syscall.Kill(s.PID, 0); err != nil && !errors.Is(err, syscall.EPERM) {
+	// Another user's process (EPERM) is not this ebb: the token must never go to it.
+	if err := syscall.Kill(s.PID, 0); err != nil {
 		return s, false
 	}
 	return s, sameProgram(s.PID)

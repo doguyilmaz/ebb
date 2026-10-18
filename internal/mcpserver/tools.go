@@ -155,12 +155,12 @@ func (s *Server) define() []tool {
 				}
 				return b.Plan(ctx, req)
 			}},
-		{Name: "ebb_cleanup_execute", Description: "Run a plan. Plans of only rebuildable caches run directly; any other plan needs the person's approval first (ebb approve <id> or ebb's window) and this returns an error until then. Every item is checked again before it is touched.",
+		{Name: "ebb_cleanup_execute", Description: "Run a plan. Plans of only rebuildable caches run directly; any other plan needs the person's approval first (ebb's window shows it to them, or they run ebb approve <id>) and this returns an error until then. Every item is checked again before it is touched.",
 			InputSchema: obj(map[string]any{"planId": str("id from ebb_cleanup_plan")}, "planId"),
 			run: func(ctx context.Context, args map[string]any) (any, error) {
 				return b.Execute(ctx, getS(args, "planId"))
 			}},
-		{Name: "ebb_undo", Description: "Put back something a cleanup moved to the Trash, by operation id from the plan result.",
+		{Name: "ebb_undo", Description: "Put back something a cleanup moved to the Trash, by operation id (ops[].id in the ebb_cleanup_execute result).",
 			InputSchema: obj(map[string]any{"opId": str("operation id")}, "opId"),
 			run: func(ctx context.Context, args map[string]any) (any, error) {
 				if err := b.Undo(ctx, getS(args, "opId")); err != nil {

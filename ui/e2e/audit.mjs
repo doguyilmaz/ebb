@@ -202,6 +202,25 @@ await scenario("apps list their Library data and uninstall to the Trash", async 
   check((await page.locator(".app-row", { hasText: "Sketchpad" }).count()) === 0, "gone from the list");
 });
 
+await scenario("an assistant's plan waits in the window and is only approved there", async () => {
+  const doc = join(HOME, "Documents", "thesis.pdf");
+  const made = await api("/plans", "POST", { paths: [doc], source: "mcp" });
+  check(made.status === 200 && made.body.needsApproval, "agent plan needs approval");
+  const banner = page.locator(".pending");
+  await banner.waitFor({ timeout: 6000 });
+  await banner.getByRole("button", { name: "Review" }).click();
+  const sheet = page.locator("dialog.sheet[open]");
+  await sheet.getByText("An assistant asks to clean").waitFor({ timeout: 4000 });
+  check(await sheet.getByRole("button", { name: "Approve" }).isDisabled(), "approve waits for the box");
+  await sheet.locator(".confirm input").check();
+  await sheet.getByRole("button", { name: "Approve" }).click();
+  await sheet.getByText("Nothing has been touched yet").waitFor({ timeout: 4000 });
+  check(existsSync(doc), "approving touches nothing");
+  check((await api(`/plans/${made.body.id}`)).body.approved === true, "plan approved");
+  await sheet.getByRole("button", { name: "Close" }).last().click();
+  await banner.waitFor({ state: "detached", timeout: 6000 });
+});
+
 await scenario("settings add and remove a protected folder", async () => {
   await nav("Settings");
   await page.locator(".suggest").getByRole("button", { name: "Documents" }).click();

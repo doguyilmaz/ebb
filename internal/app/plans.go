@@ -65,7 +65,24 @@ func (a *App) GetPlan(id string) (*clean.Plan, error) {
 	if !ok {
 		return nil, ErrNoPlan
 	}
-	return e.plan, nil
+	p := *e.plan
+	return &p, nil
+}
+
+// Pending lists plans made elsewhere (an agent, the CLI) that wait for the
+// person's approval, oldest first.
+func (a *App) Pending() []clean.Plan {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.Env.Now()
+	out := []clean.Plan{}
+	for _, e := range a.plans {
+		if p := *e.plan; p.NeedsApproval && !p.Approved && !e.ran && p.Source != "ui" && now.Before(p.Expires) {
+			out = append(out, p)
+		}
+	}
+	slices.SortFunc(out, func(x, y clean.Plan) int { return x.Created.Compare(y.Created) })
+	return out
 }
 
 // Approve records the person's yes for a plan made elsewhere (the MCP server).
@@ -77,7 +94,8 @@ func (a *App) Approve(id string) (*clean.Plan, error) {
 		return nil, ErrNoPlan
 	}
 	e.plan.Approved = true
-	return e.plan, nil
+	p := *e.plan
+	return &p, nil
 }
 
 // Execute runs a plan once, then updates the saved scan so every view shows

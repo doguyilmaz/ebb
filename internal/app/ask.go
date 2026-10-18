@@ -64,18 +64,19 @@ func (a *App) Ask(ctx context.Context, req api.AskRequest) (api.AskResponse, err
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	out, err := a.Env.Run(ctx, dir, claude, append(slices.Clone(askArgs), prompt)...)
-	if err != nil {
-		return api.AskResponse{}, fmt.Errorf("claude did not answer: %w", err)
-	}
+	out, runErr := a.Env.Run(ctx, dir, claude, append(slices.Clone(askArgs), prompt)...)
 	var res struct {
 		Result  string `json:"result"`
 		IsError bool   `json:"is_error"`
 	}
+	// claude explains its own failures (not signed in, no credit) in the result, whatever its exit code.
 	if err := json.Unmarshal(out, &res); err != nil || res.Result == "" {
+		if runErr != nil {
+			return api.AskResponse{}, fmt.Errorf("claude did not answer: %w", runErr)
+		}
 		return api.AskResponse{}, errors.New("claude gave no answer")
 	}
-	if res.IsError {
+	if res.IsError || runErr != nil {
 		return api.AskResponse{}, errors.New(res.Result)
 	}
 	return api.AskResponse{Answer: res.Result}, nil

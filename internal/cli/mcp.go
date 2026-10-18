@@ -19,10 +19,7 @@ func newMCPCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			b := mcpserver.Local(a, Version)
-			if c, err := remote.Discover(a.Env); err == nil {
-				b = mcpserver.Remote(c)
-			}
+			b := mcpserver.Auto(mcpserver.Local(a, Version), func() (*remote.Client, error) { return remote.Discover(a.Env) })
 			return mcpserver.New(b, Version).Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout())
 		},
 	}

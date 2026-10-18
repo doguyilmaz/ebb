@@ -24,6 +24,14 @@ describe("cleanup sheet state", () => {
   test("regenerable-only plans run without the box", () => {
     expect(canRun(reduce(initial, { type: "planned", plan: plan() }))).toBe(true);
   });
+  test("a plan an assistant made is only approved here, after the box", () => {
+    let s = reduce(initial, { type: "planned", plan: plan({ needsApproval: true, source: "mcp" }) });
+    expect(canRun(s)).toBe(false);
+    s = reduce(reduce(s, { type: "confirm", value: true }), { type: "run" });
+    s = reduce(s, { type: "approved" });
+    expect(s.phase).toBe("approved");
+    expect(s.result).toBeNull();
+  });
   test("summary counts what will happen", () => {
     expect(summary(plan())).toEqual({ runnable: 2, blocked: 1, manual: 1, trash: 1, bytes: 3e9 });
   });

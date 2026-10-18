@@ -1,7 +1,6 @@
 package svc
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -34,12 +33,8 @@ func (s Service) Read() api.Daemon {
 	return st
 }
 
-// alive asks whether the process exists; not being allowed to signal it
-// answers that too.
-func alive(pid int) bool {
-	err := syscall.Kill(pid, 0)
-	return err == nil || errors.Is(err, syscall.EPERM)
-}
+// alive asks whether the process exists and is this user's: the service never runs as anyone else.
+func alive(pid int) bool { return syscall.Kill(pid, 0) == nil }
 
 // TrimLog empties the service log once it is past max: launchd only ever
 // appends to it.

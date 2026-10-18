@@ -2,9 +2,10 @@ import { Ban, Hand, Loader2, Terminal, Trash2, Undo2, X } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 import { api } from "#/api/client.ts";
 import { useRefreshResults, useUndo } from "#/api/hooks.ts";
-import type { Plan, PlanItem, PlanRequest, PlanResult } from "#/api/types.gen.ts";
+import type { Plan, PlanItem, PlanResult } from "#/api/types.gen.ts";
 import { bytes } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
+import type { SheetRequest } from "#/lib/sheet.ts";
 import { Safety } from "#/ui/Safety.tsx";
 import { canRun, initial, reduce, summary } from "./cleanup.ts";
 
@@ -26,8 +27,13 @@ const actionLabel = (it: PlanItem) => {
 const ActionIcon = ({ it }: { it: PlanItem }) =>
   it.blocked ? <Ban size={14} aria-hidden /> : it.action.kind === "manual" ? <Hand size={14} aria-hidden /> : it.action.kind === "command" ? <Terminal size={14} aria-hidden /> : <Trash2 size={14} aria-hidden />;
 
-/** Shows exactly what a cleanup will do, asks, runs it and reports what happened. */
-export function CleanupSheet({ request, onClose, onDone }: { request: PlanRequest; onClose: () => void; onDone?: () => void }) {
+const askers: Record<string, string> = { mcp: "An assistant", cli: "The terminal" };
+
+/**
+ * Shows exactly what a cleanup will do, asks, runs it and reports what
+ * happened. A plan made elsewhere is only approved here: whoever asked runs it.
+ */
+export function CleanupSheet({ request, onClose, onDone }: { request: SheetRequest; onClose: () => void; onDone?: () => void }) {
   const [s, dispatch] = useReducer(reduce, initial);
   const dialog = useRef<HTMLDialogElement>(null);
   const events = useLive((l) => l.planEvents);
@@ -35,11 +41,11 @@ export function CleanupSheet({ request, onClose, onDone }: { request: PlanReques
   const refresh = useRefreshResults();
   const undo = useUndo();
 
+  const external = "planId" in request;
   useEffect(() => {
     dialog.current?.showModal();
     resetPlan();
-    api
-      .post<Plan>("/plans", { ...request, source: "ui" })
+    ("planId" in request ? api.get<Plan>(`/plans/${request.planId}`) : api.post<Plan>("/plans", { ...request, source: "ui" }))
       .then((plan) => dispatch({ type: "planned", plan }))
       .catch((e) => dispatch({ type: "error", message: e.message }));
   }, []);
@@ -49,6 +55,10 @@ export function CleanupSheet({ request, onClose, onDone }: { request: PlanReques
     dispatch({ type: "run" });
     try {
       await api.post(`/plans/${s.plan.id}/approve`);
+      if (external) {
+        dispatch({ type: "approved" });
+        return;
+      }
       const result = await api.post<PlanResult>(`/plans/${s.plan.id}/execute`);
       dispatch({ type: "done", result });
       refresh();
@@ -63,7 +73,9 @@ export function CleanupSheet({ request, onClose, onDone }: { request: PlanReques
   return (
     <dialog ref={dialog} className="sheet" onClose={onClose} aria-labelledby="sheet-title">
       <header className="sheet-head">
-        <h1 id="sheet-title">{s.phase === "done" ? "Cleanup finished" : "Review the cleanup"}</h1>
+        <h1 id="sheet-title">
+          {s.phase === "done" ? "Cleanup finished" : s.phase === "approved" ? "Approved" : external ? `${askers[s.plan?.source ?? ""] ?? "Something"} asks to clean` : "Review the cleanup"}
+        </h1>
         <button className="icon-btn" aria-label="Close" onClick={() => dialog.current?.close()}>
           <X size={18} />
         </button>
@@ -71,7 +83,10 @@ export function CleanupSheet({ request, onClose, onDone }: { request: PlanReques
       <div className="sheet-body">
         {s.phase === "planning" && !s.error && <p className="muted">Checking each item on disk…</p>}
         {s.error && <p className="error" role="alert">{s.error}</p>}
-        {s.plan && s.phase !== "done" && (
+        {s.phase === "approved" && (
+          <p className="result-line">Nothing has been touched yet. {askers[s.plan?.source ?? ""] ?? "Whoever asked"} can run it now; every item is checked again first.</p>
+        )}
+        {s.plan && s.phase !== "done" && s.phase !== "approved" && (
           <>
             <p className="muted">
               {sum!.runnable} {sum!.runnable === 1 ? "item" : "items"} will be cleaned, about <strong>{bytes(sum!.bytes)}</strong>.
@@ -139,13 +154,13 @@ export function CleanupSheet({ request, onClose, onDone }: { request: PlanReques
           </label>
         )}
         <div className="grow" />
-        {s.phase === "done" ? (
+        {s.phase === "done" || s.phase === "approved" ? (
           <button className="btn primary" onClick={() => dialog.current?.close()}>Close</button>
         ) : (
           <>
             <button className="btn" onClick={() => dialog.current?.close()}>Cancel</button>
             <button className="btn primary" disabled={!canRun(s)} onClick={run}>
-              {s.phase === "running" ? "Cleaning…" : `Clean ${sum ? bytes(sum.bytes) : ""}`}
+              {external ? (s.phase === "running" ? "Approving…" : "Approve") : s.phase === "running" ? "Cleaning…" : `Clean ${sum ? bytes(sum.bytes) : ""}`}
             </button>
           </>
         )}

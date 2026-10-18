@@ -171,12 +171,7 @@ func (s *Server) findings(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if last, err := s.app.Last(); err == nil {
-		out.Notes = report.Build(s.app.View(last), s.app.Links, s.version).Notes
-	}
-	if out.Notes == nil {
-		out.Notes = []string{}
-	}
+	out.Notes = report.Notes(s.app, s.version)
 	return out, nil
 }
 
@@ -206,7 +201,7 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) {
 	case "html":
 		_ = report.WriteHTML(w, rep, last.Tree)
 	case "text":
-		_ = report.WriteText(w, rep, 120)
+		_ = report.WriteText(w, rep, report.Width)
 	}
 }
 

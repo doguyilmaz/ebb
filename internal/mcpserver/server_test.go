@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -107,19 +109,26 @@ func itoa(n int) string { b, _ := json.Marshal(n); return string(b) }
 func TestServeToolsOverStdio(t *testing.T) {
 	a, home := sandbox(t)
 	s := New(Local(a, "test"), "test")
+	// Calls run side by side; a client waits for the scan before asking about it.
+	scanned := session(t, s, call(3, "ebb_scan", `{"root":"`+home+`"}`))
 	got := session(t, s,
 		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}`,
 		`{"jsonrpc":"2.0","method":"notifications/initialized"}`,
 		`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`,
-		call(3, "ebb_scan", `{"root":"`+home+`"}`),
+		`not json`,
 		call(4, "ebb_overview", `{}`),
 		call(5, "ebb_explain", `{"path":"`+filepath.Join(home, ".testcache", "pkgs")+`"}`),
 		call(6, "nope", `{}`),
 		`{"jsonrpc":"2.0","id":7,"method":"bogus/method"}`,
 		call(8, "ebb_cleanup_plan", `{}`),
 	)
-	if len(got) != 8 {
+	got[3] = scanned[3]
+	// Eight requests and the line that is not JSON, answered with id null.
+	if len(got) != 9 {
 		t.Fatalf("replies %d: a notification gets none, every request one", len(got))
+	}
+	if got[0].Error == nil {
+		t.Fatal("a line that is not JSON gets a parse error with id null")
 	}
 	if got[1].Result.Version != protocolVersion {
 		t.Fatalf("initialize %+v", got[1])
@@ -165,7 +174,7 @@ func TestExecuteNeedsApproval(t *testing.T) {
 
 	id := planID(t, s, "installers")
 	got := session(t, s, call(1, "ebb_cleanup_execute", `{"planId":"`+id+`"}`))
-	if !got[1].Result.IsError || !strings.Contains(got[1].Result.Content[0].Text, "needs approval") {
+	if !got[1].Result.IsError || !strings.Contains(got[1].Result.Content[0].Text, "approval") {
 		t.Fatalf("an installer plan must wait for the person: %+v", got[1])
 	}
 	if _, err := os.Stat(filepath.Join(home, "Downloads", "Setup.dmg")); err != nil {
@@ -186,3 +195,37 @@ func TestExecuteNeedsApproval(t *testing.T) {
 		t.Fatalf("cache still there: %v", err)
 	}
 }
+
+func TestCancelledCallGetsNoAnswerAndOthersGoOn(t *testing.T) {
+	a, home := sandbox(t)
+	s := New(Local(a, "test"), "test")
+	r, w := io.Pipe()
+	var out syncBuffer
+	done := make(chan error, 1)
+	go func() { done <- s.Serve(context.Background(), r, &out) }()
+	io.WriteString(w, call(1, "ebb_scan", `{"root":"`+home+`"}`)+"\n")
+	io.WriteString(w, `{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}}`+"\n")
+	io.WriteString(w, `{"jsonrpc":"2.0","id":2,"method":"ping"}`+"\n")
+	io.WriteString(w, strings.Repeat("x", maxLine+10)+"\n")
+	io.WriteString(w, `{"jsonrpc":"2.0","id":3,"method":"ping"}`+"\n")
+	w.Close()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, `"id":2`) || !strings.Contains(text, `"id":3`) || !strings.Contains(text, "request too large") {
+		t.Fatalf("pings answered and the long line refused, the session going on:\n%.400s", text)
+	}
+}
+
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+func (s *syncBuffer) String() string { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }

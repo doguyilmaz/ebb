@@ -37,7 +37,7 @@ func newReportCmd(g *globals) *cobra.Command {
 			}
 			switch format {
 			case "text":
-				return report.WriteText(w, rep, 100)
+				return report.WriteText(w, rep, report.Width)
 			case "json":
 				return report.WriteJSON(w, rep)
 			case "csv":

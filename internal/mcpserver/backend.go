@@ -44,6 +44,71 @@ func errNeedsApproval(id string) error {
 	return fmt.Errorf("needs approval: show the plan to the person, then they approve it with `ebb approve %s` or in ebb's window; call ebb_cleanup_execute again afterwards", id)
 }
 
+// errNoOneToApprove: a plan made in this process lives only here, where the
+// person cannot see or approve it.
+var errNoOneToApprove = errors.New("needs the person's approval, and no ebb is running to collect it: ask them to start ebb " +
+	"(`ebb serve --open`, or `ebb daemon install` to keep it running), then make the plan again; they approve it in ebb's window " +
+	"or with `ebb approve <id>`")
+
+type auto struct {
+	local    Backend
+	discover func() (*remote.Client, error)
+}
+
+// Auto uses the running ebb (ebb serve or the background service) whenever
+// one runs, looked up on every call, and the engine in this process
+// otherwise. So a plan is made where the person can see and approve it as
+// soon as ebb runs, even if it started after the agent.
+func Auto(local Backend, discover func() (*remote.Client, error)) Backend {
+	return &auto{local, discover}
+}
+
+func (a *auto) pick() Backend {
+	if c, err := a.discover(); err == nil {
+		return Remote(c)
+	}
+	return a.local
+}
+
+func (a *auto) Status(ctx context.Context) (api.Status, error) { return a.pick().Status(ctx) }
+func (a *auto) Scan(ctx context.Context, req api.ScanRequest, wait bool) (api.Status, error) {
+	return a.pick().Scan(ctx, req, wait)
+}
+func (a *auto) Volume(ctx context.Context) (volume.Breakdown, error) { return a.pick().Volume(ctx) }
+func (a *auto) Findings(ctx context.Context, c string, min uint64) (api.FindingsResponse, error) {
+	return a.pick().Findings(ctx, c, min)
+}
+func (a *auto) Children(ctx context.Context, p string, n int) (api.ChildrenResponse, error) {
+	return a.pick().Children(ctx, p, n)
+}
+func (a *auto) Files(ctx context.Context, p string, min uint64, days, n int) (api.FilesResponse, error) {
+	return a.pick().Files(ctx, p, min, days, n)
+}
+func (a *auto) Search(ctx context.Context, q string) (api.SearchResponse, error) {
+	return a.pick().Search(ctx, q)
+}
+func (a *auto) Explain(ctx context.Context, p string) (api.Explain, error) {
+	return a.pick().Explain(ctx, p)
+}
+func (a *auto) Presets(ctx context.Context) ([]api.PresetView, error) { return a.pick().Presets(ctx) }
+func (a *auto) Apps(ctx context.Context) (api.AppsResponse, error)    { return a.pick().Apps(ctx) }
+func (a *auto) Diff(ctx context.Context, from, to string) (api.DiffResponse, error) {
+	return a.pick().Diff(ctx, from, to)
+}
+func (a *auto) Plan(ctx context.Context, req clean.Request) (*clean.Plan, error) {
+	return a.pick().Plan(ctx, req)
+}
+func (a *auto) Execute(ctx context.Context, id string) (clean.Result, error) {
+	return a.pick().Execute(ctx, id)
+}
+func (a *auto) Undo(ctx context.Context, id string) error { return a.pick().Undo(ctx, id) }
+func (a *auto) Note(ctx context.Context, key, text string) error {
+	return a.pick().Note(ctx, key, text)
+}
+func (a *auto) Report(ctx context.Context, format string) (string, error) {
+	return a.pick().Report(ctx, format)
+}
+
 type local struct {
 	a       *app.App
 	version string
@@ -68,7 +133,9 @@ func (l *local) Scan(ctx context.Context, req api.ScanRequest, wait bool) (api.S
 
 func (l *local) Volume(context.Context) (volume.Breakdown, error) { return l.a.Volume() }
 func (l *local) Findings(_ context.Context, c string, min uint64) (api.FindingsResponse, error) {
-	return l.a.Findings(c, min, false)
+	out, err := l.a.Findings(c, min, false)
+	out.Notes = report.Notes(l.a, l.version)
+	return out, err
 }
 func (l *local) Children(_ context.Context, p string, n int) (api.ChildrenResponse, error) {
 	return l.a.Children(p, n, false)
@@ -93,7 +160,7 @@ func (l *local) Execute(ctx context.Context, id string) (clean.Result, error) {
 		return clean.Result{}, err
 	}
 	if p.NeedsApproval && !p.Approved {
-		return clean.Result{}, errNeedsApproval(id)
+		return clean.Result{}, errNoOneToApprove
 	}
 	return l.a.Execute(ctx, id, nil)
 }
@@ -109,7 +176,7 @@ func (l *local) Report(_ context.Context, format string) (string, error) {
 	var b bytes.Buffer
 	switch format {
 	case "", "text":
-		err = report.WriteText(&b, rep, 100)
+		err = report.WriteText(&b, rep, report.Width)
 	case "json":
 		err = report.WriteJSON(&b, rep)
 	case "csv":

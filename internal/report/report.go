@@ -41,6 +41,19 @@ type Report struct {
 	Notes       []string          `json:"notes"`
 }
 
+// Width is how wide text reports wrap, wherever they are made.
+const Width = 100
+
+// Notes are the report's explanations of the last scan (what is not visible,
+// shared space, permissions), for answers that show findings without the report.
+func Notes(a *app.App, version string) []string {
+	notes := []string{}
+	if last, err := a.Last(); err == nil {
+		notes = append(notes, Build(a.View(last), a.Links, version).Notes...)
+	}
+	return notes
+}
+
 func Build(r *app.ScanResult, links volume.Firmlinks, version string) *Report {
 	t := r.Tree
 	root := t.Node(t.Root())

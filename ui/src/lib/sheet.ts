@@ -5,10 +5,13 @@ import type { PlanRequest } from "#/api/types.gen.ts";
  * The one cleanup sheet of the app. It lives above every screen, so a finding
  * that disappears after it is cleaned does not take the result away with it.
  */
+/** A cleanup to plan here, or a plan made elsewhere (an assistant, the CLI) to review and approve. */
+export type SheetRequest = PlanRequest | { planId: string };
+
 interface Sheet {
-  request: PlanRequest | null;
+  request: SheetRequest | null;
   clearSelection: boolean;
-  open: (request: PlanRequest, opts?: { clearSelection?: boolean }) => void;
+  open: (request: SheetRequest, opts?: { clearSelection?: boolean }) => void;
   close: () => void;
 }
 

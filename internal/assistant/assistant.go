@@ -47,12 +47,20 @@ func Install(ctx context.Context, env sys.Env, exe string, dryRun bool) ([]strin
 		return nil
 	}
 
+	// quiet removes an earlier registration of ebb only, and failing (none there) is fine.
+	quiet := func(bin string, args ...string) {
+		if !dryRun {
+			_, _ = env.Run(ctx, "", bin, args...)
+		}
+	}
+
 	if lockstep, err := env.LookPath("lockstep"); err == nil {
 		dir := filepath.Join(sys.ConfigDir(env), "skills", "ebb")
 		if err := write(filepath.Join(dir, "SKILL.md")); err != nil {
 			return steps, err
 		}
 		_ = run(lockstep, "skill", "add", dir)
+		quiet(lockstep, "mcp", "rm", "ebb")
 		_ = run(lockstep, "mcp", "add", "ebb", "--", exe, "mcp")
 		return steps, nil
 	}
@@ -62,6 +70,8 @@ func Install(ctx context.Context, env sys.Env, exe string, dryRun bool) ([]strin
 		}
 	}
 	if claude, err := env.LookPath("claude"); err == nil {
+		// add refuses a name that exists; an earlier install may point at an old path.
+		quiet(claude, "mcp", "remove", "--scope", "user", "ebb")
 		_ = run(claude, "mcp", "add", "--scope", "user", "ebb", "--", exe, "mcp")
 	} else {
 		steps = append(steps, "claude not found: add the MCP server to your tool by hand: ebb mcp (stdio)")

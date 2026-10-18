@@ -196,3 +196,24 @@ func TestDaemonRoutes(t *testing.T) {
 		t.Fatalf("a paired page may not manage the service: %v %v", resp, err)
 	}
 }
+
+func TestPendingPlansWaitForThePerson(t *testing.T) {
+	c, root := scanned(t)
+	path := filepath.Join(root, "a", "big.bin")
+	code, p := c.post("/api/v1/plans", "", true, `{"paths":["`+path+`"],"source":"mcp"}`)
+	if code != 200 || p["needsApproval"] != true {
+		t.Fatalf("%d %v", code, p)
+	}
+	c.post("/api/v1/plans", "", true, `{"paths":["`+path+`"]}`)
+	var pending api.PendingPlans
+	if code, raw := c.get("/api/v1/plans", &pending); code != 200 || len(pending.Plans) != 1 || pending.Plans[0].ID != p["id"] {
+		t.Fatalf("only the agent's plan waits in the window: %d %s", code, raw)
+	}
+	c.post("/api/v1/plans/"+p["id"].(string)+"/approve", "", true, "")
+	if c.get("/api/v1/plans", &pending); len(pending.Plans) != 0 {
+		t.Fatalf("approved plans stop waiting: %+v", pending)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal("approving touches nothing")
+	}
+}

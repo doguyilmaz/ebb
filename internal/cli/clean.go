@@ -12,6 +12,7 @@ import (
 
 	"github.com/doguyilmaz/ebb/internal/app"
 	"github.com/doguyilmaz/ebb/internal/clean"
+	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/units"
 )
 
@@ -148,7 +149,15 @@ func printPlan(w io.Writer, p *clean.Plan) int {
 }
 
 // confirm asks on stderr and reads one answer; no answer means no.
+// confirm asks a person. An answer piped in (by a script or an agent) does
+// not count, except in sandboxed sessions, where nothing real can be touched.
 func confirm(in io.Reader, errOut io.Writer) bool {
+	if f, ok := in.(*os.File); ok && !sys.Sandboxed(sys.Real()) {
+		if fi, err := f.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+			fmt.Fprintln(errOut, "ebb asks this at a terminal only.")
+			return false
+		}
+	}
 	fmt.Fprint(errOut, "Proceed? [y/N] ")
 	line, err := bufio.NewReader(in).ReadString('\n')
 	if err != nil && line == "" {
