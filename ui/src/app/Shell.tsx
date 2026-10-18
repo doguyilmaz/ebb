@@ -6,7 +6,7 @@ import { ago, bytes, count, diskName, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
-import { isBehind, pageVersion, shortVersion } from "#/lib/version.ts";
+import { isBehind, pageVersion, shortVersion, versionLabel } from "#/lib/version.ts";
 import { Command } from "#/ui/Command.tsx";
 import { SelectionTray } from "./SelectionTray.tsx";
 import { tourSeen, useTour } from "./tour.ts";
@@ -34,7 +34,9 @@ export function Shell({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     if (!hash && content.current) content.current.scrollTop = 0;
   }, [pathname]);
-  const hasScan = !!useStatus().data?.last;
+  const status = useStatus();
+  const hasScan = !!status.data?.last;
+  const version = status.data?.version;
   const startTour = useTour((s) => s.start);
   // The tour starts by itself once, on the overview, as soon as there is a scan to show; it never pulls
   // someone away from the page they opened.
@@ -50,6 +52,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <Link to="/" className="brand" aria-label="ebb, go to the overview">
           <img src="/favicon.svg" width={26} height={26} alt="" />
           ebb
+          {version && <span className="brand-version num" data-tip="The version of ebb running on this Mac">{versionLabel(version)}</span>}
         </Link>
         <nav className="stack" style={{ gap: 2 }} aria-label="Pages">
           {nav.map(({ to, label, icon: Icon }) => (

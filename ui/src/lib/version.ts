@@ -1,6 +1,9 @@
 /** The release this page was built from; empty when git had no tags to tell. */
 export const pageVersion = (import.meta.env?.VITE_EBB_VERSION as string | undefined) ?? "";
 
+/** "v0.1.2" for a release, the build's own name (like "dev" or "v0.1.2-6-g71342c4") otherwise. */
+export const versionLabel = (v: string) => (/^\d/.test(v) ? `v${v}` : v);
+
 /** "0.1.2" from "v0.1.2", "0.1.2" or a development build like "v0.1.2-6-g71342c4". */
 export const shortVersion = (v: string) => /^v?(\d+\.\d+\.\d+)/.exec(v)?.[1] ?? "";
 

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { isBehind, shortVersion } from "./version.ts";
+import { isBehind, shortVersion, versionLabel } from "./version.ts";
 
 test("an older release is behind the page", () => {
   expect(isBehind("0.1.1", "v0.1.2")).toBe(true);
@@ -28,6 +28,12 @@ test("an unknown version on either side never asks for an update", () => {
   expect(isBehind(undefined, "v0.1.2")).toBe(false);
   expect(isBehind("0.1.1", "")).toBe(false);
   expect(isBehind("71342c4", "v0.1.2")).toBe(false);
+});
+
+test("versionLabel adds a v to releases and keeps other builds as they are", () => {
+  expect(versionLabel("0.1.2")).toBe("v0.1.2");
+  expect(versionLabel("v0.1.2-6-g71342c4")).toBe("v0.1.2-6-g71342c4");
+  expect(versionLabel("dev")).toBe("dev");
 });
 
 test("shortVersion drops the v and any build suffix", () => {
