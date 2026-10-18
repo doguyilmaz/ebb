@@ -31,7 +31,6 @@ jobs:
           bun-version: 1.4.3
       - run: cd ui && bun install --frozen-lockfile && bun run build
       - run: make check
-      - run: GOOS=linux CGO_ENABLED=0 go build -o /dev/null ./cmd/ebb-web
 
   e2e:
     if: github.event_name == 'push'

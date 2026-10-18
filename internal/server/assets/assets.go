@@ -11,7 +11,9 @@ import (
 	"strings"
 )
 
-//go:embed dist
+// all: keeps _headers, which embed leaves out by default.
+//
+//go:embed all:dist
 var distFS embed.FS
 
 // FS is the bundle's root (index.html, assets/…).
@@ -41,11 +43,6 @@ GitHub Releases) include it. From source: <code>make build</code>.</p>
 <p>The CLI and the JSON API under <code>/api/v1</code> work as usual.</p></main></body></html>
 `
 
-// Policy is the app's content security policy. The page talks to the origin
-// it came from, or, hosted elsewhere, to ebb on the visitor's own loopback.
-const Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " +
-	"connect-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-
 // Handler serves the single-page app: an embedded file when the path names one,
 // index.html for every client route. Paths under a reserved prefix (an API the
 // caller mounts itself) get 404 instead of the app shell.
@@ -54,9 +51,13 @@ func Handler(reserved ...string) http.Handler {
 	files := http.FileServer(http.FS(assets))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Content-Security-Policy", Policy)
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "no-referrer")
+		for _, rl := range headerRules {
+			if rl.matches(r.URL.Path) {
+				for _, kv := range rl.headers {
+					h.Set(kv[0], kv[1])
+				}
+			}
+		}
 		for _, p := range reserved {
 			if strings.HasPrefix(r.URL.Path, p) {
 				http.NotFound(w, r)
@@ -73,16 +74,13 @@ func Handler(reserved ...string) http.Handler {
 		if name == "" {
 			name = "index.html"
 		}
-		if _, err := fs.Stat(assets, name); err != nil {
+		if _, err := fs.Stat(assets, name); err != nil || name == "_headers" {
 			r.URL.Path = "/"
 			name = "index.html"
 		}
-		// The build stamps a content hash into every name under assets/, so
-		// those can be kept forever; a new build asks for new names. Files
-		// copied as they are (the shell, icons, fonts) keep their names.
-		if strings.HasPrefix(name, "assets/") {
-			h.Set("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
+		// Files without a rule of their own (the shell, icons, fonts) keep
+		// their names across builds, so they are checked every time.
+		if h.Get("Cache-Control") == "" {
 			h.Set("Cache-Control", "no-cache")
 		}
 		if gz := gzipFor(w, r, name); gz != nil {
@@ -123,4 +121,46 @@ func gzipFor(w http.ResponseWriter, r *http.Request, name string) *gzipWriter {
 	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Del("Content-Length")
 	return &gzipWriter{ResponseWriter: w, z: gzip.NewWriter(w)}
+}
+
+// headerRule is one block of _headers: a path (a trailing * matches
+// everything below it) and the headers responses to it carry.
+type headerRule struct {
+	path    string
+	headers [][2]string
+}
+
+func (r headerRule) matches(path string) bool {
+	if prefix, ok := strings.CutSuffix(r.path, "*"); ok {
+		return strings.HasPrefix(path, prefix)
+	}
+	return path == r.path
+}
+
+var headerRules = func() []headerRule {
+	b, err := fs.ReadFile(FS(), "_headers")
+	if err != nil {
+		return nil
+	}
+	return parseHeaders(string(b))
+}()
+
+// parseHeaders reads the _headers format Cloudflare uses: a path on its own
+// line, then indented "Name: value" lines; # starts a comment.
+func parseHeaders(text string) []headerRule {
+	var rules []headerRule
+	for line := range strings.Lines(text) {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case trimmed == "" || strings.HasPrefix(trimmed, "#"):
+		case line[0] != ' ' && line[0] != '\t':
+			rules = append(rules, headerRule{path: trimmed})
+		case len(rules) > 0:
+			if k, v, ok := strings.Cut(trimmed, ":"); ok {
+				last := &rules[len(rules)-1]
+				last.headers = append(last.headers, [2]string{strings.TrimSpace(k), strings.TrimSpace(v)})
+			}
+		}
+	}
+	return rules
 }

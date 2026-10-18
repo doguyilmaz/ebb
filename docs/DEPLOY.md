@@ -1,23 +1,26 @@
 # Hosting the web app
 
-ebb is not a service. It runs on each Mac. The only part that can be hosted is the window: a static page that runs in the visitor's browser and talks to ebb on that visitor's own machine. The server holds no data and no secrets. Two people opening the same address each see their own disk.
+ebb is not a service. It runs on each Mac. The only part that can be hosted is the window: static files that run in the visitor's browser and talk to ebb on that visitor's own machine, at `127.0.0.1`. The host holds no data and no secrets.
 
-## Build and run
+## Build
 
 ```sh
-docker build -t ebb-web .
-docker run -p 8080:8080 ebb-web
+cd ui && bun install --frozen-lockfile && bun run build
 ```
 
-The image runs `ebb-web`, which serves the built page with the same headers as `ebb serve`: the content security policy, `nosniff` and no referrer. It listens on `--listen` or `EBB_WEB_LISTEN`. The default is `127.0.0.1:8080`, and the image uses `0.0.0.0:8080`. It does not terminate TLS, so put a proxy in front of it.
+The output goes to `internal/server/assets/dist`, the same files ebb embeds. Its `_headers` file sets the content security policy, `nosniff` and no referrer. ebb serves the same rules from that file, so they live in one place.
 
-## Coolify
+## Cloudflare
 
-1. Create an application from this repository and choose the **Dockerfile** build pack.
-2. Set **Ports Exposes** to `8080` and give it a domain. Coolify's proxy handles the certificate.
-3. Deploy.
+Any static host works if it can do two things:
 
-It needs no environment variables and no volume, and the image carries its own health check.
+- send the rules in `_headers`;
+- answer every unknown path with `index.html`, because the app does its own routing.
+
+Cloudflare reads `_headers` either way:
+
+- **Workers static assets:** set `assets.directory` to `internal/server/assets/dist` and `assets.not_found_handling` to `single-page-application`.
+- **Pages:** use the build command above with output directory `internal/server/assets/dist`. With no `404.html`, Pages answers unknown paths with `index.html` on its own.
 
 ## Letting a machine use it
 
@@ -27,7 +30,7 @@ ebb trusts `https://ebb.apps.doguyilmaz.com` out of the box. A copy on your own 
 ebb web allow https://ebb.example.com
 ```
 
-The first visit shows a pairing code. Confirm it at the machine, either with `ebb web confirm <code>` or in the local window. The page then keeps a token of its own. `ebb web deny <origin>` removes the origin and every token it was given, and that works for the built-in origin too.
+The first visit shows a pairing code. Confirm it at the machine, either with `ebb web confirm <code>` or in the local window. The page then keeps a token of its own and can do everything the local window can. `ebb web deny <origin>` removes the origin and every token it was given, and that works for the built-in origin too.
 
 ## Limits
 
