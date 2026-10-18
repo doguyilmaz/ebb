@@ -24,12 +24,14 @@ cd ../web && npm ci && npx cf deploy
 answers unknown paths with `index.html` and serves it at `ebb.apps.doguyilmaz.com`. Cloudflare reads `_headers` from
 the build.
 
-Pushes to `main` deploy on their own through Workers Builds, so no Cloudflare token lives in GitHub. The Worker's build
-settings in the dashboard are:
+Releases deploy on their own through Workers Builds, so no Cloudflare token lives in GitHub. The release workflow moves
+the `release` branch to the new tag once the binaries are out. Workers Builds then deploys that branch. The page never
+runs ahead of the ebb people can install. When it is newer than the ebb it talks to, it says so and shows
+`brew upgrade ebb`. The Worker's build settings in the dashboard are:
 
 | Setting | Value |
 | --- | --- |
-| Branch | `main` only (no trigger for other branches) |
+| Branch | `release` only (no trigger for other branches) |
 | Watch paths | `ui/*` and `web/*` (Go, docs and rules changes do not deploy) |
 | Path | `/web` |
 | Build command | `cd ../ui && bun install --frozen-lockfile && bun run build && cd ../web && npm ci` |

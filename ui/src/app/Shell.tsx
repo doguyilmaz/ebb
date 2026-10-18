@@ -1,11 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, AppWindow, Bot, ChartLine, Copy, Waypoints, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
+import { Activity, AppWindow, Bot, ChartLine, CircleArrowUp, Copy, Waypoints, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePendingPlans, useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count, diskName, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
+import { isBehind, pageVersion, shortVersion } from "#/lib/version.ts";
+import { Command } from "#/ui/Command.tsx";
 import { SelectionTray } from "./SelectionTray.tsx";
 import { tourSeen, useTour } from "./tour.ts";
 
@@ -62,11 +64,27 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="main">
         <TopBar title={nav.find((n) => (n.to === "/" ? pathname === "/" : pathname.startsWith(n.to)))?.label ?? ""} />
         <div className="content" ref={content}>
+          <UpdateNotice />
           <Pending />
           <div className={wide ? "page wide" : "page"}>{children}</div>
         </div>
         <SelectionTray />
       </div>
+    </div>
+  );
+}
+
+/** The hosted window follows the latest release while ebb on the Mac waits for Homebrew, so it asks for the update. */
+function UpdateNotice() {
+  const local = useStatus().data?.version;
+  if (!isBehind(local)) return null;
+  return (
+    <div className="pending" role="status">
+      <CircleArrowUp size={16} aria-hidden />
+      <span>
+        This page is from ebb {shortVersion(pageVersion)} and this Mac runs {shortVersion(local ?? "")}. Some parts may not work until you update and start ebb again.
+      </span>
+      <Command value="brew upgrade ebb" />
     </div>
   );
 }

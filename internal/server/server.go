@@ -90,6 +90,7 @@ func (s *Server) routes() {
 	s.daemonRoutes()
 	s.dupesRoutes()
 	s.mux.HandleFunc("/api/", s.auth(func(w http.ResponseWriter, r *http.Request) {
+		// The hosted window matches this exact text to tell an older ebb from a missing item: keep it.
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such endpoint"})
 	}))
 	s.mux.Handle("/", s.spa)
