@@ -5,5 +5,7 @@ export default defineConfig({
     name: "ebb-web",
     compatibilityDate: "2026-10-06",
     assets: { notFoundHandling: "single-page-application" },
+    // ebb trusts this origin by default (config.DefaultHostedOrigin).
+    domains: ["ebb.apps.doguyilmaz.com"],
   },
 });
