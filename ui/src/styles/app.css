@@ -80,7 +80,9 @@ kbd { border: 1px solid var(--line-strong); border-bottom-width: 2px; border-rad
 .scan-pill .btn { height: 24px; border-radius: 999px; }
 .pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tide); animation: pulse 1.6s var(--ease-out) infinite; }
 /* The scrollbar's room is kept whether or not the page scrolls, so nothing shifts sideways when content grows or the tray opens. */
-.content { flex: 1; overflow: auto; min-height: 0; scrollbar-gutter: stable; }
+/* The scrollbar's place is always taken (Safari ignores scrollbar-gutter), so a page that scrolls and one that
+   does not have the same width: switching between them never shifts anything sideways. */
+.content { flex: 1; overflow: auto; overflow-y: scroll; min-height: 0; scrollbar-gutter: stable; }
 .page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 104px; display: flex; flex-direction: column; gap: 28px; }
 /* A page change cross-fades the window as a whole: nothing moves or resizes, and the sidebar, the same on both
    sides, stays still. */
