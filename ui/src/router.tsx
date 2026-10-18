@@ -1,6 +1,6 @@
 import type { FetchQueryOptions, QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
-import { appsQuery, diffQuery, duplicatesQuery, findingsQuery, historyQuery, latestDiffQuery, opsQuery, settingsQuery, sliceQuery, statusQuery, volumeQuery } from "./api/hooks.ts";
+import { appsQuery, diffQuery, packagesQuery, sourcesQuery, duplicatesQuery, findingsQuery, historyQuery, latestDiffQuery, opsQuery, settingsQuery, sliceQuery, statusQuery, volumeQuery } from "./api/hooks.ts";
 import { Root } from "./app/Root.tsx";
 import { readPrefs } from "./lib/prefs.ts";
 import { budgetFor, depthFor } from "./pages/explore/params.ts";
@@ -69,6 +69,12 @@ const duplicatesRoute = createRoute({
   loader: preload(duplicatesQuery),
   component: lazyRouteComponent(() => import("./pages/duplicates/Duplicates.tsx")),
 });
+const sourcesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sources",
+  loader: ({ context }) => preload(readPrefs().sourcesTab === "packages" ? packagesQuery : sourcesQuery)({ context }),
+  component: lazyRouteComponent(() => import("./pages/sources/Sources.tsx")),
+});
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/history",
@@ -88,7 +94,7 @@ const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/settings/Settings.tsx")),
 });
 
-const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, appsRoute, duplicatesRoute, historyRoute, activityRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, appsRoute, duplicatesRoute, sourcesRoute, historyRoute, activityRoute, settingsRoute]);
 
 export const router = createRouter({
   routeTree,

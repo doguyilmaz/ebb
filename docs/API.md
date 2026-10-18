@@ -25,6 +25,8 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/files?path&minSize&olderThanDays&limit` | — | `FilesResponse` (stored files ≥ 1 MB, largest first, optionally untouched for N days) | 400 `outside-root` |
 | GET | `/children?path&limit&small=1` | — | `ChildrenResponse` | 400 `outside-root` |
 | GET | `/search?q&limit` | — | `SearchResponse` | — |
+| GET | `/sources` | — | `Flows {nodes, links, total}` (place → owner → kind over the biggest folders of home and of the scanned disk) | 409 `never-scanned` |
+| GET | `/packages` | — | `Packages {projects, nodeModules, packages, cache, cacheBytes}` (node_modules packages across projects with copies and versions; Bun's cache per package) | 409 `never-scanned` |
 | GET | `/apps` | — | `AppsResponse {apps, note?}` (apps in /Applications and ~/Applications as the last scan saw them, biggest first, each with its Library data; uninstall with `POST /plans {app}`) | 409 `never-scanned` |
 | POST | `/duplicates` | `DuplicatesRequest {path?, minSize?}` | `DuplicatesState` (202; events `duplicates.progress`, `duplicates.done`) | 400 `outside-root`, 409 `scan-running`/`cleaning`/`searching` |
 | GET | `/duplicates` | — | `DuplicatesState {running, progress, result, error}` (the last result survives restarts) | — |

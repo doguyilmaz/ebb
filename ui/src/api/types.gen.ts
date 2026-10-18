@@ -401,6 +401,48 @@ export interface Disk {
   fs: string;
 }
 
+export interface Node {
+  id: string;
+  label: string;
+  column: number;
+  bytes: number;
+  path?: string;
+}
+
+export interface Link {
+  from: string;
+  to: string;
+  bytes: number;
+}
+
+export interface Flows {
+  nodes: Node[] | null;
+  links: Link[] | null;
+  total: number;
+}
+
+export interface Package {
+  name: string;
+  bytes: number;
+  copies: number;
+  versions?: string[] | null;
+  projects: string[] | null;
+}
+
+export interface Cached {
+  name: string;
+  versions: string[] | null;
+  bytes: number;
+}
+
+export interface Packages {
+  projects: number;
+  nodeModules: number;
+  packages: Package[] | null;
+  cache: Cached[] | null;
+  cacheBytes: number;
+}
+
 export interface PlanRequest {
   findingIds?: string[] | null;
   paths?: string[] | null;

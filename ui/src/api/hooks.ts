@@ -11,9 +11,11 @@ import type {
   DuplicatesState,
   DiffResponse,
   FilesResponse,
+  Flows,
   FindingsResponse,
   HistoryResponse,
   OpsResponse,
+  Packages,
   PendingPlans,
   Plan,
   PlanRequest,
@@ -69,6 +71,11 @@ export const useChildren = (path: string | undefined, small = false) =>
     retry: false,
   });
 
+export const sourcesQuery = queryOptions({ queryKey: ["sources"], queryFn: () => api.get<Flows>("/sources"), retry: false });
+export const useSources = () => useQuery(sourcesQuery);
+export const packagesQuery = queryOptions({ queryKey: ["packages"], queryFn: () => api.get<Packages>("/packages"), retry: false });
+export const usePackages = (enabled = true) => useQuery({ ...packagesQuery, enabled });
+
 export const useFiles = (path: string | undefined, minSize: number, olderThanDays: number) =>
   useQuery({
     queryKey: ["files", path ?? "", minSize, olderThanDays],
@@ -122,7 +129,7 @@ export const diffQuery = (from: string, to: string) =>
 export const useDiff = (from: string, to: string) => useQuery(diffQuery(from, to));
 
 /** Everything that shows scan results; refreshed after a scan or a cleanup. */
-export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"], ["duplicates"], ["files"]];
+export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"], ["duplicates"], ["files"], ["sources"], ["packages"]];
 
 export function useRefreshResults() {
   const qc = useQueryClient();

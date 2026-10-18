@@ -133,7 +133,7 @@ await scenario("a page change shows the whole page at once", async () => {
 await scenario("every page renders in light and dark", async () => {
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });
-    for (const [label, text] of [["Overview", "Where the space is"], ["Explore", "Biggest inside"], ["Findings", "Can be cleaned"], ["Apps", "Library data"], ["Duplicates", "Find duplicates"], ["Activity", "Activity"], ["Settings", "Never touch"]]) {
+    for (const [label, text] of [["Overview", "Where the space is"], ["Explore", "Biggest inside"], ["Findings", "Can be cleaned"], ["Apps", "Library data"], ["Duplicates", "Find duplicates"], ["Sources", "Where the space comes from"], ["Activity", "Activity"], ["Settings", "Never touch"]]) {
       await nav(label);
       await page.getByText(text).first().waitFor({ timeout: 8000 });
       await shot(`${label.toLowerCase()}-${scheme}`);
@@ -269,6 +269,19 @@ await scenario("duplicates are found and the extra copy goes to the Trash", asyn
   check(kept.length === 1, `one copy stays: ${kept}`);
   await sheet.locator(".sheet-foot .btn.primary").click();
   await page.locator(".dupe", { hasText: "trip" }).waitFor({ state: "detached", timeout: 6000 });
+});
+
+await scenario("sources show the flows and the packages", async () => {
+  await nav("Sources");
+  await page.getByRole("tab", { name: "Flows" }).click();
+  await page.locator(".flowchart .band").first().waitFor({ timeout: 6000 });
+  check((await page.locator(".flowchart .flow-node").count()) >= 4, "places, owners and kinds drawn");
+  await page.locator(".flowchart .flow-node[data-clickable] rect").first().click();
+  await page.waitForURL(/\/(explore|findings)/, { timeout: 4000 });
+  await nav("Sources");
+  await page.getByRole("tab", { name: "Packages" }).click();
+  await page.locator(".pkg", { hasText: "big-lib" }).waitFor({ timeout: 6000 });
+  await page.getByRole("tab", { name: "Flows" }).click();
 });
 
 await scenario("an assistant's plan waits in the window and is only approved there", async () => {

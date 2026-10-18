@@ -14,6 +14,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
+	"github.com/doguyilmaz/ebb/internal/sources"
 	"github.com/doguyilmaz/ebb/internal/tree"
 	"github.com/doguyilmaz/ebb/internal/volume"
 )
@@ -307,7 +308,7 @@ const (
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
 	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PendingPlans{}, DuplicatesRequest{}, DuplicatesState{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
-	Error{}, volume.Breakdown{}, volume.Disk{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
+	Error{}, volume.Breakdown{}, volume.Disk{}, sources.Flows{}, sources.Packages{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 
 // Names gives types from other packages their API name in TypeScript.

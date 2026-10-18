@@ -9,6 +9,7 @@ export interface Prefs {
   filesMin?: number;
   filesAge?: number;
   since?: "scan" | "day" | "week" | "month";
+  sourcesTab?: "flows" | "packages";
 }
 
 const KEY = "ebb.prefs";

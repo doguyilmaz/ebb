@@ -17,6 +17,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/dupes"
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
+	"github.com/doguyilmaz/ebb/internal/sources"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/volume"
 )
@@ -40,7 +41,11 @@ type App struct {
 	mu       sync.Mutex
 	running  bool
 	cleaning bool
-	dupes    struct {
+	packages struct {
+		scan   string
+		result sources.Packages
+	}
+	dupes struct {
 		running, loaded bool
 		stop            context.CancelFunc
 		progress        *dupes.Progress
