@@ -86,6 +86,7 @@ func (s *Server) routes() {
 	s.dataRoutes()
 	s.cleanRoutes()
 	s.daemonRoutes()
+	s.dupesRoutes()
 	s.mux.HandleFunc("/api/", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no such endpoint"})
 	}))
@@ -146,6 +147,8 @@ func (s *Server) json(h func(http.ResponseWriter, *http.Request) (any, error)) h
 				status, code = http.StatusConflict, "scan-running"
 			case errors.Is(err, app.ErrCleaning):
 				status, code = http.StatusConflict, "cleaning"
+			case errors.Is(err, app.ErrSearching):
+				status, code = http.StatusConflict, "searching"
 			}
 			body := map[string]string{"error": err.Error()}
 			if code != "" {

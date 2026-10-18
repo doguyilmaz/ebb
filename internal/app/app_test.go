@@ -291,3 +291,37 @@ func TestCleanupAndScanExcludeEachOther(t *testing.T) {
 		t.Fatalf("no scan while a cleanup runs: %v", err)
 	}
 }
+
+func TestDuplicateSearchAndCleanup(t *testing.T) {
+	a, root := testApp(t)
+	write(t, filepath.Join(root, "docs", "x.bin"), 3<<20)
+	write(t, filepath.Join(root, "docs", "copy", "x.bin"), 3<<20)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.FindDuplicates(context.Background(), "/etc", 0, nil); !errors.Is(err, ErrOutsideRoot) {
+		t.Fatalf("outside the scan: %v", err)
+	}
+	res, err := a.FindDuplicates(context.Background(), root, 0, nil)
+	if err != nil || len(res.Groups) != 1 || len(res.Groups[0].Copies) != 2 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	extra := res.Groups[0].Copies[1].Path
+	p, err := a.Plan(clean.Request{Paths: []string{extra}, Source: "ui"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Execute(context.Background(), p.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if st := a.Duplicates(); st.Result == nil || len(st.Result.Groups) != 0 {
+		t.Fatalf("a group left with one copy is gone: %+v", st.Result)
+	}
+	a.dupes.running = true
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); !errors.Is(err, ErrSearching) {
+		t.Fatalf("no scan during a search: %v", err)
+	}
+}

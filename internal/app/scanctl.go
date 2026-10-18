@@ -17,6 +17,8 @@ func (a *App) begin(root string) error {
 		return ErrScanRunning
 	case a.cleaning:
 		return ErrCleaning
+	case a.dupes.running:
+		return ErrSearching
 	}
 	a.running, a.scanRoot, a.scanErr, a.progress = true, root, "", nil
 	return nil

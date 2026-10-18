@@ -10,6 +10,7 @@ import (
 
 	"github.com/doguyilmaz/ebb/internal/apps"
 	"github.com/doguyilmaz/ebb/internal/clean"
+	"github.com/doguyilmaz/ebb/internal/dupes"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
@@ -199,6 +200,18 @@ type Settings struct {
 	LowSpaceGB      int      `json:"lowSpaceGb"`
 }
 
+type DuplicatesRequest struct {
+	Path    string `json:"path,omitempty"`    // empty: the home folder
+	MinSize uint64 `json:"minSize,omitempty"` // at least 1 MiB
+}
+
+type DuplicatesState struct {
+	Running  bool            `json:"running"`
+	Progress *dupes.Progress `json:"progress"`
+	Result   *dupes.Result   `json:"result"`
+	Error    string          `json:"error,omitempty"`
+}
+
 // PendingPlans wait for the person's approval: made by an agent or the CLI.
 type PendingPlans struct {
 	Plans []Plan `json:"plans"`
@@ -286,12 +299,14 @@ const (
 	EventPlanDone        = "plan.done"
 	EventHistoryChanged  = "history.changed"
 	EventPlansChanged    = "plans.changed" // a plan waits for approval, or no longer does
+	EventDupesProgress   = "duplicates.progress"
+	EventDupesDone       = "duplicates.done"
 )
 
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
-	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PendingPlans{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
+	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PendingPlans{}, DuplicatesRequest{}, DuplicatesState{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 
@@ -305,4 +320,4 @@ var Names = map[reflect.Type]string{
 	reflect.TypeFor[clean.Op]():      "Op",
 }
 
-var Events = []string{EventHello, EventScanProgress, EventScanDone, EventFindingsChanged, EventPlanProgress, EventPlanDone, EventHistoryChanged, EventPlansChanged}
+var Events = []string{EventHello, EventScanProgress, EventScanDone, EventFindingsChanged, EventPlanProgress, EventPlanDone, EventHistoryChanged, EventPlansChanged, EventDupesProgress, EventDupesDone}

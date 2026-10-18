@@ -70,6 +70,7 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 		newWebCmd(g),
 		newCleanCmd(g),
 		newAppsCmd(g),
+		newDupesCmd(g),
 		newUninstallCmd(g),
 		newApproveCmd(g),
 		newOpsCmd(g),

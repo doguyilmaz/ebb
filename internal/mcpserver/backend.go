@@ -12,6 +12,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/app"
 	"github.com/doguyilmaz/ebb/internal/clean"
+	"github.com/doguyilmaz/ebb/internal/dupes"
 	"github.com/doguyilmaz/ebb/internal/remote"
 	"github.com/doguyilmaz/ebb/internal/report"
 	"github.com/doguyilmaz/ebb/internal/volume"
@@ -31,6 +32,7 @@ type Backend interface {
 	Explain(ctx context.Context, path string) (api.Explain, error)
 	Presets(ctx context.Context) ([]api.PresetView, error)
 	Apps(ctx context.Context) (api.AppsResponse, error)
+	Duplicates(ctx context.Context, path string, minSize uint64) (*dupes.Result, error)
 	Diff(ctx context.Context, from, to string) (api.DiffResponse, error)
 	Plan(ctx context.Context, req clean.Request) (*clean.Plan, error)
 	Execute(ctx context.Context, planID string) (clean.Result, error)
@@ -92,6 +94,9 @@ func (a *auto) Explain(ctx context.Context, p string) (api.Explain, error) {
 }
 func (a *auto) Presets(ctx context.Context) ([]api.PresetView, error) { return a.pick().Presets(ctx) }
 func (a *auto) Apps(ctx context.Context) (api.AppsResponse, error)    { return a.pick().Apps(ctx) }
+func (a *auto) Duplicates(ctx context.Context, p string, min uint64) (*dupes.Result, error) {
+	return a.pick().Duplicates(ctx, p, min)
+}
 func (a *auto) Diff(ctx context.Context, from, to string) (api.DiffResponse, error) {
 	return a.pick().Diff(ctx, from, to)
 }
@@ -149,6 +154,9 @@ func (l *local) Search(_ context.Context, q string) (api.SearchResponse, error) 
 func (l *local) Explain(_ context.Context, p string) (api.Explain, error) { return l.a.Explain(p) }
 func (l *local) Presets(context.Context) ([]api.PresetView, error)        { return l.a.Presets(), nil }
 func (l *local) Apps(ctx context.Context) (api.AppsResponse, error)       { return l.a.Apps(ctx) }
+func (l *local) Duplicates(ctx context.Context, p string, min uint64) (*dupes.Result, error) {
+	return l.a.FindDuplicates(ctx, p, min, nil)
+}
 func (l *local) Diff(_ context.Context, from, to string) (api.DiffResponse, error) {
 	return l.a.Diff(from, to, 10_000_000)
 }
@@ -258,6 +266,32 @@ func (r *remoteBackend) Presets(ctx context.Context) ([]api.PresetView, error) {
 func (r *remoteBackend) Apps(ctx context.Context) (api.AppsResponse, error) {
 	var out api.AppsResponse
 	return out, r.get(ctx, "/apps", &out)
+}
+
+// Duplicates starts the search in the running ebb (so its window shows it too) and waits for it.
+func (r *remoteBackend) Duplicates(ctx context.Context, p string, min uint64) (*dupes.Result, error) {
+	if err := r.c.Do(ctx, "POST", "/duplicates", api.DuplicatesRequest{Path: p, MinSize: min}, nil); err != nil {
+		return nil, err
+	}
+	for {
+		var st api.DuplicatesState
+		if err := r.get(ctx, "/duplicates", &st); err != nil {
+			return nil, err
+		}
+		switch {
+		case st.Running:
+		case st.Error != "":
+			return nil, errors.New(st.Error)
+		default:
+			return st.Result, nil
+		}
+		select {
+		case <-ctx.Done():
+			_ = r.c.Do(context.Background(), "DELETE", "/duplicates/current", nil, nil)
+			return nil, ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
 }
 
 func (r *remoteBackend) Diff(ctx context.Context, from, to string) (api.DiffResponse, error) {

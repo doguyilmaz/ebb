@@ -118,6 +118,9 @@ func (a *App) Execute(ctx context.Context, id string, fn func(clean.Event)) (cle
 	case a.cleaning:
 		a.mu.Unlock()
 		return clean.Result{}, ErrCleaning
+	case a.dupes.running:
+		a.mu.Unlock()
+		return clean.Result{}, ErrSearching
 	}
 	a.cleaning = true
 	a.mu.Unlock()
@@ -186,6 +189,7 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 	}
 	r.Findings = kept
 	a.mu.Unlock()
+	a.forgetCopies(gone)
 	r.Tree.Compact()
 	return a.saveLast(r)
 }

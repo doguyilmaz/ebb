@@ -139,6 +139,24 @@ func (s *Server) define() []tool {
 				}
 				return map[string]any{"apps": out, "note": res.Note}, nil
 			}},
+		{Name: "ebb_duplicates", Description: "Files with the same content in the person's own folders (default: home), found by reading files of equal size; bundles, Photos/Music libraries, ~/Library, node_modules and dot-folders are left out. Each group lists the copy to keep first. Remove extra copies with ebb_cleanup_plan paths (they go to the Trash).",
+			InputSchema: obj(map[string]any{"path": str("folder to search; empty = home"), "minSize": num("smallest file in bytes (default and at least 1 MiB)"), "n": num("how many groups (default 20)")}),
+			run: func(ctx context.Context, args map[string]any) (any, error) {
+				res, err := b.Duplicates(ctx, getS(args, "path"), uint64(getN(args, "minSize", 0, 0, 1<<50)))
+				if err != nil {
+					return nil, err
+				}
+				groups := res.Groups[:min(getN(args, "n", 20, 1, 200), len(res.Groups))]
+				var out []map[string]any
+				for _, g := range groups {
+					var paths []string
+					for _, c := range g.Copies {
+						paths = append(paths, c.Path)
+					}
+					out = append(out, map[string]any{"size": g.Size, "extraBytes": g.Wasted, "keep": paths[0], "extras": paths[1:]})
+				}
+				return map[string]any{"groups": out, "extraBytes": res.Wasted, "groupCount": len(res.Groups)}, nil
+			}},
 		{Name: "ebb_history_diff", Description: "What grew and shrank between two scans; without ids, the newest against the one before it.",
 			InputSchema: obj(map[string]any{"from": str("older snapshot id"), "to": str("newer snapshot id")}),
 			run: func(ctx context.Context, args map[string]any) (any, error) {

@@ -14,6 +14,7 @@ import (
 	"github.com/doguyilmaz/ebb"
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/config"
+	"github.com/doguyilmaz/ebb/internal/dupes"
 	"github.com/doguyilmaz/ebb/internal/history"
 	"github.com/doguyilmaz/ebb/internal/rules"
 	"github.com/doguyilmaz/ebb/internal/sys"
@@ -39,6 +40,13 @@ type App struct {
 	mu       sync.Mutex
 	running  bool
 	cleaning bool
+	dupes    struct {
+		running, loaded bool
+		stop            context.CancelFunc
+		progress        *dupes.Progress
+		last            *dupes.Result
+		err             string
+	}
 	stop     context.CancelFunc
 	watch    *watcher
 	watchCtx context.Context

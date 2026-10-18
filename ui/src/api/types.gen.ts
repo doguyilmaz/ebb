@@ -271,6 +271,45 @@ export interface PendingPlans {
   plans: Plan[] | null;
 }
 
+export interface DuplicatesRequest {
+  path?: string;
+  minSize?: number;
+}
+
+export interface DupesProgress {
+  phase: string;
+  done: number;
+  total: number;
+}
+
+export interface Copy {
+  path: string;
+  mtime: number;
+  bytes: number;
+}
+
+export interface Group {
+  size: number;
+  copies: Copy[] | null;
+  wasted: number;
+}
+
+export interface Result {
+  root: string;
+  time: string;
+  groups: Group[] | null;
+  wasted: number;
+  hashed: number;
+  elapsed: number;
+}
+
+export interface DuplicatesState {
+  running: boolean;
+  progress: DupesProgress | null;
+  result: Result | null;
+  error?: string;
+}
+
 export interface PresetView {
   id: string;
   title: string;
@@ -402,5 +441,5 @@ export interface OpsResponse {
   ops: Op[] | null;
 }
 
-export const EVENTS = ["hello", "scan.progress", "scan.done", "findings.changed", "plan.progress", "plan.done", "history.changed", "plans.changed"] as const;
+export const EVENTS = ["hello", "scan.progress", "scan.done", "findings.changed", "plan.progress", "plan.done", "history.changed", "plans.changed", "duplicates.progress", "duplicates.done"] as const;
 export type EventName = (typeof EVENTS)[number];
