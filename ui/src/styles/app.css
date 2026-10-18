@@ -81,13 +81,13 @@ kbd { border: 1px solid var(--line-strong); border-bottom-width: 2px; border-rad
 .pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tide); animation: pulse 1.6s var(--ease-out) infinite; }
 /* The scrollbar's room is kept whether or not the page scrolls, so nothing shifts sideways when content grows or the tray opens. */
 .content { flex: 1; overflow: auto; min-height: 0; scrollbar-gutter: stable; }
-.page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 104px; display: flex; flex-direction: column; gap: 28px; view-transition-name: page; }
-@supports not (view-transition-name: none) { .page { animation: fade 180ms ease-out; } }
-::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-::view-transition-old(page) { animation: fade-out 110ms ease-out both; }
-::view-transition-new(page) { animation: page-in 260ms var(--ease-out) both; }
+.page { max-width: 1200px; margin: 0 auto; padding: 28px 28px 104px; display: flex; flex-direction: column; gap: 28px; }
+/* A page change cross-fades the window as a whole: nothing moves or resizes, and the sidebar, the same on both
+   sides, stays still. */
+::view-transition-old(root) { animation: fade-out 90ms ease-out both; }
+::view-transition-new(root) { animation: fade-in 150ms ease-out both; }
 @keyframes fade-out { to { opacity: 0; } }
-@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes fade-in { from { opacity: 0; } }
 .page.wide { max-width: none; height: 100%; padding-bottom: 20px; gap: 14px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-sub { color: var(--text-2); max-width: 72ch; }
@@ -532,8 +532,10 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .tour { position: fixed; inset: 0; z-index: 50; cursor: default; }
 .tour-spot { position: fixed; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--tide) 70%, transparent), 0 0 0 9999px rgba(10, 10, 12, 0.55); transition: opacity 200ms ease; }
 /* Glide only from one step to the next; while the page scrolls the light stays on its target. */
-.tour-spot[data-moving] { transition: top 380ms var(--ease-in-out), left 380ms var(--ease-in-out), width 380ms var(--ease-in-out), height 380ms var(--ease-in-out), opacity 200ms ease; }
-.tour-card { position: fixed; z-index: 51; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); box-shadow: var(--shadow-3); animation: rise 260ms var(--ease-out) both; }
+.tour-spot[data-moving] { transition: top 320ms var(--ease-in-out), left 320ms var(--ease-in-out), width 320ms var(--ease-in-out), height 320ms var(--ease-in-out), opacity 200ms ease; }
+.tour-card { position: fixed; z-index: 51; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); box-shadow: var(--shadow-3); }
+.tour-card[data-shown] { animation: card-in 220ms var(--ease-out) both; }
+@keyframes card-in { from { opacity: 0; transform: translateY(4px) scale(0.98); } }
 .tour-dots { display: flex; gap: 4px; margin: 2px 0 4px; }
 .tour-dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--line-strong); transition: width 220ms var(--ease-out), background-color 220ms ease; }
 .tour-dots i[data-on] { width: 16px; background: var(--text); }

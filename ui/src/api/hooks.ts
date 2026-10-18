@@ -27,11 +27,14 @@ import type {
 const q = encodeURIComponent;
 
 // Polled gently so "N folders changed" stays current while ebb watches the disk.
-export const useStatus = () => useQuery({ queryKey: ["status"], queryFn: () => api.get<Status>("/status"), refetchInterval: 15_000 });
-export const useVolume = () => useQuery({ queryKey: ["volume"], queryFn: () => api.get<Breakdown>("/volume"), retry: false });
+export const statusQuery = queryOptions({ queryKey: ["status"], queryFn: () => api.get<Status>("/status"), refetchInterval: 15_000 });
+export const useStatus = () => useQuery(statusQuery);
+export const volumeQuery = queryOptions({ queryKey: ["volume"], queryFn: () => api.get<Breakdown>("/volume"), retry: false });
+export const useVolume = () => useQuery(volumeQuery);
 
-export const useFindings = (ignored = false) =>
-  useQuery({ queryKey: ["findings", ignored], queryFn: () => api.get<FindingsResponse>(`/findings${ignored ? "?ignored=1" : ""}`), retry: false });
+export const findingsQuery = (ignored = false) =>
+  queryOptions({ queryKey: ["findings", ignored], queryFn: () => api.get<FindingsResponse>(`/findings${ignored ? "?ignored=1" : ""}`), retry: false });
+export const useFindings = (ignored = false) => useQuery(findingsQuery(ignored));
 
 export const sliceQuery = (path: string | undefined, depth: number, maxNodes: number) =>
   queryOptions({
@@ -66,14 +69,18 @@ export const useSearch = (term: string) =>
   useQuery({ queryKey: ["search", term], queryFn: () => api.get<SearchResponse>(`/search?limit=30&q=${q(term)}`), enabled: term.length > 1 });
 
 export const usePresets = () => useQuery({ queryKey: ["presets"], queryFn: () => api.get<PresetView[]>("/presets") });
-export const useOps = () => useQuery({ queryKey: ["ops"], queryFn: () => api.get<OpsResponse>("/ops?limit=500") });
-export const useSettings = () => useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
+export const opsQuery = queryOptions({ queryKey: ["ops"], queryFn: () => api.get<OpsResponse>("/ops?limit=500") });
+export const useOps = () => useQuery(opsQuery);
+export const settingsQuery = queryOptions({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
+export const useSettings = () => useQuery(settingsQuery);
 /** Plans an assistant or the CLI made that wait for the person here. */
 export const usePendingPlans = () => useQuery({ queryKey: ["plans", "pending"], queryFn: () => api.get<PendingPlans>("/plans"), refetchInterval: 30_000 });
-export const useApps = () => useQuery({ queryKey: ["apps"], queryFn: () => api.get<AppsResponse>("/apps"), retry: false });
+export const appsQuery = queryOptions({ queryKey: ["apps"], queryFn: () => api.get<AppsResponse>("/apps"), retry: false });
+export const useApps = () => useQuery(appsQuery);
 export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web"), retry: false });
 export const useDaemon = () => useQuery({ queryKey: ["daemon"], queryFn: () => api.get<Daemon>("/daemon"), refetchInterval: 15_000 });
-export const useHistory = () => useQuery({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
+export const historyQuery = queryOptions({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
+export const useHistory = () => useQuery(historyQuery);
 /** The newest scan against the one before it of the same folder; fails while there is only one. */
 export const useLatestDiff = () => useQuery({ queryKey: ["diff", "latest"], queryFn: () => api.get<DiffResponse>("/history/diff"), retry: false });
 export const useDiff = (from: string, to: string) =>

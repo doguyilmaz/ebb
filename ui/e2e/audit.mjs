@@ -99,6 +99,37 @@ await scenario("first scan shows live progress, then the overview and the tour",
   await shot("overview");
 });
 
+await scenario("a page change shows the whole page at once", async () => {
+  // A real disk answers slower than the demo: with latency a page that renders before its data shows "Loading…".
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 150, downloadThroughput: -1, uploadThroughput: -1 });
+  for (const [label, heading] of [["Findings", "Findings"], ["Apps", "Apps"], ["Explore", null], ["Activity", "Activity"], ["Overview", null]]) {
+    await page.evaluate(() => {
+      window.__frames = [];
+      const t0 = performance.now();
+      const tick = () => {
+        window.__frames.push({
+          title: document.querySelector(".topbar-title")?.textContent ?? "",
+          h1: document.querySelector(".page h1")?.textContent ?? null,
+          loading: !!document.querySelector(".page .loading"),
+        });
+        if (performance.now() - t0 < 1500) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await nav(label);
+    await page.waitForTimeout(1600);
+    const frames = await page.evaluate(() => window.__frames);
+    const after = frames.filter((f) => f.title === label);
+    check(after.length > 0, `${label}: the page showed`);
+    check(!after.some((f) => f.loading), `${label}: no "Loading…" after the switch`);
+    if (heading) check(after.every((f) => f.h1 === heading), `${label}: title and page change in the same frame`);
+  }
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+  await cdp.detach();
+});
+
 await scenario("every page renders in light and dark", async () => {
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });

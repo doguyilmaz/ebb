@@ -1,6 +1,6 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Activity, AppWindow, Bot, ChartLine, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { usePendingPlans, useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
 import { ago, bytes, count, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
@@ -22,11 +22,12 @@ const nav = [
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { pathname, hash } = useLocation();
+  // The page on screen, not the one being loaded: title, width and scroll change together with the content.
+  const { pathname, hash } = useRouterState({ select: (r) => r.resolvedLocation ?? r.location });
   const wide = pathname.startsWith("/explore");
   const content = useRef<HTMLDivElement>(null);
-  // A new page starts at its top; one opened at an anchor scrolls there itself.
-  useEffect(() => {
+  // A new page starts at its top, set before it is painted; one opened at an anchor scrolls there itself.
+  useLayoutEffect(() => {
     if (!hash && content.current) content.current.scrollTop = 0;
   }, [pathname]);
   const hasScan = !!useStatus().data?.last;

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { sliceQuery, useAges, useSlice, useStatus, useVolume } from "#/api/hooks.ts";
 import { ageColor } from "#/lib/ages.ts";
 import { readPrefs, savePrefs } from "#/lib/prefs.ts";
+import { budgetFor, depthFor } from "./params.ts";
 import { baseName } from "#/lib/format.ts";
 import { exploreRoute, type View } from "#/router.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
@@ -22,8 +23,6 @@ const views: { id: View; label: string; icon: typeof ChartPie; hint: string }[] 
   { id: "list", label: "List", icon: List, hint: "" },
 ];
 
-const depthFor = (v: View) => (v === "sunburst" ? 5 : 6);
-const budgetFor = (v: View) => (v === "treemap" ? 6000 : v === "icicle" ? 4000 : 3500);
 
 export default function Explore() {
   const search = exploreRoute.useSearch();
