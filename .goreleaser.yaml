@@ -2,9 +2,8 @@
 # one universal binary.
 version: 2
 
-before:
-  hooks:
-    - sh -c "cd ui && bun install --frozen-lockfile && bun run build"
+# The web UI is built before GoReleaser runs (make ui; in CI a step of its
+# own), so package scripts never share an environment with the signing keys.
 
 builds:
   - main: ./cmd/ebb
