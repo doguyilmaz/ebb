@@ -23,7 +23,7 @@ function Head({ title, term }: { title: string; term?: TermId }) {
 export default function Settings() {
   return (
     <>
-      <PageHead title="Settings" sub="How ebb scans, what it never touches, and which web pages may connect to it." />
+      <PageHead title="Settings" sub="How ebb scans, what it never touches and which web pages may connect to it." />
       <Scan />
       <Protect />
       <Background />
@@ -228,7 +228,7 @@ function Background() {
     : d.running
       ? `Running since ${when(d.started) ?? "now"}.`
       : d.installed
-        ? "Installed but not running. Restart it, or see the log."
+        ? "Installed but not running. Restart it or see the log."
         : "Off. ebb runs only while you start it.";
   const scanned = when(d.lastWorkAt);
   const commitGb = () => {
@@ -242,7 +242,7 @@ function Background() {
       <Head title="Background service" term="daemon" />
       <p className="muted">
         Starts at login and keeps this window ready. While the Mac is on power and nobody uses it, it updates the last scan, at most every half hour
-        and in full once a week, and warns once when free space runs low. It never cleans anything on its own.
+        and in full once a week. It warns once when free space runs low. It never cleans anything on its own.
       </p>
       <p className="service-state">
         <span className="led" data-on={d.running && !d.waiting} aria-hidden />

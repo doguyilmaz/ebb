@@ -18,6 +18,7 @@ const RETRY_MS = 2500;
 const MAX_RETRY_MS = 30_000;
 const PAIRING_MS = 2000;
 const RELEASES = "https://github.com/doguyilmaz/ebb/releases/latest";
+const SITE = "https://ebb.doguyilmaz.com";
 const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
 
 /**
@@ -145,7 +146,7 @@ export function Connect({ children }: { children: ReactNode }) {
     default:
       if (wasEmbedded())
         return (
-          <Gate title="ebb stopped" sub="This window was talking to ebb on this Mac, and ebb is not running right now. Start it again; this page reconnects by itself.">
+          <Gate title="ebb stopped" sub="This window was talking to ebb on this Mac. ebb is not running right now. Start it again; this page reconnects by itself.">
             <Command value={serve} />
             <Waiting where={where} text="Reconnects on its own" />
             {footer}
@@ -158,7 +159,7 @@ export function Connect({ children }: { children: ReactNode }) {
           {footer}
         </Gate>
       ) : (
-        <Gate title="ebb runs on macOS" sub="It reads what only macOS knows about a disk: APFS clones and snapshots, purgeable space, and the caches Xcode and simulators leave behind. Open this page on your Mac to get started." intro />
+        <Gate title="ebb runs on macOS" sub="It reads what only macOS knows about a disk: APFS clones and snapshots, purgeable space and the caches Xcode and simulators leave behind. Open this page on your Mac to get started." intro />
       );
   }
 }
@@ -171,7 +172,7 @@ function InstallGuide({ serve }: { serve: string }) {
           <Command value="brew install doguyilmaz/tap/ebb" />
           <p className="faint small-text">
             No Homebrew? Get it at{" "}
-            <a href="https://brew.sh" target="_blank" rel="noreferrer">brew.sh</a>, or download the <code>darwin</code> archive (one binary for Apple
+            <a href="https://brew.sh" target="_blank" rel="noreferrer">brew.sh</a> or download the <code>darwin</code> archive (one binary for Apple
             silicon and Intel) from the{" "}
             <a href={RELEASES} target="_blank" rel="noreferrer">latest release</a> and put <code>ebb</code> on your PATH.
           </p>
@@ -192,7 +193,7 @@ function InstallGuide({ serve }: { serve: string }) {
       </ol>
       {isSafari() && (
         <p className="gate-note small-text">
-          Safari does not let web pages reach your own Mac. Use Chrome, Edge or Firefox for this page, or the window <code>ebb serve --open</code> opens.
+          Safari does not let web pages reach your own Mac. Use Chrome, Edge or Firefox for this page. The window <code>ebb serve --open</code> opens works in Safari too.
         </p>
       )}
     </>
@@ -239,8 +240,12 @@ function Gate({ title, sub, intro, children }: { title: string; sub?: string; in
           <img src="/favicon.svg" width={36} height={36} alt="" />
           <div className="stack" style={{ gap: 0 }}>
             <span className="gate-name">ebb</span>
-            <span className="faint small-text">Where your disk space went, and how to get it back</span>
+            <span className="faint small-text">Where your disk space went and how to get it back</span>
           </div>
+          <span className="grow" />
+          <a className="small-text row" style={{ gap: 4, flex: "none" }} href={SITE} target="_blank" rel="noreferrer">
+            About ebb <ExternalLink size={12} aria-hidden />
+          </a>
         </div>
         <div className="gate-card">
           <div className="stack" style={{ gap: 6 }}>

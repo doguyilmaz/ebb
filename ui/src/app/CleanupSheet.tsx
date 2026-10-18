@@ -117,7 +117,7 @@ export function CleanupSheet({ request, onClose, onDone }: { request: SheetReque
                 );
               })}
             </ul>
-            {sum!.trash > 0 && <p className="faint">Items moved to the Trash free their space once the Trash is emptied, and can be put back until then.</p>}
+            {sum!.trash > 0 && <p className="faint">Items moved to the Trash free their space once the Trash is emptied. Until then they can be put back.</p>}
           </>
         )}
         {s.phase === "done" && s.result && (

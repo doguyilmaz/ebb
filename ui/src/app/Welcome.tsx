@@ -9,7 +9,7 @@ const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Pr
 
 const steps = [
   { icon: ScanSearch, title: "Scan", text: "ebb reads every folder once, in about a minute. It only reads: nothing is changed or uploaded." },
-  { icon: MessageSquareText, title: "Understand", text: "Every large item says why it is there, how safe it is to remove, and what removing it costs." },
+  { icon: MessageSquareText, title: "Understand", text: "Every large item says why it is there, how safe it is to remove and what removing it costs." },
   { icon: ShieldCheck, title: "Clean safely", text: "You review a plan before anything runs. Things go to the Trash, so they can be put back." },
 ];
 
@@ -24,7 +24,7 @@ export function Welcome() {
     <div className="welcome">
       <div className="stack" style={{ gap: 8 }}>
         <span className="welcome-kicker">Welcome to ebb</span>
-        <h1 className="welcome-title">See where your disk space went, and get it back safely</h1>
+        <h1 className="welcome-title">See where your disk space went and get it back safely</h1>
       </div>
       <ol className="welcome-steps">
         {steps.map(({ icon: Icon, title, text }, i) => (

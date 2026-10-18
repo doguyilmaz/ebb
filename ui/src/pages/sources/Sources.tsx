@@ -16,7 +16,7 @@ export default function Sources() {
   const pick = (t: Tab) => (setTab(t), savePrefs({ sourcesTab: t }));
   return (
     <>
-      <PageHead title="Sources" sub="Where the space comes from: which folders hold it, which tool or app put it there, and what kind it is.">
+      <PageHead title="Sources" sub="Where the space comes from: which folders hold it, which tool or app put it there and what kind it is.">
         <div className="seg" role="tablist" aria-label="Show">
           <button role="tab" aria-selected={tab === "flows"} aria-pressed={tab === "flows"} onClick={() => pick("flows")}>Flows</button>
           <button role="tab" aria-selected={tab === "packages"} aria-pressed={tab === "packages"} onClick={() => pick("packages")}>Packages</button>

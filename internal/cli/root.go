@@ -36,7 +36,7 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 	g := &globals{}
 	root := &cobra.Command{
 		Use:           "ebb",
-		Short:         "See where your disk space went, and win it back safely",
+		Short:         "See where your disk space went and win it back safely",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.NoArgs,

@@ -93,7 +93,7 @@ export function Palette() {
         <input
           autoFocus
           className="palette-input"
-          placeholder="Go to, find a folder, or clean…"
+          placeholder="Go to, find a folder or clean…"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           onKeyDown={(e) => {
