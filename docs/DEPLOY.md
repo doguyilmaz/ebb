@@ -67,6 +67,19 @@ The first visit shows a pairing code. Confirm it at the machine, either with `eb
 build step. It runs as its own Worker, `ebb-site`. Its `_headers` allow only the page's own files, so it loads nothing
 from other hosts and sends nothing anywhere.
 
+Pushes to `main` that touch `site/` deploy it through Workers Builds. Unlike the window, the page does not wait for a
+release, so text fixes go out at once. Its build settings are:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `main` only |
+| Watch paths | `site/*` |
+| Path | `/site` |
+| Build command | `npm ci` |
+| Deploy command | `npx cf deploy` |
+
+To deploy by hand:
+
 ```sh
 cd site && npm ci && npx cf deploy
 ```

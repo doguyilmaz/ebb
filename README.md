@@ -1,6 +1,7 @@
 <p align="center"><img src="assets/brand/icon-spectrum-1024.png" width="128" alt=""></p>
 <h1 align="center">ebb</h1>
 <p align="center">See where your Mac's disk space went and win it back safely.</p>
+<p align="center"><a href="https://ebb.doguyilmaz.com">ebb.doguyilmaz.com</a></p>
 
 ebb is a single binary for macOS 12 or later. It has a fast parallel scanner and findings that explain what is large and whether it is safe to remove. It also has a local web window, a background service, a CLI and an MCP server for AI agents. Nothing leaves your Mac.
 
