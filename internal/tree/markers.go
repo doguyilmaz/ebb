@@ -4,7 +4,7 @@ package tree
 // has a bit in a directory's Markers. MarkerXcode stands for a .xcodeproj or
 // .xcworkspace child.
 var MarkerNames = []string{"package.json", "Cargo.toml", "go.mod", "build.gradle", "build.gradle.kts", "settings.gradle",
-	"Podfile", "pubspec.yaml", "pyproject.toml", "requirements.txt", "setup.py", "Gemfile", "composer.json", "pom.xml"}
+	"Podfile", "pubspec.yaml", "pyproject.toml", "requirements.txt", "setup.py", "Gemfile", "composer.json", "pom.xml", "Package.swift"}
 
 const MarkerXcode uint16 = 1 << 15
 

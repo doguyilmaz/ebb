@@ -24,7 +24,7 @@ max_safety = "regenerable"
 
 [[preset]]
 id = "installers"
-title = "Installers in Downloads"
+title = "Installers and disk images"
 categories = ["installer"]
 max_safety = "caution"
 
@@ -33,3 +33,15 @@ id = "all-regenerable"
 title = "Everything tools can rebuild"
 categories = ["package-cache", "build-artifact", "sdk", "app-cache", "logs", "simulator", "stale-project"]
 max_safety = "regenerable"
+
+[[preset]]
+id = "browsers"
+title = "Browser caches"
+rules = ["browser.safari", "browser.chrome", "browser.brave", "browser.edge", "browser.arc", "browser.vivaldi", "browser.firefox"]
+max_safety = "regenerable"
+
+[[preset]]
+id = "leftovers"
+title = "Leftovers of removed apps"
+categories = ["leftover"]
+max_safety = "caution"

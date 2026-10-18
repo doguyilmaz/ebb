@@ -1,0 +1,106 @@
+# Browser caches: page data, compiled scripts, GPU shaders and service worker caches. Never profiles, cookies,
+# history, passwords or extensions. One rule per browser, so a running browser blocks only its own cache.
+
+[[rule]]
+id = "browser.safari"
+title = "Safari cache"
+owner = "Safari"
+category = "app-cache"
+paths = ["~/Library/Caches/com.apple.Safari", "~/Library/Containers/com.apple.Safari/Data/Library/Caches"]
+safety = "regenerable"
+why = "Safari caches pages, images and scripts of sites you visited."
+impact = "Sites load a little slower the first time. You stay signed in: cookies and history are not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["Safari"] }
+
+[[rule]]
+id = "browser.chrome"
+title = "Chrome cache"
+owner = "Google Chrome"
+category = "app-cache"
+paths = [
+  "~/Library/Caches/Google/Chrome",
+  "~/Library/Application Support/Google/Chrome/*/{Cache,Code Cache,GPUCache,DawnGraphiteCache,DawnWebGPUCache}",
+  "~/Library/Application Support/Google/Chrome/*/Service Worker/CacheStorage",
+]
+safety = "regenerable"
+why = "Chrome caches pages, compiled scripts, GPU shaders and offline data of sites, per profile."
+impact = "Sites load a little slower the first time. You stay signed in: cookies, history and passwords are not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["Google Chrome"] }
+
+[[rule]]
+id = "browser.brave"
+title = "Brave cache"
+owner = "Brave"
+category = "app-cache"
+paths = [
+  "~/Library/Caches/BraveSoftware/Brave-Browser",
+  "~/Library/Application Support/BraveSoftware/Brave-Browser/*/{Cache,Code Cache,GPUCache,DawnGraphiteCache,DawnWebGPUCache}",
+  "~/Library/Application Support/BraveSoftware/Brave-Browser/*/Service Worker/CacheStorage",
+]
+safety = "regenerable"
+why = "Brave caches pages, compiled scripts, GPU shaders and offline data of sites, per profile."
+impact = "Sites load a little slower the first time. You stay signed in: cookies, history and passwords are not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["Brave Browser"] }
+
+[[rule]]
+id = "browser.edge"
+title = "Edge cache"
+owner = "Microsoft Edge"
+category = "app-cache"
+paths = [
+  "~/Library/Caches/Microsoft Edge",
+  "~/Library/Application Support/Microsoft Edge/*/{Cache,Code Cache,GPUCache}",
+  "~/Library/Application Support/Microsoft Edge/*/Service Worker/CacheStorage",
+]
+safety = "regenerable"
+why = "Edge caches pages, compiled scripts, GPU shaders and offline data of sites, per profile."
+impact = "Sites load a little slower the first time. You stay signed in: cookies, history and passwords are not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["Microsoft Edge"] }
+
+[[rule]]
+id = "browser.arc"
+title = "Arc cache"
+owner = "Arc"
+category = "app-cache"
+paths = [
+  "~/Library/Caches/Arc",
+  "~/Library/Application Support/Arc/User Data/*/{Cache,Code Cache,GPUCache}",
+  "~/Library/Application Support/Arc/User Data/*/Service Worker/CacheStorage",
+]
+safety = "regenerable"
+why = "Arc caches pages, compiled scripts, GPU shaders and offline data of sites, per profile."
+impact = "Sites load a little slower the first time. You stay signed in: cookies, history and passwords are not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["Arc"] }
+
+[[rule]]
+id = "browser.vivaldi"
+title = "Vivaldi and Opera caches"
+owner = "Vivaldi, Opera"
+category = "app-cache"
+paths = [
+  "~/Library/Caches/Vivaldi", "~/Library/Caches/com.operasoftware.Opera",
+  "~/Library/Application Support/Vivaldi/*/{Cache,Code Cache,GPUCache}",
+  "~/Library/Application Support/com.operasoftware.Opera/{Cache,Code Cache,GPUCache}",
+]
+safety = "regenerable"
+why = "These browsers cache pages, compiled scripts and GPU shaders of sites, per profile."
+impact = "Sites load a little slower the first time. You stay signed in: cookies, history and passwords are not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["Vivaldi", "Opera"] }
+
+[[rule]]
+id = "browser.firefox"
+title = "Firefox cache"
+owner = "Firefox"
+category = "app-cache"
+paths = ["~/Library/Caches/Firefox/Profiles/*/cache2", "~/Library/Caches/Firefox/Profiles/*/startupCache", "~/Library/Caches/Firefox/Profiles/*/thumbnails"]
+safety = "regenerable"
+why = "Firefox caches pages and images of sites per profile, outside the profile itself."
+impact = "Sites load a little slower the first time. Your profile (bookmarks, history, passwords) is not touched."
+min_size = "100MB"
+action = { kind = "delete", quit = ["firefox"] }

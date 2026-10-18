@@ -2,6 +2,7 @@ package detect
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -159,4 +160,91 @@ func walkMarker(name string) uint16 {
 		return tree.MarkerXcode
 	}
 	return tree.MarkerBit(name)
+}
+
+func TestCoverageRules(t *testing.T) {
+	tr := home(t,
+		"Library/Caches/Google/Chrome/Default/Cache/data=150",
+		"Library/Application Support/Google/Chrome/Profile 1/Code Cache/js=120",
+		"Library/Application Support/Google/Chrome/Profile 1/History=40",
+		"Library/Caches/com.apple.Safari/WebKitCache/x=200",
+		"Library/Caches/Firefox/Profiles/ab.default/cache2/entries=130",
+		"Library/Caches/com.apple.dt.Xcode/data=300",
+		"Library/iTunes/iPhone Software Updates/iPhone.ipsw=400",
+		"Library/Containers/com.apple.mail/Data/Library/Mail Downloads/a.pdf=60",
+		".m2/repository/org/x.jar=200",
+		".pub-cache/hosted/pkg=150",
+		"miniforge3/pkgs/numpy=300",
+		".cache/uv/wheels=200",
+		".cache/huggingface/hub/model=500",
+		".ollama/models/blobs/b=900",
+		"Library/Caches/ms-playwright/chromium-1100/x=300",
+		"Library/Caches/JetBrains/IntelliJIdea2025.2/index=400",
+		"Desktop/Installer.dmg=80",
+		"Documents/Old.pkg=90",
+		"Documents/Projects/keep.dmg=90",
+	)
+	fs, err := rulesDetector{}.Detect(context.Background(), ctxFor(t, tr))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]int{"browser.chrome": 2, "browser.safari": 1, "browser.firefox": 1, "xcode.cache": 1, "ios.updates": 1, "mail.downloads": 1,
+		"maven.repo": 1, "pub.cache": 1, "conda.pkgs": 1, "uv.cache": 1, "huggingface.cache": 1, "models.local": 1, "browsers.testing": 1,
+		"jetbrains.caches": 1, "installers": 2}
+	for id, n := range want {
+		f := byRule(fs, id)
+		if f == nil || len(f.Targets) != n {
+			t.Errorf("%s: %+v", id, f)
+		}
+	}
+	for _, f := range fs {
+		for _, tg := range f.Targets {
+			if strings.HasSuffix(tg.Path, "/History") || strings.Contains(tg.Path, "Projects/keep.dmg") {
+				t.Errorf("%s claims %s", f.RuleID, tg.Path)
+			}
+		}
+	}
+	if f := byRule(fs, "apple.caches"); f != nil {
+		t.Errorf("Safari's and Xcode's caches go to their own rules, not the macOS one: %+v", f.Targets)
+	}
+	if f := byRule(fs, "models.local"); f != nil && len(f.Actions) != 0 {
+		t.Error("downloaded models are the person's: no action")
+	}
+}
+
+func TestOldIDEVersions(t *testing.T) {
+	tr := home(t,
+		"Library/Application Support/JetBrains/IntelliJIdea2024.3/options/a=5",
+		"Library/Application Support/JetBrains/IntelliJIdea2025.2/options/a=5",
+		"Library/Caches/JetBrains/IntelliJIdea2024.3/index=600",
+		"Library/Caches/JetBrains/IntelliJIdea2025.2/index=700",
+		"Library/Logs/JetBrains/IntelliJIdea2024.3/idea.log=20",
+		"Library/Caches/JetBrains/PyCharm2023.1/index=300",
+		"Library/Caches/JetBrains/PyCharm2024.1/index=300",
+		"Library/Application Support/Google/AndroidStudio2024.1/options/a=5",
+		"Library/Application Support/Google/AndroidStudio2025.1/options/a=5",
+		"Library/Caches/Google/AndroidStudio2024.1/caches=900",
+		"Library/Application Support/Google/Chrome/Default/x=10",
+	)
+	fs, err := RunWith(context.Background(), ctxFor(t, tr), []Detector{ideVersions{}, rulesDetector{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := byRule(fs, "ide.old-versions")
+	if f == nil {
+		t.Fatal("no finding")
+	}
+	var got []string
+	for _, tg := range f.Targets {
+		got = append(got, strings.TrimPrefix(tg.Path, "/h/Library/"))
+	}
+	slices.Sort(got)
+	want := []string{"Application Support/Google/AndroidStudio2024.1", "Application Support/JetBrains/IntelliJIdea2024.3",
+		"Caches/Google/AndroidStudio2024.1", "Caches/JetBrains/IntelliJIdea2024.3", "Logs/JetBrains/IntelliJIdea2024.3"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("old versions\n got %q\nwant %q", got, want)
+	}
+	if jb := byRule(fs, "jetbrains.caches"); jb == nil || slices.ContainsFunc(jb.Targets, func(t finding.Target) bool { return strings.Contains(t.Path, "2024.3") }) {
+		t.Fatalf("the current version's caches stay with the cache rule: %+v", jb)
+	}
 }

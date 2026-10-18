@@ -28,6 +28,18 @@ why = "Every photo, video and file received in Messages is stored here."
 impact = "Review large attachments in Messages → Settings → General → Keep Messages, or System Settings → General → Storage."
 
 [[rule]]
+id = "mail.downloads"
+title = "Mail attachments you opened"
+owner = "Mail"
+category = "app-cache"
+paths = ["~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads"]
+safety = "caution"
+why = "Mail saves a copy of every attachment you open; the original stays in the message."
+impact = "Attachments still in Mail open again from the message. A file you edited in place there would be lost: check before."
+min_size = "50MB"
+action = { kind = "trash", quit = ["Mail"] }
+
+[[rule]]
 id = "userdata.mail"
 title = "Mail data"
 category = "user-data"

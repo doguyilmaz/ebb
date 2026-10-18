@@ -16,6 +16,8 @@ type artifact struct {
 	// markers lists the project files that make this folder build output; a
 	// "build" folder next to only a package.json, say, may hold real sources.
 	markers []string
+	// git: some projects commit this folder (a library's dist); skip it when Git tracks files in it.
+	git bool
 }
 
 var (
@@ -27,18 +29,30 @@ var (
 
 // artifacts are folders a project's tools rebuild from its sources.
 var artifacts = map[string]artifact{
-	"node_modules":  {"JavaScript dependencies", js},
-	".next":         {"Next.js build output", js},
-	".expo":         {"Expo cache", js},
-	".turbo":        {"Turborepo cache", js},
-	".parcel-cache": {"Parcel cache", js},
-	"target":        {"Rust and Maven build output", []string{"Cargo.toml", "pom.xml"}},
-	"build":         {"Build output", append(append(slices.Clone(gradle), python...), xcodeDir...)},
-	".gradle":       {"Gradle project cache", gradle},
-	"Pods":          {"CocoaPods dependencies", []string{"Podfile"}},
-	".venv":         {"Python virtual environment", python},
-	"venv":          {"Python virtual environment", python},
-	"DerivedData":   {"Xcode build output", xcodeDir},
+	"node_modules":  {"JavaScript dependencies", js, false},
+	".next":         {"Next.js build output", js, false},
+	".expo":         {"Expo cache", js, false},
+	".turbo":        {"Turborepo cache", js, false},
+	".parcel-cache": {"Parcel cache", js, false},
+	"target":        {"Rust and Maven build output", []string{"Cargo.toml", "pom.xml"}, false},
+	"build":         {"Build output", append(append(slices.Clone(gradle), python...), xcodeDir...), false},
+	".gradle":       {"Gradle project cache", gradle, false},
+	"Pods":          {"CocoaPods dependencies", []string{"Podfile"}, false},
+	".venv":         {"Python virtual environment", python, false},
+	"venv":          {"Python virtual environment", python, false},
+	"DerivedData":   {"Xcode build output", xcodeDir, false},
+	".build":        {"Swift package build output", []string{"Package.swift"}, false},
+	".dart_tool":    {"Dart and Flutter tool cache", []string{"pubspec.yaml"}, false},
+	".svelte-kit":   {"SvelteKit build output", js, false},
+	".nuxt":         {"Nuxt build output", js, false},
+	".angular":      {"Angular cache", js, false},
+	".cxx":          {"Android native build output", gradle, false},
+	".pytest_cache": {"pytest cache", python, false},
+	".mypy_cache":   {"mypy cache", python, false},
+	".ruff_cache":   {"Ruff cache", python, false},
+	".tox":          {"tox environments", python, false},
+	"dist":          {"Build output", js, true},
+	"coverage":      {"Test coverage reports", append(slices.Clone(js), python...), true},
 }
 
 func markerMask(names []string) uint16 {
@@ -61,7 +75,7 @@ func (stale) ID() string { return "stale" }
 // skipped, so their contents are never reported a second time.
 func (stale) Pass() int { return 2 }
 
-func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
+func (stale) Detect(ctx context.Context, c *Context) ([]finding.Finding, error) {
 	type hit struct{ artifact, project tree.ID }
 	var hits []hit
 	claimed := c.coveredIDs()
@@ -110,9 +124,12 @@ func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 			continue
 		}
 		name := c.Tree.Node(h.artifact).Name
+		if artifacts[name].git && tracked(ctx, c, h.project, name) {
+			continue
+		}
 		f, ok := groups[name]
 		if !ok {
-			f = &finding.Finding{RuleID: "stale." + strings.TrimPrefix(name, "."), Category: "stale-project", Safety: finding.Regenerable,
+			f = &finding.Finding{RuleID: staleID(name), Category: "stale-project", Safety: finding.Regenerable,
 				Why:     fmt.Sprintf("%s of projects nobody has changed in %d+ days.", artifacts[name].what, int(c.StaleAfter.Hours()/24)),
 				Impact:  "The project's install or build step recreates it the next time you work on it.",
 				Actions: []finding.Action{{Kind: "delete"}}}
@@ -136,4 +153,29 @@ func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 		}
 	}
 	return fs, nil
+}
+
+// tracked reports whether Git tracks files in a project's folder, looking for
+// a repository in the project or any folder above it. Not being able to ask
+// Git counts as tracked: the folder stays.
+func tracked(ctx context.Context, c *Context, project tree.ID, name string) bool {
+	inRepo := false
+	for p := project; p != tree.None && !inRepo; p = c.Tree.Node(p).Parent {
+		inRepo = slices.ContainsFunc(c.Tree.Children(p), func(id tree.ID) bool { return c.Tree.Node(id).Name == ".git" })
+	}
+	if !inRepo {
+		return false
+	}
+	out, err := c.Env.Run(ctx, c.Tree.Path(project), "git", "ls-files", "--", name)
+	return err != nil || len(strings.TrimSpace(string(out))) > 0
+}
+
+// staleID names the finding after the folder; ".build" next to "build" (or
+// ".venv" next to "venv") keeps its dot so the two never share an ID.
+func staleID(name string) string {
+	bare := strings.TrimPrefix(name, ".")
+	if _, both := artifacts[bare]; both && bare != name {
+		return "stale.dot-" + bare
+	}
+	return "stale." + bare
 }

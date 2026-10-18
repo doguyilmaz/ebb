@@ -33,3 +33,37 @@ why = "Xcode copies debug symbols from every iOS, watchOS and tvOS version of ev
 impact = "Xcode copies the symbols again when a device with that OS version connects."
 min_target = "1MB"
 action = { kind = "delete", quit = ["Xcode"] }
+
+[[rule]]
+id = "xcode.cache"
+title = "Xcode caches"
+owner = "Xcode"
+category = "build-artifact"
+paths = ["~/Library/Caches/com.apple.dt.Xcode"]
+safety = "regenerable"
+why = "Xcode caches downloaded documentation, package data and indexes here."
+impact = "Xcode rebuilds what it needs; the first launch may be slower."
+min_size = "200MB"
+action = { kind = "delete", quit = ["Xcode"] }
+
+[[rule]]
+id = "xcode.docsets"
+title = "Downloaded documentation sets"
+owner = "Xcode"
+category = "sdk"
+paths = ["~/Library/Developer/Shared/Documentation/DocSets"]
+safety = "regenerable"
+why = "Documentation downloaded by older Xcode versions; current Xcode reads documentation online."
+impact = "Xcode downloads documentation again if it needs it."
+action = { kind = "delete", quit = ["Xcode"] }
+
+[[rule]]
+id = "ios.updates"
+title = "iPhone and iPad software updates"
+owner = "Finder"
+category = "installer"
+paths = ["~/Library/iTunes/iPhone Software Updates", "~/Library/iTunes/iPad Software Updates", "~/Library/iTunes/iPod Software Updates"]
+safety = "regenerable"
+why = "Finder keeps the iOS and iPadOS installers it downloaded to update or restore a device."
+impact = "The next update or restore through this Mac downloads the system again."
+action = { kind = "delete" }

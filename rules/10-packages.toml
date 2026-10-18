@@ -143,3 +143,179 @@ safety = "regenerable"
 why = "Homebrew keeps downloaded bottles and source archives of installed and upgraded formulae."
 impact = "Reinstalling an old version downloads it again."
 action = { kind = "command", argv = ["brew", "cleanup", "--prune=all"], requires = "brew", fallback = "delete" }
+
+[[rule]]
+id = "maven.repo"
+title = "Maven local repository"
+owner = "Maven"
+category = "package-cache"
+paths = ["~/.m2/repository"]
+safety = "caution"
+why = "Maven keeps every dependency version any project downloaded, plus artifacts you installed yourself with mvn install."
+impact = "Builds download dependencies again. Artifacts you only ever installed locally are gone until you build them again."
+action = { kind = "trash" }
+
+[[rule]]
+id = "gradle.daemons"
+title = "Gradle daemon logs and native files"
+owner = "Gradle"
+category = "package-cache"
+paths = ["~/.gradle/daemon", "~/.gradle/native", "~/.gradle/jdks"]
+safety = "regenerable"
+why = "Every Gradle version leaves daemon logs, native libraries and downloaded JDKs here."
+impact = "Gradle recreates what it needs on the next build; downloaded JDKs are fetched again. Stop daemons first (./gradlew --stop)."
+min_size = "200MB"
+action = { kind = "delete" }
+
+[[rule]]
+id = "jvm.caches"
+title = "Ivy, sbt and Coursier caches"
+owner = "Scala and JVM tools"
+category = "package-cache"
+paths = ["~/.ivy2/cache", "~/.sbt/boot", "~/Library/Caches/Coursier"]
+safety = "regenerable"
+why = "Scala and JVM build tools keep every dependency they resolved, for every version."
+impact = "The next build resolves and downloads dependencies again."
+action = { kind = "delete" }
+
+[[rule]]
+id = "deno.cache"
+title = "Deno cache"
+owner = "Deno"
+category = "package-cache"
+paths = ["~/Library/Caches/deno"]
+safety = "regenerable"
+why = "Deno keeps downloaded modules, npm packages and compiled code for every version a script imported."
+impact = "Scripts download and compile their imports again on the next run."
+action = { kind = "command", argv = ["deno", "clean"], requires = "deno", fallback = "delete" }
+
+[[rule]]
+id = "composer.cache"
+title = "Composer cache"
+owner = "PHP"
+category = "package-cache"
+paths = ["~/Library/Caches/composer", "~/.composer/cache"]
+safety = "regenerable"
+why = "Composer caches every package archive and repository listing it has fetched."
+impact = "The next composer install downloads packages again."
+action = { kind = "command", argv = ["composer", "clear-cache"], requires = "composer", fallback = "delete" }
+
+[[rule]]
+id = "nuget.packages"
+title = "NuGet packages"
+owner = ".NET"
+category = "package-cache"
+paths = ["~/.nuget/packages"]
+safety = "regenerable"
+why = ".NET keeps every NuGet package version any project restored."
+impact = "The next dotnet restore downloads packages again."
+action = { kind = "command", argv = ["dotnet", "nuget", "locals", "all", "--clear"], requires = "dotnet", fallback = "delete" }
+
+[[rule]]
+id = "pub.cache"
+title = "Dart and Flutter package cache"
+owner = "Flutter"
+category = "package-cache"
+paths = ["~/.pub-cache"]
+safety = "regenerable"
+why = "Dart and Flutter keep every package version any project fetched, plus globally activated tools."
+impact = "flutter pub get downloads packages again; global tools (dart pub global) need activating again."
+action = { kind = "command", argv = ["dart", "pub", "cache", "clean", "--force"], requires = "dart", fallback = "delete" }
+
+[[rule]]
+id = "conda.pkgs"
+title = "conda package cache"
+owner = "conda"
+category = "package-cache"
+paths = ["~/miniconda3/pkgs", "~/miniforge3/pkgs", "~/anaconda3/pkgs", "~/opt/anaconda3/pkgs", "~/opt/miniconda3/pkgs", "~/mambaforge/pkgs"]
+safety = "regenerable"
+why = "conda keeps the archive and the unpacked copy of every package it installed into any environment."
+impact = "Environments keep working; installing a package again downloads it."
+action = { kind = "command", argv = ["conda", "clean", "--all", "--yes"], requires = "conda" }
+
+[[rule]]
+id = "poetry.cache"
+title = "Poetry cache"
+owner = "Python"
+category = "package-cache"
+paths = ["~/Library/Caches/pypoetry/cache", "~/Library/Caches/pypoetry/artifacts"]
+safety = "regenerable"
+why = "Poetry keeps downloaded and built packages for every project it installed."
+impact = "The next poetry install downloads packages again."
+action = { kind = "delete" }
+
+[[rule]]
+id = "poetry.venvs"
+title = "Poetry virtual environments"
+owner = "Python"
+category = "package-cache"
+paths = ["~/Library/Caches/pypoetry/virtualenvs/*"]
+safety = "caution"
+why = "Poetry creates a virtual environment per project here, including projects you deleted long ago."
+impact = "A project you still use needs poetry install before it runs again."
+action = { kind = "delete" }
+
+[[rule]]
+id = "uv.cache"
+title = "uv cache"
+owner = "Python"
+category = "package-cache"
+paths = ["~/.cache/uv"]
+safety = "regenerable"
+why = "uv keeps every wheel and source distribution it fetched, shared by all environments."
+impact = "Environments made from the cache keep working; new installs download packages again."
+action = { kind = "command", argv = ["uv", "cache", "clean"], requires = "uv", fallback = "delete" }
+
+[[rule]]
+id = "browsers.testing"
+title = "Test browser downloads"
+owner = "Playwright, Cypress, Puppeteer"
+category = "package-cache"
+paths = ["~/Library/Caches/ms-playwright", "~/Library/Caches/Cypress", "~/.cache/puppeteer", "~/Library/Caches/electron", "~/Library/Caches/electron-builder"]
+safety = "regenerable"
+why = "Test runners and Electron tooling download whole browser builds per version and keep the old ones."
+impact = "The next test run or build downloads the browser it needs again (npx playwright install, cypress install)."
+action = { kind = "delete" }
+
+[[rule]]
+id = "jetbrains.caches"
+title = "JetBrains IDE caches"
+owner = "JetBrains"
+category = "app-cache"
+paths = ["~/Library/Caches/JetBrains/*", "~/Library/Caches/Google/AndroidStudio*"]
+safety = "regenerable"
+why = "IntelliJ-based IDEs (and Android Studio) keep indexes and local history caches per version."
+impact = "The IDE re-indexes your projects the next time it opens them, which takes a while. Quit the IDE first."
+action = { kind = "delete" }
+
+[[rule]]
+id = "swiftpm.cache"
+title = "Swift Package Manager and Carthage caches"
+owner = "Swift"
+category = "package-cache"
+paths = ["~/Library/Caches/org.swift.swiftpm", "~/Library/Caches/org.carthage.CarthageKit"]
+safety = "regenerable"
+why = "SwiftPM and Carthage keep clones and archives of every package version they resolved."
+impact = "Packages are fetched again the next time a project resolves them."
+action = { kind = "delete" }
+
+[[rule]]
+id = "models.local"
+title = "Local AI models"
+owner = "Ollama, LM Studio"
+category = "user-data"
+paths = ["~/.ollama/models", "~/.lmstudio/models", "~/.cache/lm-studio/models"]
+safety = "user-data"
+why = "Models you downloaded to run locally; each is gigabytes."
+impact = "Remove the ones you no longer use from the tool itself (ollama rm <model>, or LM Studio's My Models), so it knows they are gone."
+
+[[rule]]
+id = "huggingface.cache"
+title = "Hugging Face downloads"
+owner = "Hugging Face"
+category = "app-cache"
+paths = ["~/.cache/huggingface"]
+safety = "caution"
+why = "Models and datasets downloaded by Python libraries (transformers, diffusers) are kept here for reuse."
+impact = "Code that uses them downloads them again, which can be many gigabytes."
+action = { kind = "trash" }

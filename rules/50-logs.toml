@@ -25,9 +25,9 @@ action = { kind = "empty-trash" }
 id = "installers"
 title = "Installers and disk images"
 category = "installer"
-paths = ["~/Downloads/**/*.{dmg,pkg,xip,iso}"]
+paths = ["~/Downloads/**/*.{dmg,pkg,mpkg,xip,iso}", "~/Desktop/*.{dmg,pkg,mpkg,xip,iso}", "~/Documents/*.{dmg,pkg,mpkg,xip,iso}"]
 safety = "caution"
-why = "Installers stay in Downloads after the app is installed."
+why = "Installers and disk images stay where they were downloaded after the app is installed."
 impact = "You would need to download an installer again to reinstall."
 min_size = "50MB"
 min_target = "5MB"

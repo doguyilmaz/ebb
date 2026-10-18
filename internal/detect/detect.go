@@ -107,7 +107,7 @@ type Detector interface {
 
 // All lists every detector in the order findings are claimed.
 func All() []Detector {
-	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, docker{}, snapshots{}, rulesDetector{}, leftovers{}, stale{}, large{}, growth{}}
+	return []Detector{simulators{}, derivedData{}, xcode{}, android{}, docker{}, snapshots{}, ideVersions{}, rulesDetector{}, leftovers{}, stale{}, large{}, growth{}}
 }
 
 func Run(ctx context.Context, c *Context) ([]finding.Finding, []error) { return RunWith(ctx, c, All()) }

@@ -49,5 +49,9 @@ func (leftovers) Detect(ctx context.Context, c *Context) ([]finding.Finding, err
 	for _, id := range order[:min(len(order), 12)] {
 		f.Evidence = append(f.Evidence, fmt.Sprintf("%s: %s, no app from this maker on this Mac", id, units.Bytes(byID[id])))
 	}
-	return []finding.Finding{finish(f)}, nil
+	// Most removed apps leave kilobytes; only a sum worth a look becomes a finding.
+	if f = finish(f); f.Alloc < 20<<20 {
+		return nil, nil
+	}
+	return []finding.Finding{f}, nil
 }
