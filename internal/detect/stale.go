@@ -156,30 +156,33 @@ func (stale) Detect(_ context.Context, c *Context) ([]finding.Finding, error) {
 	return fs, nil
 }
 
-// tracked reports whether a project's folder may hold files Git tracks:
-// inside a repository it counts as untracked only when a .gitignore from the
-// project up to the repository root ignores it. Git itself never runs: a
-// cloned repository's config can make it execute commands.
+// tracked reports whether a project's folder may hold files nothing can
+// rebuild: it counts as build output only inside a repository whose
+// .gitignore, from the project up to the repository root, ignores it. Outside
+// one (an unpacked package, an archived copy) it may be all there is. Git
+// itself never runs: a cloned repository's config can make it execute commands.
 func tracked(c *Context, project tree.ID, name string) bool {
 	ignored := false
 	for p := project; p != tree.None; p = c.Tree.Node(p).Parent {
-		ignored = ignored || ignores(c, p, name)
+		ignored = ignored || ignores(c, p, name, p == project)
 		if slices.ContainsFunc(c.Tree.Children(p), func(id tree.ID) bool { return c.Tree.Node(id).Name == ".git" }) {
 			return !ignored
 		}
 	}
-	return false
+	return true
 }
 
-// ignores reads dir's .gitignore for a plain entry naming the folder
-// (name, /name, name/ or /name/); patterns are left alone.
-func ignores(c *Context, dir tree.ID, name string) bool {
+// ignores reads dir's .gitignore for a plain entry naming the folder; patterns
+// are left alone. As in Git, an entry with a leading slash (/name, /name/)
+// only covers dir's own child, so it counts only in the project's own file.
+func ignores(c *Context, dir tree.ID, name string, own bool) bool {
 	b, err := c.readFile(filepath.Join(c.Tree.Path(dir), ".gitignore"))
-	if err != nil || len(b) > 1<<20 {
+	if err != nil {
 		return false
 	}
 	for line := range strings.Lines(string(b)) {
-		if strings.Trim(strings.TrimSpace(line), "/") == name {
+		e := strings.TrimSuffix(strings.TrimSpace(line), "/")
+		if e == name || own && e == "/"+name {
 			return true
 		}
 	}

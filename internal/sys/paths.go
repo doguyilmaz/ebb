@@ -2,7 +2,7 @@ package sys
 
 import "path/filepath"
 
-// ConfigDir is where config.toml lives. Under LOCKSTEP_HOME everything is
+// ConfigDir is where config.toml lives. Under EBB_HOME everything is
 // relative to that home so a sandbox is fully self-contained.
 func ConfigDir(env Env) string {
 	if env.Getenv(HomeEnv) != "" {

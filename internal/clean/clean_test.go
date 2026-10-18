@@ -543,3 +543,32 @@ func scanTree(t *testing.T, root string) *tree.Tree {
 	}
 	return res.Tree
 }
+
+func TestCommandRunsInAnEmptyFolder(t *testing.T) {
+	env, home := sandboxEnv(t)
+	mkfile(t, filepath.Join(home, "w", "cache", "f"), 10)
+	env.Bins = map[string]string{"bun": "/opt/bun"}
+	var dir string
+	var entries int
+	env.RunFn = func(d, name string, _ ...string) ([]byte, error) {
+		if name == "bun" {
+			dir = d
+			des, _ := os.ReadDir(d)
+			entries = len(des)
+		}
+		return nil, nil
+	}
+	f := findingFor(filepath.Join(home, "w", "cache"), finding.Regenerable, finding.Action{Kind: "command", Argv: []string{"bun", "pm", "cache", "rm"}, Requires: "bun"})
+	p, _ := planner(env, f).Plan(Request{FindingIDs: []string{f.ID}})
+	p.Approved = true
+	if _, err := executor(env).Execute(context.Background(), p, nil); err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := os.Getwd()
+	if dir == "" || dir == cwd || entries != 0 {
+		t.Fatalf("ran in %q with %d entries", dir, entries)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("working folder left behind: %v", err)
+	}
+}

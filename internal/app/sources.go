@@ -1,9 +1,8 @@
 package app
 
 import (
-	"os"
-
 	"github.com/doguyilmaz/ebb/internal/sources"
+	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
 // Sources splits the last scan into place → owner → kind.
@@ -29,7 +28,7 @@ func (a *App) Packages() (sources.Packages, error) {
 		return p, nil
 	}
 	a.mu.Unlock()
-	p := sources.FindPackages(r.Tree, a.Links, a.Env.Home(), os.ReadFile, 200)
+	p := sources.FindPackages(r.Tree, a.Links, a.Env.Home(), func(p string) ([]byte, error) { return sys.ReadSmall(p, 1<<20) }, 200)
 	a.mu.Lock()
 	a.packages.scan, a.packages.result = r.Meta.ID, p
 	a.mu.Unlock()

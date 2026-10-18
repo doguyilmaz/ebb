@@ -53,7 +53,7 @@ func (c *Context) readFile(p string) ([]byte, error) {
 	if c.ReadFile != nil {
 		return c.ReadFile(p)
 	}
-	return os.ReadFile(p)
+	return sys.ReadSmall(p, 1<<20)
 }
 
 // node finds a display path in the tree.

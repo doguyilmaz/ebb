@@ -176,7 +176,14 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 		if len(it.Command) == 0 {
 			return "", errors.New("no command to run")
 		}
-		_, err := e.Env.Run(cctx, "", it.Command[0], it.Command[1:]...)
+		// Tools read project config from their working folder (yarnPath, a
+		// bunfig cache dir), so they never run where ebb was started.
+		cwd, err := os.MkdirTemp("", "ebb-run-")
+		if err != nil {
+			return "", err
+		}
+		defer os.RemoveAll(cwd)
+		_, err = e.Env.Run(cctx, cwd, it.Command[0], it.Command[1:]...)
 		return "", err
 	}
 	return "", fmt.Errorf("unknown action %q", it.Action.Kind)

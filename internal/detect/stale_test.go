@@ -238,8 +238,10 @@ func TestStaleDistOnlyWhenGitIgnoresIt(t *testing.T) {
 		"code/app/package.json=0@"+old, "code/app/dist/bundle.js=120@"+old,
 		"code/lib/package.json=0@"+old, "code/lib/.git/HEAD=0@"+old, "code/lib/dist/index.js=110@"+old,
 		"code/mono/.git/HEAD=0@"+old, "code/mono/packages/ui/package.json=0@"+old, "code/mono/packages/ui/dist/ui.js=100@"+old,
+		"code/root/.git/HEAD=0@"+old, "code/root/packages/x/package.json=0@"+old, "code/root/packages/x/dist/x.js=100@"+old,
+		"code/web/.git/HEAD=0@"+old, "code/web/package.json=0@"+old, "code/web/dist/w.js=100@"+old,
 		"code/swift/Package.swift=0@"+old, "code/swift/.build/debug/x=200@"+old)
-	for _, p := range []string{"/h/code/app", "/h/code/lib", "/h/code/mono/packages/ui"} {
+	for _, p := range []string{"/h/code/app", "/h/code/lib", "/h/code/mono/packages/ui", "/h/code/root/packages/x", "/h/code/web"} {
 		markers(tr, p, "package.json")
 	}
 	markers(tr, "/h/code/swift", "Package.swift")
@@ -249,9 +251,14 @@ func TestStaleDistOnlyWhenGitIgnoresIt(t *testing.T) {
 		t.Fatal("Git never runs in someone else's repository")
 		return nil, nil
 	}
+	ignores := map[string]string{
+		"/h/code/mono/.gitignore": "# build\nnode_modules\ndist/\n",
+		"/h/code/root/.gitignore": "/dist/\n",
+		"/h/code/web/.gitignore":  "/dist\n",
+	}
 	c.ReadFile = func(p string) ([]byte, error) {
-		if p == "/h/code/mono/.gitignore" {
-			return []byte("# build\nnode_modules\n/dist/\n"), nil
+		if b, ok := ignores[p]; ok {
+			return []byte(b), nil
 		}
 		return nil, os.ErrNotExist
 	}
@@ -259,14 +266,16 @@ func TestStaleDistOnlyWhenGitIgnoresIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dist := byRule(fs, "stale.dist")
 	var got []string
-	for _, tg := range dist.Targets {
-		got = append(got, strings.TrimPrefix(tg.Path, "/h/code/"))
+	if dist := byRule(fs, "stale.dist"); dist != nil {
+		for _, tg := range dist.Targets {
+			got = append(got, strings.TrimPrefix(tg.Path, "/h/code/"))
+		}
 	}
 	slices.Sort(got)
-	// Outside a repository it goes; inside one only when a .gitignore up to the root lists it.
-	if want := []string{"app/dist", "mono/packages/ui/dist"}; !slices.Equal(got, want) {
+	// Only inside a repository, and only when a .gitignore lists it: an
+	// anchored /dist covers the folder next to that .gitignore, not nested ones.
+	if want := []string{"mono/packages/ui/dist", "web/dist"}; !slices.Equal(got, want) {
 		t.Fatalf("dist targets %q, want %q", got, want)
 	}
 	if byRule(fs, "stale.dot-build") == nil {

@@ -142,7 +142,7 @@ func pnpmEntry(entry string) (name, version string, ok bool) {
 
 func version(read func(string) ([]byte, error), path string) string {
 	b, err := read(path)
-	if err != nil || len(b) > 1<<20 {
+	if err != nil {
 		return ""
 	}
 	var pj struct {
