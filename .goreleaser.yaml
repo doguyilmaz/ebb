@@ -20,8 +20,10 @@ builds:
 universal_binaries:
   - replace: true
     hooks:
-      # Ad-hoc signature over both slices; an unsigned arm64 binary does not run.
-      post: codesign --force --sign - {{ .Path }}
+      # Ad-hoc signature over both slices (an unsigned arm64 binary does not
+      # run), with the hardened runtime: the binary may hold Full Disk Access,
+      # so it must not load libraries injected through DYLD_* variables.
+      post: codesign --force --sign - --options runtime {{ .Path }}
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_universal"
