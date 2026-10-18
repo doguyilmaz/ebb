@@ -171,19 +171,44 @@ export const api = {
   del: <T>(path: string) => call<T>("DELETE", path),
 };
 
-/** Listens to ebb's server-sent events. */
+/**
+ * Listens to ebb's server-sent events. EventSource cannot send the token in a
+ * header and it must not go in the URL, so each connection asks for a
+ * one-time ticket first, and asks again when the stream drops.
+ */
 export function subscribe(on: (name: string, data: unknown) => void, names: readonly string[]): () => void {
-  const es = new EventSource(`${apiBase()}/api/v1/events?token=${tok}`);
-  for (const n of names) {
-    es.addEventListener(n, (e) => {
-      let data: unknown = null;
-      try {
-        data = JSON.parse((e as MessageEvent).data ?? "null");
-      } catch {
-        data = null;
-      }
-      on(n, data);
-    });
-  }
-  return () => es.close();
+  let es: EventSource | null = null;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let closed = false;
+  const open = async () => {
+    try {
+      const { ticket } = await api.post<{ ticket: string }>("/events/ticket");
+      if (closed) return;
+      es = new EventSource(`${apiBase()}/api/v1/events?ticket=${encodeURIComponent(ticket)}`);
+    } catch {
+      if (!closed) retry = setTimeout(open, 3000);
+      return;
+    }
+    for (const n of names) {
+      es.addEventListener(n, (e) => {
+        let data: unknown = null;
+        try {
+          data = JSON.parse((e as MessageEvent).data ?? "null");
+        } catch {
+          data = null;
+        }
+        on(n, data);
+      });
+    }
+    es.onerror = () => {
+      es?.close();
+      if (!closed) retry = setTimeout(open, 2000);
+    };
+  };
+  void open();
+  return () => {
+    closed = true;
+    clearTimeout(retry);
+    es?.close();
+  };
 }

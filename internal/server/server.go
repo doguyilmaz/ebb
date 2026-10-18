@@ -27,6 +27,7 @@ type Server struct {
 	hub     *hub
 	mux     *http.ServeMux
 	spa     http.Handler
+	tickets tickets
 }
 
 func New(a *app.App, version, token string) *Server {
@@ -82,7 +83,8 @@ func (s *Server) routes() {
 	s.local("GET /api/v1/web", s.webAccess)
 	s.local("POST /api/v1/web/allow", s.webAllow)
 	s.local("POST /api/v1/web/deny", s.webDeny)
-	s.mux.HandleFunc("GET /api/v1/events", s.auth(s.handleEvents))
+	s.api("POST /api/v1/events/ticket", s.eventTicket)
+	s.mux.HandleFunc("GET /api/v1/events", s.streamAuth(s.handleEvents))
 	s.dataRoutes()
 	s.cleanRoutes()
 	s.daemonRoutes()
@@ -93,13 +95,11 @@ func (s *Server) routes() {
 	s.mux.Handle("/", s.spa)
 }
 
-// bearer reads the token from the header; only the event stream and the
-// report, which a browser opens without headers, may carry it in the URL.
+// bearer reads the token from the header only: a token in a URL ends up in
+// histories and logs. The event stream, which a browser opens without
+// headers, uses a ticket instead (see events.go).
 func bearer(r *http.Request) string {
-	tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if (!ok || tok == "") && (r.URL.Path == "/api/v1/events" || r.URL.Path == "/api/v1/report") {
-		tok = r.URL.Query().Get("token")
-	}
+	tok, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	return tok
 }
 
@@ -107,8 +107,10 @@ func (s *Server) master(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(bearer(r)), []byte(s.token)) == 1
 }
 
-func (s *Server) authorized(r *http.Request) bool {
-	return s.master(r) || s.app.WebTokenValid(bearer(r))
+func (s *Server) authorized(r *http.Request) bool { return s.valid(bearer(r)) }
+
+func (s *Server) valid(tok string) bool {
+	return tok != "" && (subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1 || s.app.WebTokenValid(tok))
 }
 
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {

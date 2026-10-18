@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net"
@@ -86,7 +87,7 @@ func TestAuthRequired(t *testing.T) {
 
 func TestHostHeaderRejected(t *testing.T) {
 	c := newClient(t)
-	for _, p := range []string{"/api/v1/health", "/", "/api/v1/events?token=secret"} {
+	for _, p := range []string{"/api/v1/health", "/", "/api/v1/events"} {
 		if resp := c.req("GET", p, map[string]string{"Host": "evil.example:47340"}); resp.StatusCode != http.StatusMisdirectedRequest {
 			t.Fatalf("%s with foreign Host: %d", p, resp.StatusCode)
 		}
@@ -125,9 +126,35 @@ func TestPrivateNetworkHeader(t *testing.T) {
 	}
 }
 
+func TestEventStreamTickets(t *testing.T) {
+	c := newClient(t)
+	if resp := c.req("GET", "/api/v1/events?token=secret", nil); resp.StatusCode != 401 {
+		t.Fatalf("a token in the URL is not accepted: %d", resp.StatusCode)
+	}
+	_, got := c.post("/api/v1/events/ticket", "", true, "")
+	tk, _ := got["ticket"].(string)
+	if len(tk) < 32 {
+		t.Fatalf("ticket %v", got)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	r, _ := http.NewRequestWithContext(ctx, "GET", c.srv.URL+"/api/v1/events?ticket="+tk, nil)
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("a fresh ticket opens the stream: %v %v", resp, err)
+	}
+	cancel()
+	resp.Body.Close()
+	if resp := c.req("GET", "/api/v1/events?ticket="+tk, nil); resp.StatusCode != 401 {
+		t.Fatalf("a ticket works once: %d", resp.StatusCode)
+	}
+	if resp := c.req("POST", "/api/v1/events/ticket", nil); resp.StatusCode != 401 {
+		t.Fatalf("tickets need the token: %d", resp.StatusCode)
+	}
+}
+
 func TestSSEHelloAndEvent(t *testing.T) {
 	c := newClient(t)
-	resp := c.req("GET", "/api/v1/events?token=secret", nil)
+	resp := c.req("GET", "/api/v1/events", map[string]string{"Authorization": "Bearer secret"})
 	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
 		t.Fatalf("%d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}

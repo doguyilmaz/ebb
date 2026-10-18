@@ -1,7 +1,9 @@
 # ebb local API
 
 Base `http://127.0.0.1:<port>/api/v1` (default port 47340). JSON bodies, 1 MB limit. Every route except
-`GET /health` and `POST /pair` needs `Authorization: Bearer <token>` (or `?token=` on `/events` and `/report` only). Errors are
+`GET /health` and `POST /pair` needs `Authorization: Bearer <token>`; tokens are never accepted in a URL. The
+event stream, which a browser opens without headers, takes `?ticket=` from `POST /events/ticket` (30 s, one use,
+standing for the token that asked for it). Errors are
 `Error {error, code?}` with a matching HTTP status. Types are defined in `internal/api/types.go` and generated into
 `ui/src/api/types.gen.ts`; this table names them.
 
@@ -23,6 +25,9 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/children?path&limit&small=1` | — | `ChildrenResponse` | 400 `outside-root` |
 | GET | `/search?q&limit` | — | `SearchResponse` | — |
 | GET | `/apps` | — | `AppsResponse {apps, note?}` (apps in /Applications and ~/Applications as the last scan saw them, biggest first, each with its Library data; uninstall with `POST /plans {app}`) | 409 `never-scanned` |
+| POST | `/duplicates` | `DuplicatesRequest {path?, minSize?}` | `DuplicatesState` (202; events `duplicates.progress`, `duplicates.done`) | 400 `outside-root`, 409 `scan-running`/`cleaning`/`searching` |
+| GET | `/duplicates` | — | `DuplicatesState {running, progress, result, error}` (the last result survives restarts) | — |
+| DELETE | `/duplicates/current` | — | `DuplicatesState` (202) | 409 `no-search` |
 | GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |
 | GET | `/report?format=json\|csv\|html\|text` | — | file | 400 `bad-format` |
 | POST | `/reveal` | `PathRequest` | 204 | 400 `outside-root` |
@@ -44,7 +49,8 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET/POST | `/notes` | `NoteRequest {key, text}` (empty text removes) | `{key: text}` | 400 |
 | GET/POST | `/ignores` | `IgnoreRequest {findingId}` | `{findingId: time}` | — |
 | DELETE | `/ignores/{id}` | — | `{findingId: time}` | — |
-| GET | `/events` | — | `text/event-stream` | 401 |
+| POST | `/events/ticket` | — | `{ticket}` | 401 |
+| GET | `/events?ticket` | — | `text/event-stream` | 401 |
 
 Plans expire after 10 minutes and run once. A plan needs approval unless every runnable item is `regenerable` and
 `[mcp] auto_execute = "regenerable"` (the default). Execute re-checks every item: it must still be the same file
