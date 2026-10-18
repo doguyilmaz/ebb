@@ -30,6 +30,7 @@ settings in the dashboard are:
 | Setting | Value |
 | --- | --- |
 | Branch | `main` only (no trigger for other branches) |
+| Watch paths | `ui/*` and `web/*` (Go, docs and rules changes do not deploy) |
 | Path | `/web` |
 | Build command | `cd ../ui && bun install --frozen-lockfile && bun run build && cd ../web && npm ci` |
 | Deploy command | `npx cf deploy` |
