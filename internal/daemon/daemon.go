@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
@@ -46,7 +47,7 @@ var ErrRunning = errors.New("the background service is already running")
 // which launchd would answer by starting it again at once.
 func Run(ctx context.Context, a *app.App, opt Options) error {
 	env := a.Env
-	d := &daemon{a: a, opt: opt, dir: sys.StateDir(env), st: api.Daemon{PID: os.Getpid(), Started: env.Now()}}
+	d := &daemon{a: a, opt: opt, dir: sys.StateDir(env), st: api.Daemon{PID: os.Getpid(), Exe: realExe(), Started: env.Now()}}
 	if cur := svc.Local(env).Read(); cur.Running && cur.PID != os.Getpid() {
 		return ErrRunning
 	}
@@ -188,4 +189,16 @@ func (d *daemon) save() { _ = svc.WriteStatus(d.dir, d.st) }
 
 func (d *daemon) logf(format string, args ...any) {
 	fmt.Fprintf(d.opt.Out, "%s %s\n", time.Now().Format(time.RFC3339), fmt.Sprintf(format, args...))
+}
+
+// realExe resolves links: macOS grants Full Disk Access to the file itself.
+func realExe() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		return real
+	}
+	return exe
 }

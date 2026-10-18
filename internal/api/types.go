@@ -231,6 +231,7 @@ type Daemon struct {
 	Running    bool      `json:"running"`
 	Waiting    bool      `json:"waiting"` // another ebb serves the window; the service takes over when it closes
 	PID        int       `json:"pid"`
+	Exe        string    `json:"exe"` // the binary the service runs, which is what Full Disk Access must name
 	Started    time.Time `json:"started"`
 	LastCheck  time.Time `json:"lastCheck"`
 	LastWork   string    `json:"lastWork"` // update or full

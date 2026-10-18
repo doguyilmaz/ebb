@@ -1,12 +1,12 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-/** A command to run in Terminal, with a copy button. */
-export function Command({ value }: { value: string }) {
+/** A command to run in Terminal (or, without the prompt, any text to paste), with a copy button. */
+export function Command({ value, prompt = true }: { value: string; prompt?: boolean }) {
   const [done, setDone] = useState(false);
   return (
     <div className="cmd">
-      <span className="cmd-prompt" aria-hidden>$</span>
+      {prompt && <span className="cmd-prompt" aria-hidden>$</span>}
       <code title={value}>{value}</code>
       <button
         type="button"

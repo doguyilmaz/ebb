@@ -216,6 +216,7 @@ export interface Daemon {
   running: boolean;
   waiting: boolean;
   pid: number;
+  exe: string;
   started: string;
   lastCheck: string;
   lastWork: string;

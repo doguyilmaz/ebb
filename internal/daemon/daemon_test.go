@@ -140,7 +140,7 @@ func TestRunServesAndRecordsItself(t *testing.T) {
 			t.Fatal("the service never served")
 		}
 	}
-	if st := sv.Read(); !st.Running || st.PID != os.Getpid() || st.Started.IsZero() {
+	if st := sv.Read(); !st.Running || st.PID != os.Getpid() || st.Exe == "" || st.Started.IsZero() {
 		t.Fatalf("status while running: %+v", st)
 	}
 	cancel()
