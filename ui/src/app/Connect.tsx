@@ -15,6 +15,8 @@ type State =
   | { kind: "ready" };
 
 const RETRY_MS = 2500;
+const MAX_RETRY_MS = 30_000;
+const PAIRING_MS = 2000;
 const RELEASES = "https://github.com/doguyilmaz/ebb/releases/latest";
 const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
 
@@ -44,13 +46,37 @@ export function Connect({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void attempt();
+    // On a phone or a PC there is no ebb to find, so the page asks nothing of 127.0.0.1.
+    if (!wasEmbedded() && detectOS() !== "mac") setState({ kind: "absent" });
+    else void attempt();
   }, [attempt]);
 
   useEffect(() => {
     if (state.kind === "ready" || state.kind === "connecting" || state.kind === "no-token") return;
-    const id = setInterval(() => void attempt(), state.kind === "pairing" ? 2000 : RETRY_MS);
-    return () => clearInterval(id);
+    if (state.kind === "absent" && !wasEmbedded() && detectOS() !== "mac") return;
+    const first = state.kind === "pairing" ? PAIRING_MS : RETRY_MS;
+    let delay = first;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      if (document.visibilityState === "visible") await attempt();
+      if (stopped) return;
+      if (state.kind !== "pairing") delay = Math.min(delay * 2, MAX_RETRY_MS);
+      timer = setTimeout(tick, delay);
+    };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      delay = first;
+      void tick();
+    };
+    timer = setTimeout(tick, delay);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [state.kind, attempt]);
 
   useEffect(() => {
