@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FolderOpen, Plus, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "#/api/client.ts";
-import { useDaemon, useDaemonAction, useDisks, useFindings, useIgnore, useSaveSettings, useSettings, useStatus, useWebAccess } from "#/api/hooks.ts";
+import { useDaemon, useDaemonAction, useDisks, useFindings, useIgnore, useSaveSettings, useSettings, useStartScan, useStatus, useWebAccess } from "#/api/hooks.ts";
 import type { ChooseResponse, Settings as S } from "#/api/types.gen.ts";
 import { ago, bytes } from "#/lib/format.ts";
 import type { TermId } from "#/lib/glossary.ts";
@@ -62,6 +62,8 @@ function Field({ label, help, children }: { label: string; help: string; childre
 function Scan() {
   const settings = useSettings();
   const save = useSaveSettings();
+  const start = useStartScan();
+  const status = useStatus();
   const picker = useChooseFolder();
   const disks = useDisks();
   const [draft, setDraft] = useState<S | null>(null);
@@ -117,9 +119,23 @@ function Scan() {
         </Field>
       </div>
       <div className="row">
-        <button className="btn primary" disabled={save.isPending} onClick={() => save.mutate(draft)}>Save</button>
-        {save.error && <span className="error">{(save.error as Error).message}</span>}
-        {save.isSuccess && <span className="muted">Saved. Changes apply to the next scan.</span>}
+        <button
+          className="btn primary"
+          disabled={save.isPending}
+          onClick={() => {
+            // "Scan again" repeats the last scan's folder, so a new folder is scanned right away.
+            const last = status.data?.last?.root;
+            const moved = last && (draft.root || status.data?.defaultRoot) !== last;
+            start.reset();
+            save.mutate(draft, { onSuccess: () => moved && start.mutate({ root: draft.root || undefined }) });
+          }}
+        >
+          Save
+        </button>
+        {(save.error || start.error) && <span className="error">{((save.error ?? start.error) as Error).message}</span>}
+        {save.isSuccess && !start.error && (
+          <span className="muted">{start.isPending || start.isSuccess ? `Saved. Scanning ${draft.root || "the whole disk"} now.` : "Saved. Changes apply to the next scan."}</span>
+        )}
       </div>
     </section>
   );

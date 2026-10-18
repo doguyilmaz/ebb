@@ -98,3 +98,33 @@ func TestBulkPermissionDenied(t *testing.T) {
 		t.Fatalf("bulk reader: %v %+v", ok, res.Problems)
 	}
 }
+
+func TestOwnTrashOnAnUnlistableTrashes(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine := filepath.Join(root, ".Trashes", strconv.Itoa(os.Getuid()))
+	if err := os.MkdirAll(mine, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mine, "old.mov"), make([]byte, 3<<20), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// As on a real disk: anyone may enter .Trashes, nobody may list it.
+	trashes := filepath.Join(root, ".Trashes")
+	if err := os.Chmod(trashes, 0o1333); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(trashes, 0o755) })
+	res := scan(t, root, Options{})
+	id, ok := res.Tree.Lookup(mine)
+	if !ok || res.Tree.Node(id).Files != 1 || res.Tree.Node(id).Alloc < 3<<20 {
+		t.Fatalf("own trash not read: found %v", ok)
+	}
+	for _, p := range res.Problems {
+		if strings.Contains(p.Path, ".Trashes") {
+			t.Fatalf("reported as unreadable: %+v", p)
+		}
+	}
+}

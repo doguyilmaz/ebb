@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
+	"time"
 
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/tree"
@@ -81,6 +83,12 @@ func (ideVersions) Detect(_ context.Context, c *Context) ([]finding.Finding, err
 				continue
 			}
 			for _, v := range vs[:len(vs)-1] {
+				// One that still changes is in use too: a release beside an EAP, or a rollback.
+				if slices.ContainsFunc(v.ids, func(id tree.ID) bool {
+					return c.Now.Sub(time.Unix(c.Tree.Node(id).MaxMtime, 0)) < c.StaleAfter
+				}) {
+					continue
+				}
 				for _, id := range v.ids {
 					f.Targets = append(f.Targets, c.target(id))
 				}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -355,8 +356,10 @@ func (s *Session) apply(b *batch) {
 			s.removed = true
 			return
 		}
-		s.problem(b.path, b.err)
 		s.t.Write(func(w *tree.Writer) { w.SetFlags(b.dir, tree.FlagDenied) })
+		if !s.ownTrash(b) {
+			s.problem(b.path, b.err)
+		}
 		return
 	}
 	p := b.path
@@ -502,6 +505,32 @@ func (s *Session) apply(b *batch) {
 	})
 	s.files.Add(files)
 	s.bytes.Add(bytes)
+}
+
+// ownTrash: a disk's .Trashes cannot be listed, but the folder inside it
+// that holds this user's trashed items can, by name.
+func (s *Session) ownTrash(b *batch) bool {
+	if filepath.Base(b.path) != ".Trashes" || !errors.Is(b.err, fs.ErrPermission) || s.t.Node(b.dir).Parent != s.t.Root() {
+		return false
+	}
+	name := strconv.Itoa(os.Getuid())
+	fi, err := os.Stat(childPath(b.path, []byte(name)))
+	if err != nil || !fi.IsDir() {
+		return true
+	}
+	var id tree.ID
+	known := false
+	s.t.Write(func(w *tree.Writer) {
+		for _, c := range w.Children(b.dir) {
+			if w.Node(c).Name == name {
+				id, known = c, true
+				return
+			}
+		}
+		id = w.AddDir(b.dir, []byte(name), fi.ModTime().Unix(), 0)
+	})
+	s.push(&batch{path: b.path}, []byte(name), id, known)
+	return true
 }
 
 // push queues a subfolder of b's folder; refresh lists one already in the tree again, with everything below.

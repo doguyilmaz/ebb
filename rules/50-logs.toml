@@ -25,7 +25,8 @@ action = { kind = "empty-trash" }
 id = "installers"
 title = "Installers and disk images"
 category = "installer"
-paths = ["~/Downloads/**/*.{dmg,pkg,mpkg,xip,iso}", "~/Desktop/*.{dmg,pkg,mpkg,xip,iso}", "~/Documents/*.{dmg,pkg,mpkg,xip,iso}"]
+# Outside Downloads only package formats: a disk image kept in Documents may be someone's own (encrypted) archive.
+paths = ["~/Downloads/**/*.{dmg,pkg,mpkg,xip,iso}", "~/Desktop/*.{pkg,mpkg,xip}", "~/Documents/*.{pkg,mpkg,xip}"]
 safety = "caution"
 why = "Installers and disk images stay where they were downloaded after the app is installed."
 impact = "You would need to download an installer again to reinstall."

@@ -181,8 +181,9 @@ func TestCoverageRules(t *testing.T) {
 		".ollama/models/blobs/b=900",
 		"Library/Caches/ms-playwright/chromium-1100/x=300",
 		"Library/Caches/JetBrains/IntelliJIdea2025.2/index=400",
-		"Desktop/Installer.dmg=80",
+		"Desktop/Installer.pkg=80",
 		"Documents/Old.pkg=90",
+		"Documents/Vault.dmg=90",
 		"Documents/Projects/keep.dmg=90",
 	)
 	fs, err := rulesDetector{}.Detect(context.Background(), ctxFor(t, tr))
@@ -200,7 +201,7 @@ func TestCoverageRules(t *testing.T) {
 	}
 	for _, f := range fs {
 		for _, tg := range f.Targets {
-			if strings.HasSuffix(tg.Path, "/History") || strings.Contains(tg.Path, "Projects/keep.dmg") {
+			if strings.HasSuffix(tg.Path, "/History") || strings.HasSuffix(tg.Path, ".dmg") && !strings.Contains(tg.Path, "/Downloads/") {
 				t.Errorf("%s claims %s", f.RuleID, tg.Path)
 			}
 		}
@@ -226,6 +227,9 @@ func TestOldIDEVersions(t *testing.T) {
 		"Library/Application Support/Google/AndroidStudio2025.1/options/a=5",
 		"Library/Caches/Google/AndroidStudio2024.1/caches=900",
 		"Library/Application Support/Google/Chrome/Default/x=10",
+		// The release still in use beside a newer EAP.
+		"Library/Application Support/JetBrains/GoLand2025.1/options/a=5@1791590400",
+		"Library/Application Support/JetBrains/GoLand2025.2/options/a=5",
 	)
 	fs, err := RunWith(context.Background(), ctxFor(t, tr), []Detector{ideVersions{}, rulesDetector{}})
 	if err != nil {
