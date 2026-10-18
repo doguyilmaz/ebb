@@ -41,6 +41,11 @@ GitHub Releases) include it. From source: <code>make build</code>.</p>
 <p>The CLI and the JSON API under <code>/api/v1</code> work as usual.</p></main></body></html>
 `
 
+// Policy is the app's content security policy. The page talks to the origin
+// it came from, or, hosted elsewhere, to ebb on the visitor's own loopback.
+const Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " +
+	"connect-src 'self' http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
 // Handler serves the single-page app: an embedded file when the path names one,
 // index.html for every client route. Paths under a reserved prefix (an API the
 // caller mounts itself) get 404 instead of the app shell.
@@ -48,6 +53,10 @@ func Handler(reserved ...string) http.Handler {
 	assets := FS()
 	files := http.FileServer(http.FS(assets))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", Policy)
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
 		for _, p := range reserved {
 			if strings.HasPrefix(r.URL.Path, p) {
 				http.NotFound(w, r)
@@ -55,8 +64,8 @@ func Handler(reserved ...string) http.Handler {
 			}
 		}
 		if !Built() {
-			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			h.Set("Cache-Control", "no-store")
+			h.Set("Content-Type", "text/html; charset=utf-8")
 			io.WriteString(w, UnbuiltPage)
 			return
 		}
@@ -68,13 +77,13 @@ func Handler(reserved ...string) http.Handler {
 			r.URL.Path = "/"
 			name = "index.html"
 		}
-		// The build stamps a content hash into every asset filename, so those
-		// can be kept forever; a new build asks for new names. Only the shell
-		// keeps its name, so only the shell must never be cached.
-		if name == "index.html" {
-			w.Header().Set("Cache-Control", "no-store")
+		// The build stamps a content hash into every name under assets/, so
+		// those can be kept forever; a new build asks for new names. Files
+		// copied as they are (the shell, icons, fonts) keep their names.
+		if strings.HasPrefix(name, "assets/") {
+			h.Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			h.Set("Cache-Control", "no-cache")
 		}
 		if gz := gzipFor(w, r, name); gz != nil {
 			defer gz.Close()
