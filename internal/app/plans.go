@@ -188,6 +188,9 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 		kept = append(kept, f)
 	}
 	r.Findings = kept
+	if len(gone) > 0 {
+		a.packages.scan = ""
+	}
 	a.mu.Unlock()
 	a.forgetCopies(gone)
 	r.Tree.Compact()

@@ -131,7 +131,8 @@ func TestIgnoreHidesUntilGrowth(t *testing.T) {
 		t.Fatal("ignored finding still shown")
 	}
 	write(t, filepath.Join(home, "w", "cache", "more"), 3<<20)
-	a.Scan(context.Background(), ScanOptions{Root: home}, nil)
+	// A full scan: FSEvents hands a change over milliseconds after it happens.
+	a.Scan(context.Background(), ScanOptions{Root: home, Full: true}, nil)
 	if fr, _ := a.Findings("", 0, false); !hasFinding(fr.Findings, "test.cache") {
 		t.Fatal("a finding that grew by half must come back")
 	}

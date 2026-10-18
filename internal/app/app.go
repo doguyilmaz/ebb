@@ -47,6 +47,7 @@ type App struct {
 	}
 	dupes struct {
 		running, loaded bool
+		stopped         bool
 		stop            context.CancelFunc
 		progress        *dupes.Progress
 		last            *dupes.Result

@@ -120,9 +120,32 @@ func (c *changes) waitReady(ctx context.Context, limit time.Duration) bool {
 }
 
 type watcher struct {
-	root string
-	set  *changes
-	stop context.CancelFunc
+	root  string
+	set   *changes
+	stop  context.CancelFunc
+	flush chan chan struct{}
+	ended chan struct{}
+}
+
+// sync hands the set every event so far: the stream delivers them up to a
+// second late, and a scan right after a change must see it.
+func (w *watcher) sync(ctx context.Context) {
+	done := make(chan struct{})
+	timeout := time.After(5 * time.Second)
+	select {
+	case w.flush <- done:
+	case <-w.ended:
+		return
+	case <-ctx.Done():
+		return
+	case <-timeout:
+		return
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+	case <-timeout:
+	}
 }
 
 // pathMapper turns FSEvents paths (firmlinked display form, /Users/…) into
@@ -160,14 +183,16 @@ func (a *App) follow(ctx context.Context, root string, since uint64, uuid string
 		close(set.wake)
 	}
 	wctx, stop := context.WithCancel(ctx)
+	w := &watcher{root: root, set: set, stop: stop, flush: make(chan chan struct{}), ended: make(chan struct{})}
 	go func() {
-		if err := fsevents.Watch(wctx, root, since, time.Second, set.add); err != nil {
+		defer close(w.ended)
+		if err := fsevents.Watch(wctx, root, since, time.Second, set.add, w.flush); err != nil {
 			set.mu.Lock()
 			set.lost = true
 			set.mu.Unlock()
 		}
 	}()
-	return &watcher{root: root, set: set, stop: stop}
+	return w
 }
 
 // Watch keeps track of what changes on disk while ebb serves, so "scan again"
@@ -213,17 +238,15 @@ func (a *App) changesSince(ctx context.Context, last *ScanResult) (changeSet, *c
 	a.mu.Lock()
 	w := a.watch
 	a.mu.Unlock()
-	set := (*changes)(nil)
-	if w != nil && w.root == root {
-		set = w.set
-	} else {
-		w := a.follow(ctx, root, last.Meta.EventID, last.Meta.FSEvents)
+	if w == nil || w.root != root {
+		w = a.follow(ctx, root, last.Meta.EventID, last.Meta.FSEvents)
 		defer w.stop()
-		set = w.set
 	}
+	set := w.set
 	if !set.waitReady(ctx, time.Minute) {
 		return changeSet{}, nil, false
 	}
+	w.sync(ctx)
 	if _, lost, _ := set.summary(); lost {
 		return changeSet{}, nil, false
 	}

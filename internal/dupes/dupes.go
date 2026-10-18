@@ -56,7 +56,9 @@ type Progress struct {
 var skipNames = []string{"Library", "node_modules"}
 
 var bundleExts = []string{".app", ".bundle", ".framework", ".photoslibrary", ".musiclibrary", ".imovielibrary", ".tvlibrary",
-	".fcpbundle", ".logicx", ".band", ".xcarchive", ".lrlibrary", ".lrdata", ".aplibrary", ".pkg", ".plugin", ".kext", ".xcodeproj"}
+	".fcpbundle", ".logicx", ".band", ".xcarchive", ".lrlibrary", ".lrdata", ".aplibrary", ".pkg", ".plugin", ".kext", ".xcodeproj",
+	".sparsebundle", ".pvm", ".vmwarevm", ".utm", ".key", ".pages", ".numbers", ".rtfd", ".dsym", ".docset", ".xcworkspace",
+	".playground", ".xcassets", ".xcdatamodeld", ".scptd", ".appex", ".prefpane", ".qlgenerator", ".mdimporter", ".saver"}
 
 func skipped(name string) bool {
 	return strings.HasPrefix(name, ".") || slices.Contains(skipNames, name) || slices.Contains(bundleExts, strings.ToLower(filepath.Ext(name)))
@@ -112,7 +114,7 @@ func Find(ctx context.Context, t *tree.Tree, links volume.Firmlinks, root tree.I
 		}
 	}
 	res := Result{Root: links.Display(t.Path(root)), Time: start}
-	sampled, err := regroup(ctx, sized, total, "sample", progress, func(c cand) (string, error) { return digest(c.path, c.size, true) })
+	sampled, err := regroup(ctx, sized, total, "sample", progress, func(c cand) (string, error) { return digest(ctx, c.path, c.size, true) })
 	if err != nil {
 		return res, err
 	}
@@ -125,7 +127,7 @@ func Find(ctx context.Context, t *tree.Tree, links volume.Firmlinks, root tree.I
 		if c.size <= 2*sample {
 			return "same", nil
 		}
-		return digest(c.path, c.size, false)
+		return digest(ctx, c.path, c.size, false)
 	})
 	if err != nil {
 		return res, err
@@ -220,7 +222,7 @@ feed:
 // digest hashes the first and last 64 KiB (sampled) or the whole file. It
 // bypasses the page cache, so a search through gigabytes does not push out
 // what other apps keep in memory.
-func digest(path string, size uint64, sampled bool) (string, error) {
+func digest(ctx context.Context, path string, size uint64, sampled bool) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -230,7 +232,7 @@ func digest(path string, size uint64, sampled bool) (string, error) {
 	h := sha256.New()
 	buf := make([]byte, 1<<20)
 	if !sampled {
-		if _, err := io.CopyBuffer(h, f, buf); err != nil {
+		if _, err := io.CopyBuffer(h, ctxReader{ctx, f}, buf); err != nil {
 			return "", err
 		}
 		return hex.EncodeToString(h.Sum(nil)), nil
@@ -253,4 +255,17 @@ func digest(path string, size uint64, sampled bool) (string, error) {
 		h.Write(buf[:m])
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// ctxReader stops a long read (a whole disk image) as soon as the search is stopped.
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (c ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
 }

@@ -1,7 +1,7 @@
 import { ChevronRight, FolderOpen, FolderSearch, Search, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "#/api/client.ts";
-import { useDuplicates, useFindDuplicates, useReveal, useStopDuplicates } from "#/api/hooks.ts";
+import { useDuplicates, useFindDuplicates, useReveal, useStatus, useStopDuplicates } from "#/api/hooks.ts";
 import type { ChooseResponse, Group } from "#/api/types.gen.ts";
 import { ago, baseName, bytes, count } from "#/lib/format.ts";
 import { useSelection } from "#/lib/selection.ts";
@@ -20,6 +20,7 @@ const phases: Record<string, string> = { sample: "Comparing the start and end of
 
 export default function Duplicates() {
   const dupes = useDuplicates();
+  const status = useStatus();
   const find = useFindDuplicates();
   const stop = useStopDuplicates();
   const openSheet = useSheet((s) => s.open);
@@ -32,6 +33,9 @@ export default function Duplicates() {
   if (dupes.error) return <Problem error={dupes.error} />;
   if (!dupes.data) return <Loading />;
   const st = dupes.data;
+  // Home is searched unless the last scan covered another disk or a folder outside it.
+  const root = status.data?.last?.root ?? "";
+  const otherRoot = root && root !== "/" && root !== status.data?.defaultRoot ? root : "";
   const groups = st.result?.groups ?? [];
   const chosen = extras(groups, picked, keep);
   const allPicked = groups.length > 0 && groups.every((g) => picked.has(groupKey(g)));
@@ -55,8 +59,8 @@ export default function Duplicates() {
             </button>
           ))}
         </div>
-        <button className="btn" onClick={browse} data-tip={folder ? folder : "Your home folder; apps' data, libraries and bundles are left out"}>
-          <FolderOpen size={14} aria-hidden /> {folder ? baseName(folder) : "Home"}
+        <button className="btn" onClick={browse} data-tip={folder || otherRoot || "Your home folder; apps' data, libraries and bundles are left out"}>
+          <FolderOpen size={14} aria-hidden /> {folder ? baseName(folder) : otherRoot ? baseName(otherRoot) : "Home"}
         </button>
         {st.running ? (
           <button className="btn" onClick={() => stop.mutate()}>

@@ -14,11 +14,17 @@ import (
 var ErrSearching = errors.New("a duplicate search is running: try again when it is done")
 
 // dupesRoot is where a search looks when no folder is given: the person's own files.
+// dupesRoot is the folder to search: the one asked for, else home, else (when
+// the last scan was of another disk or a folder outside home) that scan's root.
 func (a *App) dupesRoot(path string) string {
-	if path == "" {
-		return a.Env.Home()
+	if path != "" {
+		return path
 	}
-	return path
+	home := a.Env.Home()
+	if r, err := a.Last(); err == nil && !within(a.Links.Real(home), a.Links.Real(r.Meta.Root)) {
+		return r.Meta.Root
+	}
+	return home
 }
 
 // FindDuplicates searches below path (empty: home) and waits for the result.
@@ -93,7 +99,7 @@ func (a *App) beginSearch() error {
 	case a.cleaning:
 		return ErrCleaning
 	}
-	a.dupes.running, a.dupes.progress, a.dupes.err = true, nil, ""
+	a.dupes.running, a.dupes.progress, a.dupes.err, a.dupes.stopped = true, nil, "", false
 	return nil
 }
 
@@ -104,7 +110,10 @@ func (a *App) endSearch(res *dupes.Result, err error) {
 	if res != nil {
 		a.dupes.last = res
 	}
-	if err != nil && !errors.Is(err, context.Canceled) {
+	switch {
+	case errors.Is(err, context.Canceled):
+		a.dupes.stopped = true
+	case err != nil:
 		a.dupes.err = err.Error()
 	}
 }
@@ -132,7 +141,7 @@ func (a *App) Duplicates() api.DuplicatesState {
 			a.dupes.last = &res
 		}
 	}
-	return api.DuplicatesState{Running: a.dupes.running, Progress: a.dupes.progress, Result: a.dupes.last, Error: a.dupes.err}
+	return api.DuplicatesState{Running: a.dupes.running, Stopped: a.dupes.stopped, Progress: a.dupes.progress, Result: a.dupes.last, Error: a.dupes.err}
 }
 
 // forgetCopies drops copies a cleanup removed, and groups left with one.

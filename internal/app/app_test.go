@@ -302,8 +302,14 @@ func TestDuplicateSearchAndCleanup(t *testing.T) {
 	if _, err := a.FindDuplicates(context.Background(), "/etc", 0, nil); !errors.Is(err, ErrOutsideRoot) {
 		t.Fatalf("outside the scan: %v", err)
 	}
-	res, err := a.FindDuplicates(context.Background(), root, 0, nil)
-	if err != nil || len(res.Groups) != 1 || len(res.Groups[0].Copies) != 2 {
+	stopped, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := a.FindDuplicates(stopped, root, 0, nil); err == nil || !a.Duplicates().Stopped {
+		t.Fatalf("a stopped search says so: %v %+v", err, a.Duplicates())
+	}
+	// Home is outside this scan, so the default is the scanned folder.
+	res, err := a.FindDuplicates(context.Background(), "", 0, nil)
+	if err != nil || len(res.Groups) != 1 || len(res.Groups[0].Copies) != 2 || a.Duplicates().Stopped {
 		t.Fatalf("%+v %v", res, err)
 	}
 	extra := res.Groups[0].Copies[1].Path

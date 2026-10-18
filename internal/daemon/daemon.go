@@ -160,7 +160,7 @@ func (d *daemon) check(ctx context.Context) {
 		return
 	}
 	err = d.s.StartScan(app.ScanOptions{Root: last.Meta.Root, Gentle: true, Full: work == Full})
-	if errors.Is(err, app.ErrScanRunning) || errors.Is(err, app.ErrCleaning) {
+	if errors.Is(err, app.ErrScanRunning) || errors.Is(err, app.ErrCleaning) || errors.Is(err, app.ErrSearching) {
 		return
 	}
 	if err != nil {

@@ -3,6 +3,7 @@ package dupes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -42,6 +43,8 @@ func TestFindGroupsIdenticalFilesOnly(t *testing.T) {
 	write(t, filepath.Join(root, "Documents", "edited.mp4"), b)
 	// Copies inside bundles, dot-folders and ~/Library belong to something else.
 	write(t, filepath.Join(root, "Applications", "Tool.app", "Contents", "movie.mp4"), a)
+	write(t, filepath.Join(root, "Parallels", "Win.pvm", "disk.hds", "movie.mp4"), a)
+	write(t, filepath.Join(root, "Backup.sparsebundle", "bands", "0"), a)
 	write(t, filepath.Join(root, ".cache", "movie.mp4"), a)
 	write(t, filepath.Join(root, "Library", "Caches", "movie.mp4"), a)
 	// A hardlink already shares its data.
@@ -94,5 +97,15 @@ func TestFindStopsWhenCancelled(t *testing.T) {
 	cancel()
 	if _, err := Find(ctx, scan.Tree, volume.Firmlinks{}, scan.Tree.Root(), 1<<20, nil); err == nil {
 		t.Fatal("a cancelled search ends with its error")
+	}
+}
+
+func TestDigestStopsMidFile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "big")
+	write(t, p, content(4, 3<<20))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := digest(ctx, p, 3<<20, false); !errors.Is(err, context.Canceled) {
+		t.Fatalf("a stopped search still read the whole file: %v", err)
 	}
 }

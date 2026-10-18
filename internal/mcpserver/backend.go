@@ -282,6 +282,8 @@ func (r *remoteBackend) Duplicates(ctx context.Context, p string, min uint64) (*
 		case st.Running:
 		case st.Error != "":
 			return nil, errors.New(st.Error)
+		case st.Stopped || st.Result == nil:
+			return nil, errors.New("the search was stopped in ebb's window before it finished")
 		default:
 			return st.Result, nil
 		}

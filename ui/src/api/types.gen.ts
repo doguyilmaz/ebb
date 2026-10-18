@@ -306,6 +306,7 @@ export interface Result {
 
 export interface DuplicatesState {
   running: boolean;
+  stopped: boolean;
   progress: DupesProgress | null;
   result: Result | null;
   error?: string;

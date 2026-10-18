@@ -73,6 +73,8 @@ ebb_watch *ebb_watch_start(const char *root, uint64_t since, double latency, uin
 	return w;
 }
 
+void ebb_watch_flush(ebb_watch *w) { FSEventStreamFlushSync(w->stream); }
+
 void ebb_watch_stop(ebb_watch *w) {
 	/* On the stream's own queue, so a callback already running finishes first. */
 	dispatch_sync(w->queue, ^{

@@ -15,6 +15,7 @@ import (
 	"errors"
 	"runtime/cgo"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -37,9 +38,14 @@ func UUID(path string) string {
 // Watch reports folders that change under root until ctx ends. With since set
 // it first replays history after that ID, then marks the end with a
 // HistoryDone event, then goes on live. fn runs on the stream's own thread,
-// one batch at a time.
-func Watch(ctx context.Context, root string, since uint64, latency time.Duration, fn func([]Event)) error {
-	h := cgo.NewHandle(fn)
+// one batch at a time. A request on flush hands fn everything that happened
+// so far, latency or not, and is answered by closing it.
+func Watch(ctx context.Context, root string, since uint64, latency time.Duration, fn func([]Event), flush <-chan chan struct{}) error {
+	var last atomic.Int64
+	h := cgo.NewHandle(func(evs []Event) {
+		fn(evs)
+		last.Store(time.Now().UnixNano())
+	})
 	defer h.Delete()
 	croot := C.CString(root)
 	defer C.free(unsafe.Pointer(croot))
@@ -47,9 +53,29 @@ func Watch(ctx context.Context, root string, since uint64, latency time.Duration
 	if w == nil {
 		return errors.New("fsevents: could not watch " + root)
 	}
-	<-ctx.Done()
-	C.ebb_watch_stop(w)
-	return nil
+	for {
+		select {
+		case <-ctx.Done():
+			C.ebb_watch_stop(w)
+			return nil
+		case done := <-flush:
+			C.ebb_watch_flush(w)
+			settle(&last)
+			close(done)
+		}
+	}
+}
+
+// settle waits for the events a flush released: the stream hands them over
+// a moment after the flush returns, so wait until it has been quiet briefly.
+func settle(last *atomic.Int64) {
+	start := time.Now()
+	for time.Since(start) < 250*time.Millisecond {
+		time.Sleep(10 * time.Millisecond)
+		if time.Since(start) >= 30*time.Millisecond && time.Since(time.Unix(0, last.Load())) >= 20*time.Millisecond {
+			return
+		}
+	}
 }
 
 //export ebbFSEvents

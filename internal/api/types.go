@@ -208,6 +208,7 @@ type DuplicatesRequest struct {
 
 type DuplicatesState struct {
 	Running  bool            `json:"running"`
+	Stopped  bool            `json:"stopped"` // the latest search was stopped; Result is from an earlier one
 	Progress *dupes.Progress `json:"progress"`
 	Result   *dupes.Result   `json:"result"`
 	Error    string          `json:"error,omitempty"`
