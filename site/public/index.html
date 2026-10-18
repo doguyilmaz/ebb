@@ -6,7 +6,7 @@
 <title>ebb · Disk analyzer for macOS</title>
 <meta name="description" content="See where your Mac's disk space went and get it back safely. ebb scans your disk in about a minute, explains every large item and cleans only what you approve.">
 <link rel="canonical" href="https://ebb.doguyilmaz.com/">
-<meta name="theme-color" content="#f3f3f2">
+<meta name="theme-color" content="#0c0c0e">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ebb.doguyilmaz.com/">
 <meta property="og:title" content="ebb · Disk analyzer for macOS">
@@ -86,8 +86,7 @@
 </figure>
 </section>
 
-<section class="dark fade-both" aria-label="The window">
-<div class="window">
+<section class="wrap section near" aria-label="The window">
 <figure class="shot">
 <img src="/img/explore.webp" width="2400" height="1500" alt="ebb's Explore view: a sunburst of 436.2 GB in the home folder, with .bun, Library and Developer as the largest rings">
 <figcaption>The same scan in the window. Click a ring to go in; every large folder says what it is. Folder names are changed.</figcaption>
@@ -97,10 +96,9 @@
 <li><b>Seconds</b><span>for every scan after that, which reads only the folders that changed</span></li>
 <li><b>1 binary</b><span>with the window, a CLI, a background service and an MCP server</span></li>
 </ul>
-</div>
 </section>
 
-<section id="finds" class="wrap section after-fade">
+<section id="finds" class="wrap section">
 <div class="intro">
 <h2>It knows what your tools leave behind.</h2>
 <p>Rules for package managers, Xcode, Android, browsers and apps say what a folder is, why it grew and whether it comes back on its own.</p>
@@ -191,10 +189,7 @@
 </div>
 </section>
 
-<section id="cli" class="dark fade-in">
-<div class="wrap cli">
-
-<div class="stack">
+<section id="cli" class="wrap section">
 <h2 class="mono-h">Scan, read, plan, undo.</h2>
 <div class="cols">
 <ol class="steps">
@@ -221,8 +216,9 @@
    <span class="tc">4.2 GB</span>  <span class="tg">regenerable</span>  CocoaPods cache         ~/Library/Caches/CocoaPods</pre>
 </figure>
 </div>
-</div>
+</section>
 
+<section class="wrap section" aria-label="AI agents">
 <div class="cols">
 <div class="agents">
 <h2 class="mono-h minor">Agents plan. You approve.</h2>
@@ -236,8 +232,9 @@
 <p class="faint small">When the window or the background service runs, agents share its scan.</p>
 </div>
 </div>
+</section>
 
-<div class="stack">
+<section class="wrap section" aria-label="Background service">
 <div class="fresh-head">
 <div class="fresh-text">
 <h2 class="mono-h minor">Then it keeps the numbers fresh.</h2>
@@ -250,8 +247,9 @@
 <figure class="shot"><img src="/img/history.webp" width="1200" height="750" loading="lazy" decoding="async" alt="History: used space over 21 scans and the folders that grew or shrank"><figcaption><strong>History.</strong> Pick two scans and see what grew between them.</figcaption></figure>
 <figure class="shot"><img src="/img/apps.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Apps: 88 apps with their size and the data they keep in the Library"><figcaption><strong>Apps.</strong> Each app with what it keeps in your Library. Uninstalling moves both to the Trash.</figcaption></figure>
 </div>
-</div>
+</section>
 
+<div class="wrap">
 <div class="cta">
 <div>
 <h2>Try it on your Mac.</h2>
@@ -263,13 +261,11 @@
 <p class="faint small">Already running? <a href="https://ebb.apps.doguyilmaz.com">Open the window in Chrome, Edge or Firefox</a>.</p>
 </div>
 </div>
-
 </div>
-</section>
 
 </main>
 
-<footer class="dark foot">
+<footer class="foot">
 <div class="wrap">
 <p>ebb · MIT license · <a href="https://doguyilmaz.com">doguyilmaz.com</a></p>
 <nav aria-label="Links">
