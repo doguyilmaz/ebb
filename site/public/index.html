@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ebb · Disk analyzer for macOS</title>
+<meta name="description" content="See where your Mac's disk space went and get it back safely. ebb scans your disk in about a minute, explains every large item and cleans only what you approve.">
+<link rel="canonical" href="https://ebb.doguyilmaz.com/">
+<meta name="theme-color" content="#f3f3f2">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ebb.doguyilmaz.com/">
+<meta property="og:title" content="ebb · Disk analyzer for macOS">
+<meta property="og:description" content="See where your Mac's disk space went and get it back safely. Nothing leaves your Mac.">
+<meta property="og:image" content="https://ebb.doguyilmaz.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/ibm-plex-sans-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/styles.css">
+<script src="/site.js" defer></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true">
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-never" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+<nav class="wrap nav" aria-label="Main">
+<a class="brand" href="/"><img src="/favicon.svg" alt="" width="32" height="32">ebb</a>
+<div class="links">
+<a href="#finds">What it finds</a>
+<a href="#safety">Safety</a>
+<a href="#cli">CLI and agents</a>
+<a href="https://github.com/doguyilmaz/ebb">GitHub</a>
+</div>
+<a class="btn" href="https://ebb.apps.doguyilmaz.com">Open the app</a>
+</nav>
+</header>
+
+<main id="main">
+
+<section class="wrap hero">
+<div class="hero-text">
+<p class="eyebrow">Disk analyzer for macOS 12 or later</p>
+<h1>See where your disk space went. Get it back safely.</h1>
+<p class="lead">ebb reads your whole disk in about a minute, explains every large item and cleans only what you approve. Nothing leaves your Mac.</p>
+<div class="row">
+<div class="cmd"><span class="p" aria-hidden="true">$</span><code>brew install doguyilmaz/tap/ebb</code><button class="copy" type="button" data-copy="brew install doguyilmaz/tap/ebb" aria-label="Copy the install command"><svg class="idle" width="16" height="16"><use href="#i-copy"/></svg><svg class="done" width="16" height="16"><use href="#i-check"/></svg></button></div>
+<a href="https://github.com/doguyilmaz/ebb/releases/latest">Or download the binary</a>
+</div>
+<ul class="meta">
+<li>Apple silicon and Intel</li>
+<li>Signed and notarized</li>
+<li>MIT license</li>
+</ul>
+</div>
+
+<figure class="disk">
+<div class="disk-head">
+<div class="figs">
+<p class="fig free"><b>5.1 GB</b><span>was free</span></p>
+<p class="fig clean"><b>98.3 GB</b><span>could go</span></p>
+</div>
+<figcaption class="note">One scan of a 494 GB MacBook used for app development</figcaption>
+</div>
+<div class="bar" role="img" aria-label="Disk of 494.4 GB: macOS 42.8 GB, apps 54.3 GB, can be cleaned 98.3 GB, everything else 273.4 GB, not visible 20.5 GB, free 5.1 GB">
+<i class="seg macos"></i><i class="seg apps"></i><i class="seg clean">Can be cleaned</i><i class="seg else">Everything else</i><i class="seg unseen"></i><i class="seg free"></i>
+</div>
+<ul class="legend" aria-hidden="true">
+<li class="macos">macOS <span>42.8 GB</span></li>
+<li class="apps">Apps <span>54.3 GB</span></li>
+<li class="clean">Can be cleaned <span>98.3 GB</span></li>
+<li class="else">Everything else <span>273.4 GB</span></li>
+<li class="unseen">Not visible <span>20.5 GB</span></li>
+<li class="free">Free <span>5.1 GB</span></li>
+</ul>
+</figure>
+</section>
+
+<section class="dark fade-both" aria-label="The window">
+<div class="window">
+<figure class="shot">
+<img src="/img/explore.webp" width="2400" height="1500" alt="ebb's Explore view: a sunburst of 436.2 GB in the home folder, with .bun, Library and Developer as the largest rings">
+<figcaption>The same scan in the window. Click a ring to go in; every large folder says what it is. Folder names are changed.</figcaption>
+</figure>
+<ul class="stats" aria-label="In numbers">
+<li><b>~1 min</b><span>for the first scan of 6 million files</span></li>
+<li><b>Seconds</b><span>for every scan after that, which reads only the folders that changed</span></li>
+<li><b>1 binary</b><span>with the window, a CLI, a background service and an MCP server</span></li>
+</ul>
+</div>
+</section>
+
+<section id="finds" class="wrap section after-fade">
+<div class="intro">
+<h2>It knows what your tools leave behind.</h2>
+<p>Rules for package managers, Xcode, Android, browsers and apps say what a folder is, why it grew and whether it comes back on its own.</p>
+</div>
+<ul class="grid">
+<li class="card">
+<h3>Package caches</h3>
+<p>npm, Bun, pnpm, Yarn, Cargo, Go, Gradle, CocoaPods, pip and more.</p>
+<div class="card-foot"><p class="path"><span>~/.bun/install/cache</span><b>33.8 GB</b></p><div class="meter"><i class="w100"></i></div></div>
+</li>
+<li class="card">
+<h3>Apps</h3>
+<p>What each app keeps in your Library and what removed apps left behind.</p>
+<div class="card-foot"><p class="path"><span>88 apps, Library data</span><b>16.5 GB</b></p><div class="meter"><i class="w49"></i></div></div>
+</li>
+<li class="card">
+<h3>Logs and other tools</h3>
+<p>Docker data, old IDE versions, logs, installers in Downloads and local snapshots.</p>
+<div class="card-foot"><p class="path"><span>~/Library/Logs</span><b>7.9 GB</b></p><div class="meter"><i class="w23"></i></div></div>
+</li>
+<li class="card">
+<h3>Your own files</h3>
+<p>Duplicates and the largest and oldest files. These are never cleaned for you.</p>
+<div class="card-foot"><p class="path"><span>large files</span><b>5.8 GB</b></p><div class="meter"><i class="w17"></i></div></div>
+</li>
+<li class="card">
+<h3>Xcode and simulators</h3>
+<p>DerivedData, archives, device support, unavailable simulators, old runtimes and docsets.</p>
+<div class="card-foot"><p class="path"><span>~/Library/Developer</span><b>4.3 GB</b></p><div class="meter"><i class="w13"></i></div></div>
+</li>
+<li class="card">
+<h3>Old projects</h3>
+<p>Build folders of projects you have not touched for months.</p>
+<div class="card-foot"><p class="path"><span>node_modules, target, build</span><b>2.6 GB</b></p><div class="meter"><i class="w8"></i></div></div>
+</li>
+</ul>
+</section>
+
+<section class="wrap section" aria-labelledby="tiers">
+<div class="intro">
+<h2 id="tiers">Every finding says how safe it is.</h2>
+<p>You see why it is there and what removing it costs before you pick it. When a tool has its own clean command, ebb runs that.</p>
+</div>
+<div class="tierbar" role="img" aria-label="Of 98.3 GB, 75.4 GB rebuilds itself and 22.9 GB should be checked first"><i></i><i></i></div>
+<ul class="grid">
+<li class="card">
+<span class="badge good"><svg width="14" height="14" aria-hidden="true"><use href="#i-ok"/></svg>Rebuilds itself</span>
+<p class="tier-num">75.4 GB <span>in 19 findings</span></p>
+<p>The tool downloads or builds it again when it needs it. The first build after may be slower.</p>
+</li>
+<li class="card">
+<span class="badge warning"><svg width="14" height="14" aria-hidden="true"><use href="#i-alert"/></svg>Check first</span>
+<p class="tier-num">22.9 GB <span>in 10 findings</span></p>
+<p>Probably safe, but something may still use it. The finding says what to look at.</p>
+</li>
+<li class="card">
+<span class="badge serious"><svg width="14" height="14" aria-hidden="true"><use href="#i-lock"/></svg>Your data</span>
+<p class="tier-num">Your call</p>
+<p>Duplicates and large files in your own folders go to the Trash only when you say so.</p>
+</li>
+</ul>
+<figure class="shot">
+<img src="/img/findings.webp" width="2400" height="1500" loading="lazy" decoding="async" alt="The findings list with the Bun install cache at 33.8 GB, Gradle caches at 8.9 GB and CocoaPods cache at 4.2 GB, each marked Rebuilds itself">
+</figure>
+</section>
+
+<section id="safety" class="wrap section">
+<div class="intro">
+<h2>Nothing runs before you approve it.</h2>
+<p>Every cleanup starts as a plan. It lists each action, its size, how safe it is and anything blocking it.</p>
+</div>
+<div class="cols">
+<div class="never">
+<h3>It will never</h3>
+<ul>
+<li><svg width="18" height="18" aria-hidden="true"><use href="#i-never"/></svg>Touch anything outside the folder it scanned</li>
+<li><svg width="18" height="18" aria-hidden="true"><use href="#i-never"/></svg>Touch system folders, Keychains, iCloud or your protect list</li>
+<li><svg width="18" height="18" aria-hidden="true"><use href="#i-never"/></svg>Remove anything that changed since the plan was made</li>
+<li><svg width="18" height="18" aria-hidden="true"><use href="#i-never"/></svg>Uninstall an app while it is running</li>
+<li><svg width="18" height="18" aria-hidden="true"><use href="#i-never"/></svg>Run as root</li>
+<li><svg width="18" height="18" aria-hidden="true"><use href="#i-never"/></svg>Send anything off your Mac: no account, no telemetry</li>
+</ul>
+<p>Your own files go to the Trash, so <code>ebb undo</code> can put them back.</p>
+</div>
+<figure class="shot plan">
+<img src="/img/plan.webp" width="1600" height="1000" loading="lazy" decoding="async" alt="The cleanup review: 49 items, 73.2 GB, each with its action and safety">
+</figure>
+</div>
+</section>
+
+<section id="cli" class="dark fade-in">
+<div class="wrap cli">
+
+<div class="stack">
+<h2 class="mono-h">Scan, read, plan, undo.</h2>
+<div class="cols">
+<ol class="steps">
+<li><code><span class="p">$</span> ebb scan</code><p>About a minute for 6 million files the first time. After that ebb follows FSEvents and reads only the folders that changed.</p></li>
+<li><code><span class="p">$</span> ebb findings</code><p>What takes space, why it is there and how safe it is to remove.</p></li>
+<li><code><span class="p">$</span> ebb clean --preset dev-caches</code><p>Shows the plan, then runs it after you confirm.</p></li>
+<li><code><span class="p">$</span> ebb undo</code><p>Puts back what went to the Trash.</p></li>
+<li><p class="note">every command takes --json</p></li>
+</ol>
+<figure class="term" aria-label="Output of ebb in Terminal">
+<div class="term-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+<pre><span class="p">$</span> <span class="tc">ebb</span>
+<span class="tb">ebb</span>  /System/Volumes/Data  ·  6071190 files in 3.1s
+<span class="tc">Disk</span>  494.4 GB total · 493.8 GB used · <span class="tr">604.1 MB free</span>
+
+<span class="tc">Reclaimable</span>  <span class="tg">98.8 GB</span> in 9 findings ebb can act on
+
+<span class="tc">Findings</span>
+  <span class="tc">33.8 GB</span>  <span class="tg">regenerable</span>  Bun install cache       ~/.bun/install/cache
+   <span class="tc">8.9 GB</span>  <span class="tg">regenerable</span>  Gradle caches           ~/.gradle/caches
+   <span class="tc">8.5 GB</span>  <span class="tg">regenerable</span>  Logs and crash reports  8 locations
+   <span class="tc">7.1 GB</span>  <span class="tw">caution</span>      Unity Asset Store       ~/Library/Unity
+   <span class="tc">5.8 GB</span>  <span class="tw">caution</span>      Large files             2 locations
+   <span class="tc">4.2 GB</span>  <span class="tg">regenerable</span>  CocoaPods cache         ~/Library/Caches/CocoaPods</pre>
+</figure>
+</div>
+</div>
+
+<div class="cols">
+<div class="agents">
+<h2 class="mono-h minor">Agents plan. You approve.</h2>
+<p class="muted"><code>ebb assistant install</code> registers ebb's MCP server with your AI tools. An agent can scan, read findings, explain any path and make a cleanup plan. The plan waits until you approve it in the window or with <code>ebb approve</code>.</p>
+</div>
+<div class="tools">
+<p class="note">ebb mcp · tools</p>
+<ul>
+<li>ebb_scan</li><li>ebb_overview</li><li>ebb_findings</li><li>ebb_explain</li><li>ebb_top</li><li>ebb_search</li><li>ebb_apps</li><li>ebb_duplicates</li><li>ebb_history_diff</li><li>ebb_cleanup_plan</li><li>ebb_undo</li>
+</ul>
+<p class="faint small">When the window or the background service runs, agents share its scan.</p>
+</div>
+</div>
+
+<div class="stack">
+<div class="fresh-head">
+<div class="fresh-text">
+<h2 class="mono-h minor">Then it keeps the numbers fresh.</h2>
+<p>The background service starts at login, scans what changed and warns you before space runs out.</p>
+</div>
+<div class="cmd"><span class="p" aria-hidden="true">$</span><code>ebb daemon install</code><button class="copy" type="button" data-copy="ebb daemon install" aria-label="Copy ebb daemon install"><svg class="idle" width="16" height="16"><use href="#i-copy"/></svg><svg class="done" width="16" height="16"><use href="#i-check"/></svg></button></div>
+</div>
+<div class="gallery">
+<figure class="shot"><img src="/img/sources.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Sources: a flow from folders to tools to kinds of data"><figcaption><strong>Sources.</strong> Which folder holds the space, which tool put it there and what kind it is.</figcaption></figure>
+<figure class="shot"><img src="/img/history.webp" width="1200" height="750" loading="lazy" decoding="async" alt="History: used space over 21 scans and the folders that grew or shrank"><figcaption><strong>History.</strong> Pick two scans and see what grew between them.</figcaption></figure>
+<figure class="shot"><img src="/img/apps.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Apps: 88 apps with their size and the data they keep in the Library"><figcaption><strong>Apps.</strong> Each app with what it keeps in your Library. Uninstalling moves both to the Trash.</figcaption></figure>
+</div>
+</div>
+
+<div class="cta">
+<div>
+<h2>Try it on your Mac.</h2>
+<p class="muted">Scanning only reads. You decide later if anything goes.</p>
+</div>
+<div>
+<div class="cmd"><span class="p" aria-hidden="true">$</span><code>brew install doguyilmaz/tap/ebb</code><button class="copy" type="button" data-copy="brew install doguyilmaz/tap/ebb" aria-label="Copy the install command"><svg class="idle" width="16" height="16"><use href="#i-copy"/></svg><svg class="done" width="16" height="16"><use href="#i-check"/></svg></button></div>
+<div class="cmd"><span class="p" aria-hidden="true">$</span><code>ebb serve --open</code><button class="copy" type="button" data-copy="ebb serve --open" aria-label="Copy ebb serve --open"><svg class="idle" width="16" height="16"><use href="#i-copy"/></svg><svg class="done" width="16" height="16"><use href="#i-check"/></svg></button></div>
+<p class="faint small">Already running? <a href="https://ebb.apps.doguyilmaz.com">Open the window in Chrome, Edge or Firefox</a>.</p>
+</div>
+</div>
+
+</div>
+</section>
+
+</main>
+
+<footer class="dark foot">
+<div class="wrap">
+<p>ebb · MIT license · <a href="https://doguyilmaz.com">doguyilmaz.com</a></p>
+<nav aria-label="Links">
+<a href="https://github.com/doguyilmaz/ebb">GitHub</a>
+<a href="https://github.com/doguyilmaz/ebb/releases">Releases</a>
+<a href="https://github.com/doguyilmaz/ebb/blob/main/docs/API.md">API</a>
+<a href="https://github.com/doguyilmaz/ebb/blob/main/docs/PERF.md">Performance</a>
+</nav>
+</div>
+</footer>
+</body>
+</html>

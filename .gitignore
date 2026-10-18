@@ -11,3 +11,5 @@ internal/server/assets/dist/*
 /web/node_modules/
 /web/.cloudflare/
 /web/.wrangler/
+/site/.cloudflare/
+/site/.wrangler/

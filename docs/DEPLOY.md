@@ -60,3 +60,16 @@ The first visit shows a pairing code. Confirm it at the machine, either with `eb
 - **Safari** does not let an https page reach `http://127.0.0.1`. Use Chrome, Edge or Firefox. The local window (`ebb serve --open`) works in any browser.
 - **Chrome** may ask once whether the site may reach devices on your local network. Without that permission the page cannot find ebb.
 - **The content security policy** allows only the bundle's own scripts. That also blocks extensions that inject into the page, React DevTools among them.
+
+## Product page
+
+`site/` holds the page at `ebb.doguyilmaz.com`: plain HTML and CSS with one small script for the copy buttons, no
+build step. It runs as its own Worker, `ebb-site`. Its `_headers` allow only the page's own files, so it loads nothing
+from other hosts and sends nothing anywhere.
+
+```sh
+cd site && npm ci && npx cf deploy
+```
+
+The screenshots in `site/public/img` come from a real scan with the folder names changed. Keep them anonymous when
+they are replaced.
