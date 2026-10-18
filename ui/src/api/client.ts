@@ -172,7 +172,6 @@ export const api = {
 };
 
 /** URL for a download (report export) that carries the token. */
-export const downloadURL = (path: string) => `${apiBase()}/api/v1${path}${path.includes("?") ? "&" : "?"}token=${tok}`;
 
 /** Listens to ebb's server-sent events. */
 export function subscribe(on: (name: string, data: unknown) => void, names: readonly string[]): () => void {

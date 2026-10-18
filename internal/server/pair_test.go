@@ -73,7 +73,7 @@ func TestPairConfirmedGetsToken(t *testing.T) {
 	if status != 200 || len(tok) < 32 || tok == "secret" {
 		t.Fatalf("the page gets its own token, never the master one: %d %v", status, got)
 	}
-	r, _ := http.NewRequest("GET", c.srv.URL+"/api/v1/web", nil)
+	r, _ := http.NewRequest("GET", c.srv.URL+"/api/v1/status", nil)
 	r.Header.Set("Authorization", "Bearer "+tok)
 	if resp, err := http.DefaultClient.Do(r); err != nil || resp.StatusCode != 200 {
 		t.Fatalf("issued token must work: %v %v", resp, err)
@@ -101,7 +101,7 @@ func TestDenyRevokesIssuedTokens(t *testing.T) {
 	_, got := c.post("/api/v1/pair", hosted, false, nonce)
 	tok := got["token"].(string)
 	c.post("/api/v1/web/deny", "", true, `{"origin":"`+hosted+`"}`)
-	r, _ := http.NewRequest("GET", c.srv.URL+"/api/v1/web", nil)
+	r, _ := http.NewRequest("GET", c.srv.URL+"/api/v1/status", nil)
 	r.Header.Set("Authorization", "Bearer "+tok)
 	if resp, _ := http.DefaultClient.Do(r); resp.StatusCode != 401 {
 		t.Fatalf("denied origin's token still works: %d", resp.StatusCode)

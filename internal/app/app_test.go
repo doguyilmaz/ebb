@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
+	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/state"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/walk"
@@ -269,5 +270,24 @@ func TestExplainAndFiles(t *testing.T) {
 	stale, _ := a.Files("", 1<<20, 365, 10)
 	if len(stale.Items) != 1 || stale.Items[0].Name != "old.iso" {
 		t.Fatalf("old files %+v", stale.Items)
+	}
+}
+
+func TestCleanupAndScanExcludeEachOther(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	p, err := a.Plan(clean.Request{Paths: []string{filepath.Join(root, "docs", "a.txt")}, Source: "cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.running = true
+	if _, err := a.Execute(context.Background(), p.ID, nil); !errors.Is(err, ErrScanRunning) {
+		t.Fatalf("no cleanup while a scan edits the tree: %v", err)
+	}
+	a.running, a.cleaning = false, true
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); !errors.Is(err, ErrCleaning) {
+		t.Fatalf("no scan while a cleanup runs: %v", err)
 	}
 }

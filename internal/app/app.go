@@ -26,6 +26,7 @@ var (
 	ErrNeverScanned = errors.New("no scan yet — run: ebb scan")
 	ErrScanRunning  = errors.New("a scan is already running")
 	ErrScanStopped  = errors.New("the scan was stopped")
+	ErrCleaning     = errors.New("a cleanup is running: try again when it is done")
 )
 
 type App struct {
@@ -37,6 +38,7 @@ type App struct {
 
 	mu       sync.Mutex
 	running  bool
+	cleaning bool
 	stop     context.CancelFunc
 	watch    *watcher
 	watchCtx context.Context

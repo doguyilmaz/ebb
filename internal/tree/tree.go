@@ -423,20 +423,22 @@ func (w *Writer) Linked(ino uint64) bool     { _, ok := w.t.links[ino]; return o
 func (w *Writer) Cloned(cloneID uint64) bool { _, ok := w.t.clones[cloneID]; return ok }
 
 // Remove takes id out of the tree after it was deleted from disk: its sizes
-// leave every ancestor and it is unlinked from its parent.
+// leave every ancestor and it is detached from its parent, so removing it (or
+// anything below it) again changes nothing.
 func (w *Writer) Remove(id ID) {
 	t := w.t
-	if id == 0 {
+	if id == 0 || !t.attached(id) {
 		return
 	}
 	n := t.node(id)
-	for p := ID(t.parent[id]); p != None; p = ID(t.parent[p]) {
+	parent := ID(t.parent[id])
+	for p := parent; p != None; p = ID(t.parent[p]) {
 		t.alloc[p] -= min(n.Alloc, t.alloc[p])
 		t.unique[p] -= min(n.Unique, t.unique[p])
 		t.logical[p] -= min(n.Logical, t.logical[p])
 		t.files[p] -= min(n.Files, t.files[p])
 	}
-	parent := ID(t.parent[id])
+	t.parent[id] = uint32(None)
 	if ID(t.first[parent]) == id {
 		t.first[parent] = t.next[id]
 		return
@@ -447,4 +449,14 @@ func (w *Writer) Remove(id ID) {
 			return
 		}
 	}
+}
+
+// attached reports whether id still hangs below the root.
+func (t *Tree) attached(id ID) bool {
+	for ; id != 0; id = ID(t.parent[id]) {
+		if ID(t.parent[id]) == None {
+			return false
+		}
+	}
+	return true
 }

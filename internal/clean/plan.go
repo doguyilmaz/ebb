@@ -188,6 +188,30 @@ func (p *Planner) pathItem(path string) Item {
 	return it
 }
 
+// OwnDirs are ebb's config and state: never cleaned, or every protection would go with them.
+func OwnDirs(env sys.Env) []string { return []string{sys.ConfigDir(env), sys.StateDir(env)} }
+
+// scanned refuses what the last scan does not vouch for: a path it never saw
+// (or spelled another way), a mounted disk or a folder holding one, and
+// anything in a cloud-synced folder, where a deletion reaches every device.
+func (p *Planner) scanned(real string) string {
+	if p.Tree == nil {
+		return ""
+	}
+	id, ok := p.Tree.Lookup(real)
+	switch {
+	case !ok:
+		return "not in the last scan: scan again first"
+	case p.Tree.FlagAbove(id, tree.FlagSyncRoot):
+		return "inside a cloud-synced folder: deleting here deletes it on every device"
+	case p.Tree.Node(id).Flags&tree.FlagMount != 0:
+		return "a mounted disk"
+	case p.Tree.FlagBelow(id, tree.FlagMount):
+		return "holds a mounted disk"
+	}
+	return ""
+}
+
 // outermost drops items inside another item and duplicates.
 func outermost(items []Item) []Item {
 	slices.SortStableFunc(items, func(a, b Item) int { return cmp.Compare(a.Path, b.Path) })
@@ -229,10 +253,14 @@ func (p *Planner) check(it *Item) {
 	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
 		it.Dev, it.Ino = int64(st.Dev), st.Ino
 	}
-	g := Guard{Home: p.Env.Home(), Roots: p.Roots, Protect: p.Protect}
+	g := Guard{Home: p.Env.Home(), Roots: p.Roots, Protect: p.Protect, Keep: OwnDirs(p.Env)}
 	if it.Action.Kind != "empty-trash" {
 		if err := g.Check(it.Path); err != nil {
 			it.Blocked = err.Error()
+			return
+		}
+		if why := p.scanned(real); why != "" {
+			it.Blocked = why
 			return
 		}
 	}

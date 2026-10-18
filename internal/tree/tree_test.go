@@ -253,3 +253,16 @@ func TestRemoveSubtractsUpChain(t *testing.T) {
 		t.Fatal("removed node still reachable")
 	}
 }
+
+func TestRemoveTwiceChangesNothing(t *testing.T) {
+	tr, a, b := build(t)
+	tr.Write(func(w *Writer) { w.Remove(a) })
+	once := tr.Node(tr.Root())
+	tr.Write(func(w *Writer) {
+		w.Remove(a)
+		w.Remove(b)
+	})
+	if again := tr.Node(tr.Root()); again != once {
+		t.Fatalf("second removal drifted: %+v, want %+v", again, once)
+	}
+}

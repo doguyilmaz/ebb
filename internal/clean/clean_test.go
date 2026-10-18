@@ -11,6 +11,7 @@ import (
 
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/tree"
 )
 
 func sandboxEnv(t *testing.T) (*sys.Fake, string) {
@@ -365,5 +366,91 @@ func TestGuardFileDirectlyInHomeIsFine(t *testing.T) {
 	}
 	if err := g.Check(filepath.Join(home, "Work")); err == nil {
 		t.Fatal("a folder directly in home stays protected")
+	}
+}
+
+// A data-volume root covers the data volume, not every disk mounted under it.
+func TestGuardOtherDiskIsOutsideDataVolume(t *testing.T) {
+	if _, err := os.Stat(dataVolume); err != nil {
+		t.Skip("no data volume")
+	}
+	g := Guard{Home: t.TempDir(), Roots: []string{dataVolume}}
+	if err := g.Check("/dev/null"); err == nil {
+		t.Fatal("a path on another device is outside the scanned data volume")
+	}
+}
+
+func TestGuardRefusesFoldersHoldingProtectedOnes(t *testing.T) {
+	home := t.TempDir()
+	for _, d := range []string{"Projects/acme/secret", "Projects/other"} {
+		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := Guard{Home: home, Roots: []string{home}, Protect: []string{"~/Projects/acme/secret/**"}}
+	for _, p := range []string{"Projects/acme", "Projects/acme/secret"} {
+		if err := g.Check(filepath.Join(home, p)); err == nil {
+			t.Fatalf("%s holds a protected folder", p)
+		}
+	}
+	if err := g.Check(filepath.Join(home, "Projects", "other")); err != nil {
+		t.Fatalf("an unrelated folder is fine: %v", err)
+	}
+}
+
+func TestGuardKeepsEbbsOwnFiles(t *testing.T) {
+	home := t.TempDir()
+	state := filepath.Join(home, ".local", "state", "ebb")
+	if err := os.MkdirAll(state, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := Guard{Home: home, Roots: []string{home}, Keep: []string{state}}
+	for _, p := range []string{state, filepath.Join(state, "oplog.jsonl"), filepath.Join(home, ".local", "state")} {
+		if err := g.Check(p); err == nil {
+			t.Fatalf("%s is ebb's own state", p)
+		}
+	}
+}
+
+func TestPlanOnlyWhatTheScanVouchesFor(t *testing.T) {
+	env, home := sandboxEnv(t)
+	for _, d := range []string{"a/cache", "b/sync/x", "c/disk", "d/holder/inner", "e/unscanned"} {
+		mkfile(t, filepath.Join(home, d, "f"), 10)
+	}
+	tr := tree.New(home)
+	tr.Write(func(w *tree.Writer) {
+		dir := func(parent tree.ID, name string, f tree.Flag) tree.ID { return w.AddDir(parent, []byte(name), 0, f) }
+		dir(dir(0, "a", 0), "cache", 0)
+		dir(dir(dir(0, "b", 0), "sync", tree.FlagSyncRoot), "x", 0)
+		dir(dir(0, "c", 0), "disk", tree.FlagMount)
+		dir(dir(dir(0, "d", 0), "holder", 0), "inner", tree.FlagMount)
+		dir(0, "e", 0)
+	})
+	tr.Finish()
+	pl := planner(env)
+	pl.Tree = tr
+	want := map[string]string{
+		"a/cache":     "",
+		"b/sync/x":    "cloud-synced",
+		"c/disk":      "mounted disk",
+		"d/holder":    "holds a mounted disk",
+		"e/unscanned": "not in the last scan",
+	}
+	var paths []string
+	for rel := range want {
+		paths = append(paths, filepath.Join(home, rel))
+	}
+	p, err := pl.Plan(Request{Paths: paths, Source: "cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != len(want) {
+		t.Fatalf("items %d", len(p.Items))
+	}
+	for _, it := range p.Items {
+		rel, _ := filepath.Rel(home, it.Path)
+		if w := want[rel]; w == "" && it.Blocked != "" || !strings.Contains(it.Blocked, w) {
+			t.Errorf("%s: blocked %q, want %q", rel, it.Blocked, w)
+		}
 	}
 }

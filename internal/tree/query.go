@@ -102,3 +102,36 @@ func (t *Tree) WalkDirs(id ID, fn func(n Node) bool) {
 		}
 	}
 }
+
+// FlagAbove reports whether id or a folder above it carries f.
+func (t *Tree) FlagAbove(id ID, f Flag) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for ; id != None; id = ID(t.parent[id]) {
+		if t.flags[id]&f != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// FlagBelow reports whether a folder inside id carries f.
+func (t *Tree) FlagBelow(id ID, f Flag) bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	stack := []ID{id}
+	for len(stack) > 0 {
+		cur := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		for c := ID(t.first[cur]); c != None; c = ID(t.next[c]) {
+			if t.kind[c] != KindDir {
+				continue
+			}
+			if t.flags[c]&f != 0 {
+				return true
+			}
+			stack = append(stack, c)
+		}
+	}
+	return false
+}

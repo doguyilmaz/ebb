@@ -20,12 +20,11 @@ func (s *Server) dataRoutes() {
 	s.api("GET /api/v1/status", s.status)
 	s.api("POST /api/v1/scans", s.startScan)
 	s.api("GET /api/v1/scans/current", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.ScanState(), nil })
-	s.api("DELETE /api/v1/scans/current", func(w http.ResponseWriter, _ *http.Request) (any, error) {
+	s.api("DELETE /api/v1/scans/current", func(http.ResponseWriter, *http.Request) (any, error) {
 		if !s.app.StopScan() {
 			return nil, coded(http.StatusConflict, "no-scan", "no scan is running")
 		}
-		w.WriteHeader(http.StatusAccepted)
-		return s.app.ScanState(), nil
+		return accepted{s.app.ScanState()}, nil
 	})
 	s.api("GET /api/v1/volume", func(http.ResponseWriter, *http.Request) (any, error) { return s.app.Volume() })
 	s.api("GET /api/v1/tree", s.tree)
@@ -104,7 +103,7 @@ func (s *Server) status(_ http.ResponseWriter, _ *http.Request) (any, error) {
 	return s.app.Status(s.version), nil
 }
 
-func (s *Server) startScan(w http.ResponseWriter, r *http.Request) (any, error) {
+func (s *Server) startScan(_ http.ResponseWriter, r *http.Request) (any, error) {
 	var req api.ScanRequest
 	if r.ContentLength != 0 {
 		if err := decode(r, &req); err != nil {
@@ -134,8 +133,7 @@ func (s *Server) startScan(w http.ResponseWriter, r *http.Request) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	w.WriteHeader(http.StatusAccepted)
-	return s.app.ScanState(), nil
+	return accepted{s.app.ScanState()}, nil
 }
 
 func (s *Server) tree(_ http.ResponseWriter, r *http.Request) (any, error) {

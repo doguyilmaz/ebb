@@ -79,7 +79,7 @@ func (s *Server) routes() {
 	s.local("GET /api/v1/pair/pending", s.pairPending)
 	s.local("POST /api/v1/pair/confirm", s.pairConfirm)
 	s.local("POST /api/v1/pair/reject", s.pairReject)
-	s.api("GET /api/v1/web", s.webAccess)
+	s.local("GET /api/v1/web", s.webAccess)
 	s.local("POST /api/v1/web/allow", s.webAllow)
 	s.local("POST /api/v1/web/deny", s.webDeny)
 	s.mux.HandleFunc("GET /api/v1/events", s.auth(s.handleEvents))
@@ -91,9 +91,11 @@ func (s *Server) routes() {
 	s.mux.Handle("/", s.spa)
 }
 
+// bearer reads the token from the header; only the event stream and the
+// report, which a browser opens without headers, may carry it in the URL.
 func bearer(r *http.Request) string {
 	tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !ok || tok == "" {
+	if (!ok || tok == "") && (r.URL.Path == "/api/v1/events" || r.URL.Path == "/api/v1/report") {
 		tok = r.URL.Query().Get("token")
 	}
 	return tok
@@ -141,6 +143,8 @@ func (s *Server) json(h func(http.ResponseWriter, *http.Request) (any, error)) h
 				status, code = http.StatusConflict, "never-scanned"
 			case errors.Is(err, app.ErrScanRunning):
 				status, code = http.StatusConflict, "scan-running"
+			case errors.Is(err, app.ErrCleaning):
+				status, code = http.StatusConflict, "cleaning"
 			}
 			body := map[string]string{"error": err.Error()}
 			if code != "" {
@@ -153,9 +157,16 @@ func (s *Server) json(h func(http.ResponseWriter, *http.Request) (any, error)) h
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		if a, ok := v.(accepted); ok {
+			writeJSON(w, http.StatusAccepted, a.v)
+			return
+		}
 		writeJSON(w, http.StatusOK, v)
 	}
 }
+
+// accepted answers 202: the work goes on after the reply.
+type accepted struct{ v any }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

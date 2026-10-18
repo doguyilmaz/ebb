@@ -99,15 +99,26 @@ func (a *App) update(ctx context.Context, root string, opt walk.Options, progres
 		return nil, false, nil
 	}
 	started := a.Env.Now()
-	res, err := walk.UpdateWith(ctx, last.Tree, set.dirs, set.subtrees, opt, 100*time.Millisecond, progress)
+	out, err := func() (*ScanResult, error) {
+		res, err := walk.UpdateWith(ctx, last.Tree, set.dirs, set.subtrees, opt, 100*time.Millisecond, progress)
+		if err != nil {
+			return nil, err
+		}
+		problems := append(slices.Clone(last.Problems), res.Problems...)
+		meta := history.Meta{Elapsed: res.Elapsed, Dirs: last.Meta.Dirs, Files: uint64(last.Tree.Node(last.Tree.Root()).Files),
+			EventID: max(set.last, last.Meta.EventID), FSEvents: last.Meta.FSEvents, Incremental: true, Changed: res.Dirs}
+		return a.conclude(ctx, root, last.Tree, problems, started, meta)
+	}()
 	if err != nil {
+		// The tree was edited in place and is now half updated: go back to the
+		// saved scan, and keep the changes for the next try.
 		from.putBack(set)
-		return nil, true, err
+		a.mu.Lock()
+		if a.cur == last {
+			a.cur = nil
+		}
+		a.mu.Unlock()
 	}
-	problems := append(slices.Clone(last.Problems), res.Problems...)
-	meta := history.Meta{Elapsed: res.Elapsed, Dirs: last.Meta.Dirs, Files: uint64(last.Tree.Node(last.Tree.Root()).Files),
-		EventID: max(set.last, last.Meta.EventID), FSEvents: last.Meta.FSEvents, Incremental: true, Changed: res.Dirs}
-	out, err := a.conclude(ctx, root, last.Tree, problems, started, meta)
 	return out, true, err
 }
 
@@ -129,6 +140,9 @@ func (a *App) conclude(ctx context.Context, root string, t *tree.Tree, problems 
 	dc := &detect.Context{Tree: t, Volume: vol, Env: a.Env, Rules: a.Rules, History: a.History, Links: a.Links,
 		Now: started, StaleAfter: time.Duration(a.Config.Scan.StaleDays) * 24 * time.Hour, LargeFile: uint64(large)}
 	findings, errs := detect.Run(ctx, dc)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var errText []string
 	for _, e := range errs {
 		errText = append(errText, e.Error())

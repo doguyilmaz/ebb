@@ -54,6 +54,7 @@ const (
 	maxPooledEntries = 16 << 10
 
 	efMayShareBlocks = 0x1
+	efIsSyncRoot     = 0x4
 	sfDataless       = 0x40000000
 )
 
@@ -219,6 +220,7 @@ func newSession(ctx context.Context, opt Options, t *tree.Tree, root, ioRoot str
 	if opt.Threads <= 0 {
 		opt.Threads = min(8, runtime.NumCPU())
 	}
+	opt.Threads = min(opt.Threads, 64)
 	if opt.SmallThreshold == 0 {
 		opt.SmallThreshold = 1 << 20
 	}
@@ -437,7 +439,11 @@ func (s *Session) apply(b *batch) {
 					w.AddDir(b.dir, name, e.mtime, 0)
 					continue
 				}
-				s.push(b, name, w.AddDir(b.dir, name, e.mtime, 0), false)
+				var df tree.Flag
+				if e.ext&efIsSyncRoot != 0 {
+					df = tree.FlagSyncRoot
+				}
+				s.push(b, name, w.AddDir(b.dir, name, e.mtime, df), false)
 				continue
 			}
 			markers |= tree.MarkerBit(string(name))

@@ -22,6 +22,7 @@ type Guard struct {
 	Home    string
 	Roots   []string // scanned roots; nothing outside them is touched
 	Protect []string // the person's own globs (~ allowed)
+	Keep    []string // ebb's own config and state: removing them would lift every protection
 }
 
 // subtrees are never touched, nor anything inside them.
@@ -78,7 +79,7 @@ func (g Guard) Check(path string) error {
 // resolved returns the guard with home and roots spelled as the OS resolves
 // them, for comparing with resolved paths.
 func (g Guard) resolved() Guard {
-	r := Guard{Home: g.Home, Protect: g.Protect}
+	r := Guard{Home: g.Home, Protect: g.Protect, Keep: g.Keep}
 	if h, err := filepath.EvalSymlinks(g.Home); err == nil {
 		r.Home = h
 	}
@@ -91,9 +92,18 @@ func (g Guard) resolved() Guard {
 	return r
 }
 
+var syncedHomes = []string{"Dropbox", "Google Drive", "OneDrive", "Box", "Box Sync"}
+
+func cloudy(s string) bool {
+	return strings.Contains(s, "Mobile Documents") || strings.Contains(s, "CloudStorage") || slices.Contains(syncedHomes, filepath.Base(s))
+}
+
 func (g Guard) protectedLists() (subs, exact, tops []string) {
 	home := g.Home
 	subs = append(slices.Clone(subtrees), home+"/Library/Keychains", home+"/Library/Mobile Documents", home+"/Library/CloudStorage")
+	for _, d := range syncedHomes {
+		subs = append(subs, home+"/"+d)
+	}
 	exact = []string{"/", "/Applications", "/Library", "/Users", "/Volumes", "/usr/local", "/opt", "/private", "/private/var",
 		"/private/tmp", "/var", "/tmp", home, home + "/Library"}
 	// Children of these are folders the system or the person relies on as a
@@ -111,7 +121,7 @@ func (g Guard) checkName(path string) error {
 	subs, exact, tops := g.protectedLists()
 	for _, s := range subs {
 		if within(p, lower(s)) && !within(p, "/usr/local") {
-			if strings.Contains(s, "Mobile Documents") || strings.Contains(s, "CloudStorage") {
+			if cloudy(s) {
 				return errors.New("inside a cloud-synced folder: deleting here deletes it on every device")
 			}
 			return fmt.Errorf("protected system location (%s)", s)
@@ -124,16 +134,42 @@ func (g Guard) checkName(path string) error {
 	if slices.ContainsFunc(tops, func(t string) bool { return lower(t) == parent }) && !isFile(path) {
 		return errors.New("top-level folder: remove what is inside it instead")
 	}
+	for _, k := range g.Keep {
+		k = lower(canonical(filepath.Clean(k)))
+		if within(p, k) || within(k, p) {
+			return errors.New("ebb's own settings and history")
+		}
+	}
 	for _, glob := range g.Protect {
 		pat := glob
 		if rest, ok := strings.CutPrefix(glob, "~/"); ok {
 			pat = filepath.Join(g.Home, rest)
 		}
-		if ok, _ := doublestar.Match(lower(pat), p); ok {
+		pat = lower(canonical(pat))
+		if ok, _ := doublestar.Match(pat, p); ok {
 			return fmt.Errorf("on your protect list (%s)", glob)
+		}
+		// Removing a folder removes what is inside it, protected or not.
+		if base := staticBase(pat); base != "/" && within(base, p) {
+			return fmt.Errorf("holds something on your protect list (%s)", glob)
 		}
 	}
 	return nil
+}
+
+// staticBase is the part of a glob before its first wildcard segment.
+func staticBase(pat string) string {
+	var keep []string
+	for _, seg := range strings.Split(pat, "/") {
+		if strings.ContainsAny(seg, "*?[{") {
+			break
+		}
+		keep = append(keep, seg)
+	}
+	if b := strings.Join(keep, "/"); b != "" {
+		return b
+	}
+	return "/"
 }
 
 type fileID struct {
@@ -180,8 +216,16 @@ func (g Guard) checkIdentity(resolved string) error {
 	// path, already done, is the whole answer; system locations have their
 	// own protections and the system volume is read-only.
 	inRoot := slices.ContainsFunc(g.Roots, func(r string) bool { return canonical(filepath.Clean(r)) == "/" })
-	if id, ok := idOf(resolved, false); ok && !inRoot {
-		_, inRoot = rootIDs[id]
+	if id, ok := idOf(resolved, false); ok {
+		// A scan never crosses into another disk, so neither does a cleanup:
+		// a mounted volume reports its own device (the system and data
+		// volumes of one Mac share theirs).
+		if !slices.ContainsFunc(g.Roots, func(r string) bool { rid, ok := idOf(r, true); return ok && rid.dev == id.dev }) {
+			return errors.New("on another disk than the one scanned")
+		}
+		if !inRoot {
+			_, inRoot = rootIDs[id]
+		}
 	}
 	first := true
 	for dir := filepath.Dir(resolved); ; dir = filepath.Dir(dir) {
@@ -194,7 +238,7 @@ func (g Guard) checkIdentity(resolved string) error {
 				subIDs = nil
 			}
 			if s, hit := subIDs[id]; hit {
-				if strings.Contains(s, "Mobile Documents") || strings.Contains(s, "CloudStorage") {
+				if cloudy(s) {
 					return errors.New("inside a cloud-synced folder: deleting here deletes it on every device")
 				}
 				return fmt.Errorf("protected system location (%s)", s)

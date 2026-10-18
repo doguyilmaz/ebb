@@ -24,7 +24,7 @@ var ErrNoPlan = errors.New("no such plan (plans expire after 10 minutes)")
 func (a *App) OpLog() *clean.OpLog { return clean.OpenOpLog(sys.StateDir(a.Env)) }
 
 func (a *App) guard(r *ScanResult) clean.Guard {
-	return clean.Guard{Home: a.Env.Home(), Roots: []string{r.Tree.RootPath()}, Protect: a.reloadConfig().Clean.Protect}
+	return clean.Guard{Home: a.Env.Home(), Roots: []string{r.Tree.RootPath()}, Protect: a.reloadConfig().Clean.Protect, Keep: clean.OwnDirs(a.Env)}
 }
 
 func (a *App) Plan(req clean.Request) (*clean.Plan, error) {
@@ -79,16 +79,31 @@ func (a *App) Approve(id string) (*clean.Plan, error) {
 // Execute runs a plan once, then updates the saved scan so every view shows
 // what is left.
 func (a *App) Execute(ctx context.Context, id string, fn func(clean.Event)) (clean.Result, error) {
+	// A scan edits the tree this updates afterwards, and two cleanups would
+	// race on it and on the findings: one thing at a time, settled under one lock.
 	a.mu.Lock()
 	e, ok := a.plans[id]
-	if ok && e.ran {
+	switch {
+	case !ok:
+		a.mu.Unlock()
+		return clean.Result{}, ErrNoPlan
+	case e.ran:
 		a.mu.Unlock()
 		return clean.Result{}, fmt.Errorf("plan %s already ran", id)
+	case a.running:
+		a.mu.Unlock()
+		return clean.Result{}, fmt.Errorf("%w: clean when it is done", ErrScanRunning)
+	case a.cleaning:
+		a.mu.Unlock()
+		return clean.Result{}, ErrCleaning
 	}
+	a.cleaning = true
 	a.mu.Unlock()
-	if !ok {
-		return clean.Result{}, ErrNoPlan
-	}
+	defer func() {
+		a.mu.Lock()
+		a.cleaning = false
+		a.mu.Unlock()
+	}()
 	r, err := a.Last()
 	if err != nil {
 		return clean.Result{}, err
@@ -149,6 +164,7 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 	}
 	r.Findings = kept
 	a.mu.Unlock()
+	r.Tree.Compact()
 	return a.saveLast(r)
 }
 

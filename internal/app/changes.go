@@ -60,6 +60,11 @@ func (c *changes) add(evs []fsevents.Event) {
 		} else {
 			c.dirs[p] = true
 		}
+		// Past this a full scan is faster, and the set stops growing.
+		if len(c.dirs)+len(c.subtrees) > maxUpdate {
+			c.lost = true
+			c.dirs, c.subtrees = map[string]bool{}, map[string]bool{}
+		}
 	}
 }
 
@@ -222,12 +227,7 @@ func (a *App) changesSince(ctx context.Context, last *ScanResult) (changeSet, *c
 	if _, lost, _ := set.summary(); lost {
 		return changeSet{}, nil, false
 	}
-	s := set.take()
-	if len(s.dirs)+len(s.subtrees) > maxUpdate {
-		set.putBack(s)
-		return changeSet{}, nil, false
-	}
-	return s, set, true
+	return set.take(), set, true
 }
 
 // Changes says how many folders changed since the last scan, for the UI.

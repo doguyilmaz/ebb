@@ -12,8 +12,11 @@ import (
 func (a *App) begin(root string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.running {
+	switch {
+	case a.running:
 		return ErrScanRunning
+	case a.cleaning:
+		return ErrCleaning
 	}
 	a.running, a.scanRoot, a.scanErr, a.progress = true, root, "", nil
 	return nil

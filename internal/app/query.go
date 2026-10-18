@@ -65,7 +65,7 @@ func (a *App) item(r *ScanResult, id tree.ID, notes map[string]string) api.Item 
 	path := a.Links.Display(t.Path(id))
 	it := api.Item{Path: path, Name: n.Name, Kind: kindName(n.Kind), Alloc: n.Alloc, Bytes: t.Reclaimable(id), Files: n.Files, Modified: n.MaxMtime,
 		Note: notes["path:"+path]}
-	for _, f := range r.Findings {
+	for _, f := range a.findings(r) {
 		if slices.ContainsFunc(f.Targets, func(tg finding.Target) bool { return within(tg.Path, path) }) {
 			it.Findings = append(it.Findings, f.ID)
 		}
@@ -113,7 +113,7 @@ func (a *App) Explain(path string) (api.Explain, error) {
 	out := api.Explain{Item: a.item(r, id, notes), Findings: []api.FindingView{}, Biggest: []api.Item{}}
 	display := out.Item.Path
 	ig := a.ignores()
-	for _, f := range r.Findings {
+	for _, f := range a.findings(r) {
 		if slices.ContainsFunc(f.Targets, func(tg finding.Target) bool { return within(tg.Path, display) || within(display, tg.Path) }) {
 			f.UserNote = notes["finding:"+f.ID]
 			out.Findings = append(out.Findings, api.FindingView{Finding: f, Ignored: ignored(ig, f)})
@@ -215,7 +215,7 @@ func (a *App) Findings(category string, minBytes uint64, withIgnored bool) (api.
 	}
 	out := api.FindingsResponse{Findings: []api.FindingView{}}
 	notes, ig := a.Notes(), a.ignores()
-	for _, f := range r.Findings {
+	for _, f := range a.findings(r) {
 		if (category != "" && f.Category != category) || f.Bytes < minBytes {
 			continue
 		}

@@ -46,7 +46,7 @@ func (a *App) Ignore(findingID string) error {
 		return err
 	}
 	var bytes uint64
-	for _, f := range r.Findings {
+	for _, f := range a.findings(r) {
 		if f.ID == findingID {
 			bytes = f.Bytes
 		}
@@ -82,10 +82,13 @@ func ignored(ig map[string]ignore, f finding.Finding) bool {
 // View is a scan as the person sees it: ignored findings left out and their
 // notes attached. Reports and the CLI show this, never the raw result.
 func (a *App) View(r *ScanResult) *ScanResult {
+	a.mu.Lock()
 	v := *r
+	a.mu.Unlock()
 	notes, ig := a.Notes(), a.ignores()
+	all := v.Findings
 	v.Findings = nil
-	for _, f := range r.Findings {
+	for _, f := range all {
 		if ignored(ig, f) {
 			continue
 		}
@@ -93,4 +96,11 @@ func (a *App) View(r *ScanResult) *ScanResult {
 		v.Findings = append(v.Findings, f)
 	}
 	return &v
+}
+
+// findings reads r's findings, which a cleanup replaces (never edits) under a.mu.
+func (a *App) findings(r *ScanResult) []finding.Finding {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return r.Findings
 }
