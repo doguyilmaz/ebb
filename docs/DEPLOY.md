@@ -34,9 +34,12 @@ runs ahead of the ebb people can install. When it is newer than the ebb it talks
 | Branch | `release` only (no trigger for other branches) |
 | Watch paths | `ui/*` and `web/*` (Go, docs and rules changes do not deploy) |
 | Path | `/web` |
-| Build command | `cd ../ui && bun install --frozen-lockfile && bun run build && cd ../web && npm ci` |
+| Build command | `git fetch --quiet --unshallow --tags origin; cd ../ui && bun install --frozen-lockfile && bun run build && cd ../web && npm ci` |
 | Deploy command | `npx cf deploy` |
 | Variable | `BUN_VERSION=1.4.3` |
+
+Workers Builds clones without history or tags. The fetch brings them back so the page can read its version from the
+latest tag.
 
 The commands above are for deploying by hand, which is only needed when Workers Builds is down.
 
