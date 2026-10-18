@@ -33,40 +33,7 @@ func newCleanCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			p, err := a.Plan(req)
-			if err != nil {
-				return err
-			}
-			out := cmd.OutOrStdout()
-			runnable := printPlan(out, p)
-			if dry {
-				return nil
-			}
-			if runnable == 0 {
-				return fmt.Errorf("nothing in this plan can be done (see the reasons above)")
-			}
-			if !(yes && !p.NeedsApproval) && !confirm(cmd.InOrStdin(), cmd.ErrOrStderr()) {
-				return fmt.Errorf("this plan needs your confirmation: answer y in a terminal, or approve it in the UI")
-			}
-			if _, err := a.Approve(p.ID); err != nil {
-				return err
-			}
-			res, err := a.Execute(cmd.Context(), p.ID, func(e clean.Event) {
-				switch e.State {
-				case "done":
-					fmt.Fprintf(out, "  done     %s\n", e.Path)
-				case "refused", "failed":
-					fmt.Fprintf(out, "  %-8s %s: %s\n", e.State, e.Path, e.Err)
-				}
-			})
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "Freed about %s: %d done, %d refused, %d failed.\n", units.Bytes(res.Freed), res.Done, res.Refused, res.Failed)
-			if slices.ContainsFunc(p.Items, func(it clean.Item) bool { return it.Action.Kind == "trash" }) {
-				fmt.Fprintln(out, "Items moved to the Trash free their space when the Trash is emptied; ebb undo puts the last one back.")
-			}
-			return nil
+			return runPlan(cmd, a, req, dry, yes)
 		},
 	}
 	f := cmd.Flags()
@@ -75,6 +42,45 @@ func newCleanCmd(g *globals) *cobra.Command {
 	f.BoolVar(&dry, "dry-run", false, "only show the plan")
 	f.BoolVar(&yes, "yes", false, "do not ask when every item can be rebuilt by its tool")
 	return cmd
+}
+
+// runPlan shows a plan, asks unless told not to (and then only when everything
+// can be rebuilt), and carries it out.
+func runPlan(cmd *cobra.Command, a *app.App, req clean.Request, dry, yes bool) error {
+	p, err := a.Plan(req)
+	if err != nil {
+		return err
+	}
+	out := cmd.OutOrStdout()
+	runnable := printPlan(out, p)
+	if dry {
+		return nil
+	}
+	if runnable == 0 {
+		return fmt.Errorf("nothing in this plan can be done (see the reasons above)")
+	}
+	if !(yes && !p.NeedsApproval) && !confirm(cmd.InOrStdin(), cmd.ErrOrStderr()) {
+		return fmt.Errorf("this plan needs your confirmation: answer y in a terminal, or approve it in the UI")
+	}
+	if _, err := a.Approve(p.ID); err != nil {
+		return err
+	}
+	res, err := a.Execute(cmd.Context(), p.ID, func(e clean.Event) {
+		switch e.State {
+		case "done":
+			fmt.Fprintf(out, "  done     %s\n", e.Path)
+		case "refused", "failed":
+			fmt.Fprintf(out, "  %-8s %s: %s\n", e.State, e.Path, e.Err)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Freed about %s: %d done, %d refused, %d failed.\n", units.Bytes(res.Freed), res.Done, res.Refused, res.Failed)
+	if slices.ContainsFunc(p.Items, func(it clean.Item) bool { return it.Action.Kind == "trash" }) {
+		fmt.Fprintln(out, "Items moved to the Trash free their space when the Trash is emptied; ebb undo puts the last one back.")
+	}
+	return nil
 }
 
 func cleanRequest(a *app.App, args []string, preset string, paths []string) (clean.Request, error) {

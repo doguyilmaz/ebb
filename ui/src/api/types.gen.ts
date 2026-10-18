@@ -120,6 +120,7 @@ export interface Action {
   fallback?: string;
   hint?: string;
   quit?: string[] | null;
+  unload?: boolean;
 }
 
 export interface FindingView {
@@ -222,6 +223,25 @@ export interface Daemon {
   lastAlert: string;
   error: string;
   log: string;
+}
+
+export interface App {
+  name: string;
+  bundleId: string;
+  version?: string;
+  path: string;
+  bytes: number;
+  alloc: number;
+  apple: boolean;
+  rootOwned: boolean;
+  executable: string;
+  leftovers: Target[] | null;
+  leftoverBytes: number;
+}
+
+export interface AppsResponse {
+  apps: App[] | null;
+  note?: string;
 }
 
 export interface PresetView {

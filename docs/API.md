@@ -22,6 +22,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/files?path&minSize&olderThanDays&limit` | — | `FilesResponse` (stored files ≥ 1 MB, largest first, optionally untouched for N days) | 400 `outside-root` |
 | GET | `/children?path&limit&small=1` | — | `ChildrenResponse` | 400 `outside-root` |
 | GET | `/search?q&limit` | — | `SearchResponse` | — |
+| GET | `/apps` | — | `AppsResponse {apps, note?}` (apps in /Applications and ~/Applications as the last scan saw them, biggest first, each with its Library data; uninstall with `POST /plans {app}`) | 409 `never-scanned` |
 | GET | `/findings?category&minBytes&ignored=1` | — | `FindingsResponse` | — |
 | GET | `/report?format=json\|csv\|html\|text` | — | file | 400 `bad-format` |
 | POST | `/reveal` | `PathRequest` | 204 | 400 `outside-root` |
@@ -33,7 +34,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 | GET | `/daemon` | — | `Daemon` (installed, running or waiting for another ebb to close, what it did last, log path) | — |
 | POST | `/daemon/install\|restart\|uninstall` | — | `Daemon` (202 when the server answering is the service itself; it acts right after) | 400, 409 `unsupported` |
 | GET | `/presets` | — | `PresetView[]` | — |
-| POST | `/plans` | `PlanRequest {findingIds?, paths?, preset?, source?}` | `Plan` | 400, 409 `never-scanned` |
+| POST | `/plans` | `PlanRequest {findingIds?, paths?, preset?, app?, source?}` (`app`: name or bundle ID to uninstall; Apple's apps are refused) | `Plan` | 400, 409 `never-scanned` |
 | GET | `/plans/{id}` | — | `Plan` | 404 `no-plan` |
 | POST | `/plans/{id}/approve` | — | `Plan` | 404 `no-plan` |
 | POST | `/plans/{id}/execute` | — | `PlanResult` (events `plan.progress` per item, `plan.done`) | 404, 409 `needs-approval`, 409 `scan-running`, 409 `cleaning`, 410 `plan-expired` |

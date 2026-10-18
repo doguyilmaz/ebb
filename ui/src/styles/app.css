@@ -436,6 +436,35 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .ops li { display: grid; grid-template-columns: 110px 180px 90px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 16px; }
 .ops li + li { border-top: 1px solid var(--line); }
 
+/* ---------- apps ---------- */
+.apps-sum { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; }
+.apps-sum .key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.key.app, .app-bar .app { background: var(--text); }
+.key.lib, .app-bar .lib { background: var(--tide); }
+.apps { list-style: none; margin: 0; padding: 0; }
+.app-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 16px 8px 8px; }
+.app-row + .app-row { border-top: 1px solid var(--line); }
+.app-main { display: grid; grid-template-columns: 16px 30px minmax(140px, 1.1fr) minmax(80px, 2fr) 84px; align-items: center; gap: 10px; min-width: 0; padding: 4px 6px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 150ms ease; }
+.app-main:hover:not(:disabled) { background: var(--surface-2); }
+.app-main:disabled { cursor: default; }
+.app-main:disabled .chev { visibility: hidden; }
+.app-main .chev { color: var(--text-3); transition: transform 180ms var(--ease-out); }
+.app-row[data-open="true"] .chev { transform: rotate(90deg); }
+.app-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--surface-3); color: var(--text-2); font-weight: 600; font-size: 13px; }
+.app-name { display: flex; flex-direction: column; min-width: 0; }
+.app-bar { display: flex; gap: 2px; height: 8px; min-width: 0; }
+.app-bar > span { min-width: 0; border-radius: 2px; }
+.app-bar > span[style*="width: 0%"] { display: none; }
+.app-main .num { text-align: right; }
+.app-leftovers { grid-column: 1 / -1; list-style: none; margin: 0 0 6px 62px; padding: 0; border-left: 1px solid var(--line); animation: fade 160ms ease-out; }
+.app-leftovers li { display: grid; grid-template-columns: minmax(0, 1fr) 80px 28px; align-items: center; gap: 10px; padding: 3px 0 3px 12px; }
+.app-leftovers .num { text-align: right; }
+@media (max-width: 720px) {
+  .app-main { grid-template-columns: 16px 30px minmax(0, 1fr) 72px; }
+  .app-bar { display: none; }
+  .app-leftovers { margin-left: 24px; }
+}
+
 /* ---------- settings ---------- */
 .setting { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .setting-head { display: flex; align-items: center; gap: 6px; }

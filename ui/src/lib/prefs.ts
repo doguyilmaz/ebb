@@ -5,6 +5,7 @@ export interface Prefs {
   view?: View;
   unique?: boolean;
   color?: "folder" | "age";
+  appSort?: "total" | "library" | "name";
 }
 
 const KEY = "ebb.prefs";

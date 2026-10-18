@@ -13,6 +13,14 @@ mk "$home/Downloads/Setup-2.3.dmg" $((7 << 20))
 mk "$home/.Trash/old-notes.txt" $((2 << 20))
 mk "$home/Documents/thesis.pdf" $((3 << 20))
 
+app="$home/Applications/Sketchpad.app"
+mk "$app/Contents/MacOS/Sketchpad" $((8 << 20))
+cat >"$app/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.example.Sketchpad</string><key>CFBundleName</key><string>Sketchpad</string><key>CFBundleExecutable</key><string>Sketchpad</string><key>CFBundleShortVersionString</key><string>3.1</string></dict></plist>
+PLIST
+mk "$home/Library/Containers/com.example.Sketchpad/Data/Library/brushes.db" $((5 << 20))
+mk "$home/Library/Preferences/com.example.Sketchpad.plist" 900
+
 dd="$home/Library/Developer/Xcode/DerivedData/Gone-abcdef"
 mk "$dd/Build/Products/app" $((12 << 20))
 cat >"$dd/info.plist" <<PLIST

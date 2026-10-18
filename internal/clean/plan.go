@@ -8,11 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/apps"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/rules"
 	"github.com/doguyilmaz/ebb/internal/sys"
@@ -62,6 +65,7 @@ type Planner struct {
 	Tree        *tree.Tree // optional: sizes for arbitrary paths
 	Links       volume.Firmlinks
 	Findings    []finding.Finding
+	Apps        []apps.App // for uninstall requests
 	Rules       *rules.Set
 	Protect     []string
 	Roots       []string
@@ -102,6 +106,13 @@ func (p *Planner) Plan(req Request) (*Plan, error) {
 	}
 	for _, path := range req.Paths {
 		items = append(items, p.pathItem(path))
+	}
+	if req.App != "" {
+		its, err := p.appItems(req.App)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, its...)
 	}
 	items = outermost(items)
 	if len(items) == 0 {
@@ -188,6 +199,37 @@ func (p *Planner) pathItem(path string) Item {
 	return it
 }
 
+// appItems uninstalls an app: the bundle and everything it keeps in the
+// Library go to the Trash, its launch agents stopped first.
+func (p *Planner) appItems(name string) ([]Item, error) {
+	i := slices.IndexFunc(p.Apps, func(a apps.App) bool { return strings.EqualFold(a.BundleID, name) || strings.EqualFold(a.Name, name) })
+	if i < 0 {
+		return nil, fmt.Errorf("no app %q in Applications (see ebb apps)", name)
+	}
+	a := p.Apps[i]
+	if a.Apple {
+		return nil, fmt.Errorf("%s comes with macOS or from Apple: ebb does not uninstall it", a.Name)
+	}
+	var quit []string
+	if a.Executable != "" {
+		quit = []string{a.Executable}
+	}
+	bundle := Item{Path: a.Path, Title: a.Name, Bytes: a.Bytes, Safety: finding.Caution, Action: finding.Action{Kind: "trash", Quit: quit}}
+	if a.RootOwned {
+		bundle.Action = finding.Action{Kind: "manual", Hint: "It was installed for every user (the App Store does this): drag it to the Trash in Finder, which asks for your password."}
+	}
+	items := []Item{bundle}
+	for _, t := range a.Leftovers {
+		it := Item{Path: t.Path, Title: a.Name + " data", Bytes: t.Bytes, Safety: finding.Caution, Action: finding.Action{Kind: "trash", Quit: quit}}
+		if filepath.Base(filepath.Dir(t.Path)) == "LaunchAgents" {
+			it.Action.Unload = true
+			it.Warnings = append(it.Warnings, "A background helper: it is stopped first, so it does not start again.")
+		}
+		items = append(items, it)
+	}
+	return items, nil
+}
+
 // OwnDirs are ebb's config and state: never cleaned, or every protection would go with them.
 func OwnDirs(env sys.Env) []string { return []string{sys.ConfigDir(env), sys.StateDir(env)} }
 
@@ -199,17 +241,33 @@ func (p *Planner) scanned(real string) string {
 		return ""
 	}
 	id, ok := p.Tree.Lookup(real)
+	small := false
+	if !ok {
+		// Files under 1 MiB are counted in their folder, not listed: the folder vouches for them.
+		parent, pok := p.Tree.Lookup(filepath.Dir(real))
+		if !pok || !smallFile(real) {
+			return "not in the last scan: scan again first"
+		}
+		id, small = parent, true
+	}
 	switch {
-	case !ok:
-		return "not in the last scan: scan again first"
 	case p.Tree.FlagAbove(id, tree.FlagSyncRoot):
 		return "inside a cloud-synced folder: deleting here deletes it on every device"
 	case p.Tree.Node(id).Flags&tree.FlagMount != 0:
 		return "a mounted disk"
-	case p.Tree.FlagBelow(id, tree.FlagMount):
+	case !small && p.Tree.FlagBelow(id, tree.FlagMount):
 		return "holds a mounted disk"
 	}
 	return ""
+}
+
+func smallFile(path string) bool {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	return ok && st.Blocks*512 < 1<<20
 }
 
 // outermost drops items inside another item and duplicates.
@@ -275,6 +333,11 @@ func (p *Planner) check(it *Item) {
 func running(env sys.Env, name string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := env.Run(ctx, "", "pgrep", "-x", name)
+	args := []string{"-x", name}
+	// Process names are cut at 16 characters; longer ones are matched by command line.
+	if len(name) > 15 {
+		args = []string{"-f", "/" + regexp.QuoteMeta(name) + "( |$)"}
+	}
+	out, err := env.Run(ctx, "", "pgrep", args...)
 	return err == nil && len(strings.TrimSpace(string(out))) > 0
 }

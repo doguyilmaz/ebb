@@ -30,6 +30,7 @@ type Backend interface {
 	Search(ctx context.Context, q string) (api.SearchResponse, error)
 	Explain(ctx context.Context, path string) (api.Explain, error)
 	Presets(ctx context.Context) ([]api.PresetView, error)
+	Apps(ctx context.Context) (api.AppsResponse, error)
 	Diff(ctx context.Context, from, to string) (api.DiffResponse, error)
 	Plan(ctx context.Context, req clean.Request) (*clean.Plan, error)
 	Execute(ctx context.Context, planID string) (clean.Result, error)
@@ -80,6 +81,7 @@ func (l *local) Search(_ context.Context, q string) (api.SearchResponse, error) 
 }
 func (l *local) Explain(_ context.Context, p string) (api.Explain, error) { return l.a.Explain(p) }
 func (l *local) Presets(context.Context) ([]api.PresetView, error)        { return l.a.Presets(), nil }
+func (l *local) Apps(ctx context.Context) (api.AppsResponse, error)       { return l.a.Apps(ctx) }
 func (l *local) Diff(_ context.Context, from, to string) (api.DiffResponse, error) {
 	return l.a.Diff(from, to, 10_000_000)
 }
@@ -184,6 +186,11 @@ func (r *remoteBackend) Explain(ctx context.Context, p string) (api.Explain, err
 func (r *remoteBackend) Presets(ctx context.Context) ([]api.PresetView, error) {
 	var out []api.PresetView
 	return out, r.get(ctx, "/presets", &out)
+}
+
+func (r *remoteBackend) Apps(ctx context.Context) (api.AppsResponse, error) {
+	var out api.AppsResponse
+	return out, r.get(ctx, "/apps", &out)
 }
 
 func (r *remoteBackend) Diff(ctx context.Context, from, to string) (api.DiffResponse, error) {

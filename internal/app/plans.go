@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/doguyilmaz/ebb/internal/api"
+	"github.com/doguyilmaz/ebb/internal/apps"
 	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/sys"
@@ -35,6 +36,9 @@ func (a *App) Plan(req clean.Request) (*clean.Plan, error) {
 	cfg := a.reloadConfig()
 	pl := &clean.Planner{Env: a.Env, Tree: r.Tree, Links: a.Links, Findings: a.View(r).Findings, Rules: a.Rules,
 		Protect: cfg.Clean.Protect, Roots: []string{r.Tree.RootPath()}, AutoExecute: cfg.MCP.AutoExecute}
+	if req.App != "" {
+		pl.Apps, _ = apps.Source{Env: a.Env, Tree: r.Tree, Links: a.Links}.Installed(context.Background())
+	}
 	p, err := pl.Plan(req)
 	if err != nil {
 		return nil, err

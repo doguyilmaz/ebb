@@ -49,7 +49,11 @@ func newScanCmd(g *globals) *cobra.Command {
 			}
 			out := cmd.OutOrStdout()
 			if res.Meta.Incremental {
-				fmt.Fprintf(out, "Updated %s: listed %s changed folders again in %s (%s files, %s)\n", units.Printable(res.Meta.Root), thousands(res.Meta.Changed),
+				folders := thousands(res.Meta.Changed) + " changed folders"
+				if res.Meta.Changed == 1 {
+					folders = "1 changed folder"
+				}
+				fmt.Fprintf(out, "Updated %s: listed %s again in %s (%s files, %s)\n", units.Printable(res.Meta.Root), folders,
 					res.Meta.Elapsed.Round(1e7), thousands(res.Meta.Files), units.Bytes(res.Meta.Scanned))
 			} else {
 				fmt.Fprintf(out, "Scanned %s: %s files in %s folders, %s, in %s\n", units.Printable(res.Meta.Root), thousands(res.Meta.Files), thousands(res.Meta.Dirs),

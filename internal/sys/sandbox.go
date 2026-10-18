@@ -4,7 +4,8 @@ import "errors"
 
 var ErrSandbox = errors.New("not run in sandbox")
 
-var sandboxAllowed = map[string]bool{"plutil": true, "sw_vers": true}
+// Read-only lookups that sandboxed sessions may still make.
+var sandboxAllowed = map[string]bool{"plutil": true, "sw_vers": true, "mdfind": true}
 
 func Sandboxed(env Env) bool { return env.Getenv(SandboxEnv) == "1" }
 

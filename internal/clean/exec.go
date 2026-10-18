@@ -163,6 +163,10 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 		}
 		return "", parent.RemoveAll(tmp)
 	case "trash":
+		if it.Action.Unload {
+			// A loaded launch agent keeps running, and starting, after its file is gone.
+			_, _ = e.Env.Run(ctx, "", "launchctl", "bootout", fmt.Sprintf("gui/%d", os.Getuid()), filepath.Join(dir, name))
+		}
 		return e.Trash.Trash(filepath.Join(dir, name))
 	case "empty-trash":
 		return "", e.emptyTrash(real)

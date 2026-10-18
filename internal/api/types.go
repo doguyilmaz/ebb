@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/apps"
 	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/history"
@@ -198,6 +199,11 @@ type Settings struct {
 	LowSpaceGB      int      `json:"lowSpaceGb"`
 }
 
+type AppsResponse struct {
+	Apps []apps.App `json:"apps"`
+	Note string     `json:"note,omitempty"`
+}
+
 // Daemon is the background service: whether it is set up, running, and what
 // it did last. Supported, Installed and Running are worked out when read.
 type Daemon struct {
@@ -279,7 +285,7 @@ const (
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
-	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
+	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, AppsResponse{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 

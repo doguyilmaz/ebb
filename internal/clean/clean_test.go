@@ -5,13 +5,16 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/apps"
 	"github.com/doguyilmaz/ebb/internal/finding"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/tree"
+	"github.com/doguyilmaz/ebb/internal/walk"
 )
 
 func sandboxEnv(t *testing.T) (*sys.Fake, string) {
@@ -453,4 +456,90 @@ func TestPlanOnlyWhatTheScanVouchesFor(t *testing.T) {
 			t.Errorf("%s: blocked %q, want %q", rel, it.Blocked, w)
 		}
 	}
+}
+
+func TestUninstallPlan(t *testing.T) {
+	env, home := sandboxEnv(t)
+	bundle := filepath.Join(home, "Applications", "Notely.app")
+	agent := filepath.Join(home, "Library", "LaunchAgents", "com.example.Notely.helper.plist")
+	support := filepath.Join(home, "Library", "Application Support", "Notely")
+	mkfile(t, filepath.Join(bundle, "Contents", "MacOS", "Notely"), 2<<20)
+	mkfile(t, agent, 300)
+	mkfile(t, filepath.Join(support, "db"), 2<<20)
+	var ran []string
+	busy := false
+	env.RunFn = func(_ string, name string, args ...string) ([]byte, error) {
+		ran = append(ran, name+" "+strings.Join(args, " "))
+		if name == "pgrep" && busy {
+			return []byte("123\n"), nil
+		}
+		return nil, errors.New("not running")
+	}
+	notely := apps.App{Name: "Notely", BundleID: "com.example.Notely", Executable: "Notely", Path: bundle, Bytes: 2 << 20,
+		Leftovers: []finding.Target{{Path: agent, Bytes: 4096}, {Path: support, Bytes: 2 << 20}}}
+	pl := planner(env)
+	pl.Apps = []apps.App{notely, {Name: "Safari", BundleID: "com.apple.Safari", Apple: true, Path: "/Applications/Safari.app"},
+		{Name: "Store", BundleID: "com.example.Store", RootOwned: true, Path: filepath.Join(home, "Applications", "Store.app")}}
+	pl.Tree = scanTree(t, home)
+
+	if _, err := pl.Plan(Request{App: "safari"}); err == nil || !strings.Contains(err.Error(), "does not uninstall") {
+		t.Fatalf("Apple apps are never uninstalled: %v", err)
+	}
+	if p, err := pl.Plan(Request{App: "com.example.store"}); err == nil && p.Items[0].Action.Kind != "manual" {
+		t.Fatalf("an app installed for every user goes through Finder: %+v", p.Items[0])
+	}
+	busy = true
+	p, err := pl.Plan(Request{App: "Notely"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Items) != 3 || !strings.Contains(p.Items[0].Blocked, "Quit Notely") {
+		t.Fatalf("while it runs nothing goes: %+v", p.Items)
+	}
+	busy = false
+	p, err = pl.Plan(Request{App: "Notely"})
+	if err != nil || !p.NeedsApproval {
+		t.Fatalf("an uninstall always waits for the person: %+v %v", p, err)
+	}
+	for _, it := range p.Items {
+		if it.Blocked != "" || it.Action.Kind != "trash" {
+			t.Fatalf("%+v", it)
+		}
+		if it.Path == agent && !it.Action.Unload {
+			t.Fatal("the launch agent is stopped before it goes")
+		}
+	}
+	p.Approved = true
+	res, err := executor(env).Execute(context.Background(), p, nil)
+	if err != nil || res.Done != 3 || exists(bundle) || exists(agent) || exists(support) {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if !slices.ContainsFunc(ran, func(c string) bool {
+		return strings.HasPrefix(c, "launchctl bootout gui/") && strings.HasSuffix(c, "com.example.Notely.helper.plist")
+	}) {
+		t.Fatalf("ran %q", ran)
+	}
+}
+
+func TestRunningMatchesLongNamesByCommandLine(t *testing.T) {
+	env, _ := sandboxEnv(t)
+	var got []string
+	env.RunFn = func(_ string, _ string, args ...string) ([]byte, error) { got = args; return nil, errors.New("no") }
+	running(env, "Short")
+	if got[0] != "-x" {
+		t.Fatalf("%q", got)
+	}
+	running(env, "A Very Long Helper (Renderer)")
+	if got[0] != "-f" || got[1] != `/A Very Long Helper \(Renderer\)( |$)` {
+		t.Fatalf("%q", got)
+	}
+}
+
+func scanTree(t *testing.T, root string) *tree.Tree {
+	t.Helper()
+	res, err := walk.Scan(context.Background(), walk.Options{Root: root}, time.Hour, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res.Tree
 }

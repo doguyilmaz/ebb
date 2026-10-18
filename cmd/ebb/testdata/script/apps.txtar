@@ -1,0 +1,38 @@
+# Apps come from the scan, with what each keeps in the Library.
+fill 2097152 $HOME/Applications/Notely.app/Contents/MacOS/Notely
+cp Info.plist $HOME/Applications/Notely.app/Contents/Info.plist
+fill 3145728 $HOME/Library/Containers/com.example.Notely/Data/blob
+fill 600 $HOME/Library/Preferences/com.example.Notely.plist
+fill 600 $HOME/Library/Preferences/com.example.Other.plist
+exec ebb scan $HOME
+exec ebb apps
+stdout 'Notely\s+com.example.Notely'
+exec ebb apps --json
+stdout '"leftoverBytes"'
+
+# An uninstall is shown first and goes to the Trash only after a yes.
+exec ebb uninstall notely --dry-run
+stdout 'Notely.app'
+stdout 'Containers/com.example.Notely'
+stdout 'Preferences/com.example.Notely.plist'
+! stdout 'com.example.Other'
+exists $HOME/Applications/Notely.app
+! exec ebb uninstall com.example.nope
+stderr 'no app'
+stdin yes.txt
+exec ebb uninstall com.example.Notely
+! exists $HOME/Applications/Notely.app
+! exists $HOME/Library/Containers/com.example.Notely
+! exists $HOME/Library/Preferences/com.example.Notely.plist
+exists $HOME/Library/Preferences/com.example.Other.plist
+exists $HOME/.Trash/Notely.app
+
+-- yes.txt --
+y
+-- Info.plist --
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.example.Notely</string>
+<key>CFBundleName</key><string>Notely</string>
+<key>CFBundleExecutable</key><string>Notely</string>
+</dict></plist>

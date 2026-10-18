@@ -102,7 +102,7 @@ await scenario("first scan shows live progress, then the overview and the tour",
 await scenario("every page renders in light and dark", async () => {
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });
-    for (const [label, text] of [["Overview", "Where the space is"], ["Explore", "Biggest inside"], ["Findings", "Can be cleaned"], ["Activity", "Activity"], ["Settings", "Never touch"]]) {
+    for (const [label, text] of [["Overview", "Where the space is"], ["Explore", "Biggest inside"], ["Findings", "Can be cleaned"], ["Apps", "Library data"], ["Activity", "Activity"], ["Settings", "Never touch"]]) {
       await nav(label);
       await page.getByText(text).first().waitFor({ timeout: 8000 });
       await shot(`${label.toLowerCase()}-${scheme}`);
@@ -178,6 +178,28 @@ await scenario("a quick cleanup of rebuildable caches runs end to end", async ()
   await sheet.locator(".sheet-foot .btn.primary").click();
   await nav("Activity");
   await page.locator(".ops li").first().waitFor({ timeout: 4000 });
+});
+
+await scenario("apps list their Library data and uninstall to the Trash", async () => {
+  await nav("Apps");
+  const row = page.locator(".app-row", { hasText: "Sketchpad" });
+  await row.waitFor({ timeout: 4000 });
+  await row.locator(".app-main").click();
+  await row.getByText("Containers/com.example.Sketchpad").waitFor({ timeout: 2000 });
+  await row.getByRole("button", { name: "Uninstall" }).click();
+  const sheet = page.locator("dialog.sheet[open]");
+  await sheet.locator(".plan-items li").first().waitFor({ timeout: 8000 });
+  check((await sheet.locator(".plan-items li").count()) === 3, "bundle, container and preferences planned");
+  const confirm = sheet.locator(".confirm input");
+  if (await confirm.count()) await confirm.check();
+  await sheet.locator(".sheet-foot .btn.primary").click();
+  await sheet.getByText("Cleanup finished").waitFor({ timeout: 20000 });
+  check(!existsSync(join(HOME, "Applications", "Sketchpad.app")), "app moved");
+  check(existsSync(join(HOME, ".Trash", "Sketchpad.app")), "app in the Trash");
+  check(!existsSync(join(HOME, "Library", "Preferences", "com.example.Sketchpad.plist")), "preferences moved");
+  await sheet.locator(".sheet-foot .btn.primary").click();
+  await settle();
+  check((await page.locator(".app-row", { hasText: "Sketchpad" }).count()) === 0, "gone from the list");
 });
 
 await scenario("settings add and remove a protected folder", async () => {

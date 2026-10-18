@@ -125,17 +125,33 @@ func (s *Server) define() []tool {
 		{Name: "ebb_presets", Description: "Ready-made cleanups (for example every cache that rebuilds itself) with what each would free now.",
 			InputSchema: obj(map[string]any{}),
 			run:         func(ctx context.Context, _ map[string]any) (any, error) { return b.Presets(ctx) }},
+		{Name: "ebb_apps", Description: "Installed apps, biggest first, with the size of the app and of what it keeps in the Library (containers, caches, preferences, saved state, launch agents). Uninstall one with ebb_cleanup_plan app=<name or bundle id>.",
+			InputSchema: obj(map[string]any{"n": num("how many (default 30)")}),
+			run: func(ctx context.Context, args map[string]any) (any, error) {
+				res, err := b.Apps(ctx)
+				if err != nil {
+					return nil, err
+				}
+				var out []map[string]any
+				for _, a := range res.Apps[:min(getN(args, "n", 30, 1, 500), len(res.Apps))] {
+					out = append(out, map[string]any{"name": a.Name, "bundleId": a.BundleID, "appBytes": a.Bytes, "libraryBytes": a.LeftoverBytes,
+						"libraryLocations": len(a.Leftovers), "apple": a.Apple, "installedForAllUsers": a.RootOwned})
+				}
+				return map[string]any{"apps": out, "note": res.Note}, nil
+			}},
 		{Name: "ebb_history_diff", Description: "What grew and shrank between two scans; without ids, the newest against the one before it.",
 			InputSchema: obj(map[string]any{"from": str("older snapshot id"), "to": str("newer snapshot id")}),
 			run: func(ctx context.Context, args map[string]any) (any, error) {
 				return b.Diff(ctx, getS(args, "from"), getS(args, "to"))
 			}},
 		{Name: "ebb_cleanup_plan", Description: "Make a cleanup plan from finding ids, a preset or paths. Nothing is removed: the plan lists every item, its action (trash, delete, the tool's own command, or manual), size, safety and anything blocking it. Show it to the person.",
-			InputSchema: obj(map[string]any{"findingIds": arr("finding ids from ebb_findings"), "preset": str("preset id from ebb_presets"), "paths": arr("absolute paths inside the scan; they go to the Trash")}),
+			InputSchema: obj(map[string]any{"findingIds": arr("finding ids from ebb_findings"), "preset": str("preset id from ebb_presets"),
+				"paths": arr("absolute paths inside the scan; a path a finding covers gets that finding's action (which may delete it outright), any other goes to the Trash"),
+				"app":   str("uninstall this app (name or bundle id from ebb_apps): the app and its Library data go to the Trash")}),
 			run: func(ctx context.Context, args map[string]any) (any, error) {
-				req := clean.Request{FindingIDs: getList(args, "findingIds"), Preset: getS(args, "preset"), Paths: getList(args, "paths"), Source: "mcp"}
-				if len(req.FindingIDs) == 0 && req.Preset == "" && len(req.Paths) == 0 {
-					return nil, errors.New("give findingIds, a preset or paths")
+				req := clean.Request{FindingIDs: getList(args, "findingIds"), Preset: getS(args, "preset"), Paths: getList(args, "paths"), App: getS(args, "app"), Source: "mcp"}
+				if len(req.FindingIDs) == 0 && req.Preset == "" && len(req.Paths) == 0 && req.App == "" {
+					return nil, errors.New("give findingIds, a preset, paths or an app")
 				}
 				return b.Plan(ctx, req)
 			}},

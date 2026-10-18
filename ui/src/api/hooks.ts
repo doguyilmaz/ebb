@@ -2,6 +2,7 @@ import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient }
 import { api } from "./client.ts";
 import type {
   AgesResponse,
+  AppsResponse,
   Breakdown,
   ChildrenResponse,
   Daemon,
@@ -66,6 +67,7 @@ export const useSearch = (term: string) =>
 export const usePresets = () => useQuery({ queryKey: ["presets"], queryFn: () => api.get<PresetView[]>("/presets") });
 export const useOps = () => useQuery({ queryKey: ["ops"], queryFn: () => api.get<OpsResponse>("/ops?limit=500") });
 export const useSettings = () => useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
+export const useApps = () => useQuery({ queryKey: ["apps"], queryFn: () => api.get<AppsResponse>("/apps"), retry: false });
 export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web"), retry: false });
 export const useDaemon = () => useQuery({ queryKey: ["daemon"], queryFn: () => api.get<Daemon>("/daemon"), refetchInterval: 15_000 });
 export const useHistory = () => useQuery({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
@@ -75,7 +77,7 @@ export const useDiff = (from: string, to: string) =>
   useQuery({ queryKey: ["diff", from, to], queryFn: () => api.get<DiffResponse>(`/history/diff?from=${q(from)}&to=${q(to)}`), enabled: !!from && !!to, retry: false });
 
 /** Everything that shows scan results; refreshed after a scan or a cleanup. */
-export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"]];
+export const resultKeys = [["status"], ["volume"], ["findings"], ["tree"], ["ages"], ["children"], ["search"], ["presets"], ["history"], ["diff"], ["apps"]];
 
 export function useRefreshResults() {
   const qc = useQueryClient();

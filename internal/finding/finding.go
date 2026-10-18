@@ -33,6 +33,7 @@ type Action struct {
 	Fallback string   `json:"fallback,omitempty" toml:"fallback"`
 	Hint     string   `json:"hint,omitempty" toml:"hint"`
 	Quit     []string `json:"quit,omitempty" toml:"quit"`
+	Unload   bool     `json:"unload,omitempty" toml:"unload"` // a launch agent: stopped before it goes
 }
 
 type Target struct {

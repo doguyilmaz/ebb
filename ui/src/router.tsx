@@ -7,7 +7,6 @@ const views: View[] = ["sunburst", "treemap", "icicle", "list"];
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({ component: Root });
 
-
 export const exploreRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/explore",
@@ -30,6 +29,11 @@ const findingsRoute = createRoute({
   path: "/findings",
   component: lazyRouteComponent(() => import("./pages/findings/Findings.tsx")),
 });
+const appsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/apps",
+  component: lazyRouteComponent(() => import("./pages/apps/Apps.tsx")),
+});
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/history",
@@ -46,7 +50,7 @@ const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import("./pages/settings/Settings.tsx")),
 });
 
-const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, historyRoute, activityRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([overviewRoute, exploreRoute, findingsRoute, appsRoute, historyRoute, activityRoute, settingsRoute]);
 
 export const router = createRouter({
   routeTree,
