@@ -8,3 +8,5 @@ ui/dist/
 internal/server/assets/dist/*
 !internal/server/assets/dist/README
 .DS_Store
+/assets/brand/png/
+/assets/brand/*.icns
