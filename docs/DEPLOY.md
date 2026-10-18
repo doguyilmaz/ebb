@@ -20,8 +20,22 @@ cd ui && bun install --frozen-lockfile && bun run build
 cd ../web && npm ci && npx cf deploy
 ```
 
-`web/wrangler.config.ts` points at the same build the Go binary embeds. `web/cloudflare.config.ts` names the Worker
-and answers unknown paths with `index.html`. Cloudflare reads `_headers` from the build.
+`web/wrangler.config.ts` points at the same build the Go binary embeds. `web/cloudflare.config.ts` names the Worker,
+answers unknown paths with `index.html` and serves it at `ebb.apps.doguyilmaz.com`. Cloudflare reads `_headers` from
+the build.
+
+Pushes to `main` deploy on their own through Workers Builds, so no Cloudflare token lives in GitHub. The Worker's build
+settings in the dashboard are:
+
+| Setting | Value |
+| --- | --- |
+| Branch | `main` only (no trigger for other branches) |
+| Path | `/web` |
+| Build command | `cd ../ui && bun install --frozen-lockfile && bun run build && cd ../web && npm ci` |
+| Deploy command | `npx cf deploy` |
+| Variable | `BUN_VERSION=1.4.3` |
+
+The commands above are for deploying by hand, which is only needed when Workers Builds is down.
 
 Any other static host works too if it sends the rules in `_headers` and answers every unknown path with `index.html`.
 
