@@ -79,7 +79,7 @@ func Load(env sys.Env, builtin fs.FS) (*Set, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := set.add(n, b); err != nil {
+		if err := set.add(n, b, false); err != nil {
 			return nil, err
 		}
 	}
@@ -90,14 +90,17 @@ func Load(env sys.Env, builtin fs.FS) (*Set, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := set.add(n, b); err != nil {
+		if err := set.add(n, b, !sys.Isolated(env)); err != nil {
 			return nil, err
 		}
 	}
 	return set, nil
 }
 
-func (s *Set) add(name string, b []byte) error {
+// add merges a rule file. A capped file (the user's own, outside a sandbox)
+// never counts as rebuildable, whatever it says: anything able to write the
+// config folder could otherwise make a cleanup that runs without asking.
+func (s *Set) add(name string, b []byte, capped bool) error {
 	var f file
 	if err := toml.Unmarshal(b, &f); err != nil {
 		return fmt.Errorf("%s: %w", name, err)
@@ -105,6 +108,9 @@ func (s *Set) add(name string, b []byte) error {
 	for _, r := range f.Rule {
 		if r.ID == "" || r.Safety.Rank() < 0 {
 			return fmt.Errorf("%s: rule %q needs an id and a valid safety", name, r.ID)
+		}
+		if capped && r.Safety == finding.Regenerable {
+			r.Safety = finding.Caution
 		}
 		if r.MinSize == 0 {
 			r.MinSize = defaultMinSize

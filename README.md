@@ -88,7 +88,7 @@ Every command takes `--json`.
 
 - `~/.local/state/ebb`: the last scan, history and the operation log.
 - `~/.config/ebb/config.toml`: settings.
-- `~/.config/ebb/rules/*.toml`: your own rules, the same format as [rules/](rules).
+- `~/.config/ebb/rules/*.toml`: your own rules, the same format as [rules/](rules). ebb always asks before acting on them.
 
 ## Not done on purpose
 

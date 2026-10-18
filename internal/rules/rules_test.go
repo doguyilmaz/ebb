@@ -90,6 +90,9 @@ impact = "i"
 	if !ok || r.Title != "My bun cache" {
 		t.Fatalf("override lost: %+v", r)
 	}
+	if r.Safety != finding.Caution {
+		t.Fatalf("a user rule claimed %q; only built-in rules may run without asking", r.Safety)
+	}
 	if _, ok := set.Rule("my.thing"); !ok {
 		t.Fatal("new user rule missing")
 	}

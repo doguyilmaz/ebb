@@ -28,11 +28,12 @@ func Bytes(n uint64) string {
 // Printable replaces control characters (ANSI escapes, newlines, bells) so
 // file names cannot rewrite or spoof a terminal.
 func Printable(s string) string {
-	if !strings.ContainsFunc(s, unicode.IsControl) {
+	hidden := func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r) }
+	if !strings.ContainsFunc(s, hidden) {
 		return s
 	}
 	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		if hidden(r) {
 			return '?'
 		}
 		return r

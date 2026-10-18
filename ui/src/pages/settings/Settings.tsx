@@ -145,8 +145,8 @@ function Protect() {
     <section className="card setting">
       <Head title="Never touch" term="protect" />
       <p className="muted">
-        Folders ebb never offers or removes, on top of system folders, Keychains and cloud-synced folders. Use ~ for your home and ** for everything
-        inside.
+        Folders ebb never offers or removes, on top of system folders, Keychains and cloud-synced folders. A folder covers everything inside it;
+        use ~ for your home and * for patterns.
       </p>
       {list.length > 0 && (
         <ul className="chips">

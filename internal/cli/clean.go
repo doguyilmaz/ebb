@@ -69,9 +69,9 @@ func runPlan(cmd *cobra.Command, a *app.App, req clean.Request, dry, yes bool) e
 	res, err := a.Execute(cmd.Context(), p.ID, func(e clean.Event) {
 		switch e.State {
 		case "done":
-			fmt.Fprintf(out, "  done     %s\n", e.Path)
+			fmt.Fprintf(out, "  done     %s\n", units.Printable(e.Path))
 		case "refused", "failed":
-			fmt.Fprintf(out, "  %-8s %s: %s\n", e.State, e.Path, e.Err)
+			fmt.Fprintf(out, "  %-8s %s: %s\n", e.State, units.Printable(e.Path), units.Printable(e.Err))
 		}
 	})
 	if err != nil {
@@ -134,25 +134,26 @@ func printPlan(w io.Writer, p *clean.Plan) int {
 	}
 	printTable(w, []string{"STATE", "ACTION", "SIZE", "SAFETY", "PATH"}, rows)
 	for _, it := range p.Items {
+		path := units.Printable(it.Path)
 		for _, warn := range it.Warnings {
-			fmt.Fprintf(w, "note: %s: %s\n", it.Path, warn)
+			fmt.Fprintf(w, "note: %s: %s\n", path, units.Printable(warn))
 		}
 		if it.Blocked != "" {
-			fmt.Fprintf(w, "blocked: %s: %s\n", it.Path, it.Blocked)
+			fmt.Fprintf(w, "blocked: %s: %s\n", path, units.Printable(it.Blocked))
 		}
 		if it.Action.Kind == "manual" && it.Action.Hint != "" {
-			fmt.Fprintf(w, "manual: %s: %s\n", it.Path, it.Action.Hint)
+			fmt.Fprintf(w, "manual: %s: %s\n", path, units.Printable(it.Action.Hint))
 		}
 	}
 	fmt.Fprintf(w, "Plan %s: %d to do, about %s.\n", p.ID, runnable, units.Bytes(p.Bytes))
 	return runnable
 }
 
-// confirm asks on stderr and reads one answer; no answer means no.
-// confirm asks a person. An answer piped in (by a script or an agent) does
-// not count, except in sandboxed sessions, where nothing real can be touched.
+// confirm asks a person on stderr; no answer means no. An answer piped in (by
+// a script or an agent) does not count, except in a sandbox on a home of its
+// own, where nothing real can be touched.
 func confirm(in io.Reader, errOut io.Writer) bool {
-	if f, ok := in.(*os.File); ok && !sys.Sandboxed(sys.Real()) {
+	if f, ok := in.(*os.File); ok && !sys.Isolated(sys.Real()) {
 		if fi, err := f.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
 			fmt.Fprintln(errOut, "ebb asks this at a terminal only.")
 			return false

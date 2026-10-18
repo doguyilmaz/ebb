@@ -115,6 +115,10 @@ func TestGuardProtectedPaths(t *testing.T) {
 	if g2.Check("/Users/h/.bun/x") == nil || g2.Check("/Users/h/Developer/keep/a") == nil || g2.Check("/Users/h/Developer/x/y") != nil {
 		t.Fatal("roots and user protect list")
 	}
+	g3 := Guard{Home: "/Users/h", Roots: []string{"/Users/h/Developer"}, Protect: []string{"~/Developer/Work"}}
+	if g3.Check("/Users/h/Developer/Work") == nil || g3.Check("/Users/h/Developer/Work/a/b") == nil || g3.Check("/Users/h/Developer/Workshop") != nil {
+		t.Fatal("a plain protected path covers what is inside it, and only that")
+	}
 }
 
 func TestPlanDefaultsBySafety(t *testing.T) {

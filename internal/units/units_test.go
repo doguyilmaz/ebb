@@ -18,3 +18,9 @@ func TestPrintable(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestPrintableHidesTerminalAndBidiControls(t *testing.T) {
+	if got := Printable("a\x1b[2Jb‮c"); got != "a?[2Jb?c" {
+		t.Fatalf("%q", got)
+	}
+}

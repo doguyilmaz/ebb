@@ -333,7 +333,7 @@ func (p *Planner) check(it *Item) {
 func running(env sys.Env, name string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	args := []string{"-x", name}
+	args := []string{"-x", "--", name}
 	// Process names are cut at 16 characters; longer ones are matched by command line.
 	if len(name) > 15 {
 		args = []string{"-f", "/" + regexp.QuoteMeta(name) + "( |$)"}

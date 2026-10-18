@@ -146,11 +146,13 @@ func (g Guard) checkName(path string) error {
 			pat = filepath.Join(g.Home, rest)
 		}
 		pat = lower(canonical(pat))
-		if ok, _ := doublestar.Match(pat, p); ok {
+		base := staticBase(pat)
+		// A plain path protects everything inside it, as a person means it.
+		if ok, _ := doublestar.Match(pat, p); ok || base == pat && within(p, pat) {
 			return fmt.Errorf("on your protect list (%s)", glob)
 		}
 		// Removing a folder removes what is inside it, protected or not.
-		if base := staticBase(pat); base != "/" && within(base, p) {
+		if base != "/" && within(base, p) {
 			return fmt.Errorf("holds something on your protect list (%s)", glob)
 		}
 	}
