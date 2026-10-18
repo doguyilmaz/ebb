@@ -19,7 +19,8 @@ type Conditions struct {
 	OnAC     bool
 	Idle     time.Duration
 	Changed  int  // folders changed since the last scan
-	Known    bool // the watcher knows what changed (history replayed, nothing lost)
+	Pending  bool // the watcher is still replaying what changed while ebb was not running
+	Lost     bool // the watcher cannot say what changed (events dropped, or too many)
 	LastScan time.Time
 	LastFull time.Time
 }
@@ -37,9 +38,9 @@ const (
 // to correct any drift. The first scan is always the person's own.
 func NextWork(c Conditions) Work {
 	switch {
-	case c.LastScan.IsZero(), !c.OnAC, c.Idle < minIdle, c.Now.Sub(c.LastScan) < minGap:
+	case c.LastScan.IsZero(), c.Pending, !c.OnAC, c.Idle < minIdle, c.Now.Sub(c.LastScan) < minGap:
 		return Nothing
-	case !c.Known, c.Now.Sub(c.LastFull) >= fullGap:
+	case c.Lost, c.Now.Sub(c.LastFull) >= fullGap:
 		return Full
 	case c.Changed > 0:
 		return Update

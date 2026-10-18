@@ -34,11 +34,19 @@ type MCP struct {
 	AutoExecute string `toml:"auto_execute"`
 }
 
+type Daemon struct {
+	// Scans lets the background service keep the last scan fresh on its own.
+	Scans bool `toml:"scans"`
+	// LowSpaceGB is the free space below which it warns; 0 never warns.
+	LowSpaceGB int `toml:"low_space_gb"`
+}
+
 type Config struct {
 	Scan   Scan   `toml:"scan"`
 	Server Server `toml:"server"`
 	Clean  Clean  `toml:"clean"`
 	MCP    MCP    `toml:"mcp"`
+	Daemon Daemon `toml:"daemon"`
 }
 
 const (
@@ -51,6 +59,7 @@ func Default() Config {
 		Scan:   Scan{StaleDays: 30, LargeFile: "1GiB"},
 		Server: Server{Port: DefaultPort, WebOrigins: []string{DefaultHostedOrigin}},
 		MCP:    MCP{AutoExecute: "regenerable"},
+		Daemon: Daemon{Scans: true, LowSpaceGB: 10},
 	}
 }
 

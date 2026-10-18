@@ -15,7 +15,8 @@ func (a *App) Settings() api.Settings {
 	if protect == nil {
 		protect = []string{}
 	}
-	return api.Settings{Root: c.Scan.Root, Threads: c.Scan.Threads, StaleDays: c.Scan.StaleDays, LargeFile: c.Scan.LargeFile, Protect: protect}
+	return api.Settings{Root: c.Scan.Root, Threads: c.Scan.Threads, StaleDays: c.Scan.StaleDays, LargeFile: c.Scan.LargeFile, Protect: protect,
+		BackgroundScans: c.Daemon.Scans, LowSpaceGB: c.Daemon.LowSpaceGB}
 }
 
 // SaveSettings validates and stores scan and cleanup preferences.
@@ -30,6 +31,9 @@ func (a *App) SaveSettings(s api.Settings) (api.Settings, error) {
 	if err := size.UnmarshalText([]byte(s.LargeFile)); err != nil || size < 1<<20 {
 		return api.Settings{}, fmt.Errorf("large file threshold %q must be a size like 1GiB", s.LargeFile)
 	}
+	if s.LowSpaceGB < 0 || s.LowSpaceGB > 100_000 {
+		return api.Settings{}, errors.New("the low space warning must be between 0 (never) and 100000 GB")
+	}
 	if s.Root != "" {
 		if st, err := os.Stat(rules.Expand(a.Env, s.Root)); err != nil || !st.IsDir() {
 			return api.Settings{}, fmt.Errorf("scan root %q is not a folder", s.Root)
@@ -37,6 +41,7 @@ func (a *App) SaveSettings(s api.Settings) (api.Settings, error) {
 	}
 	c := a.reloadConfig()
 	c.Scan.Root, c.Scan.Threads, c.Scan.StaleDays, c.Scan.LargeFile, c.Clean.Protect = s.Root, s.Threads, s.StaleDays, s.LargeFile, s.Protect
+	c.Daemon.Scans, c.Daemon.LowSpaceGB = s.BackgroundScans, s.LowSpaceGB
 	if err := a.SaveConfig(c); err != nil {
 		return api.Settings{}, err
 	}

@@ -27,12 +27,27 @@ type Service struct {
 
 // Local describes the service for the running binary.
 func Local(env sys.Env) Service {
-	exe, _ := os.Executable()
-	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = resolved
-	}
-	return Service{Env: env, StateDir: sys.StateDir(env), Exe: exe, UID: os.Getuid()}
+	return Service{Env: env, StateDir: sys.StateDir(env), Exe: sys.Executable(env), UID: os.Getuid()}
 }
+
+// temporary: go run, go test and anything in a temp folder disappear.
+func temporary(exe string) bool {
+	if strings.Contains(exe, "/go-build") {
+		return true
+	}
+	tmps := []string{os.TempDir(), "/tmp", "/private/tmp", "/var/folders", "/private/var/folders"}
+	if r, err := filepath.EvalSymlinks(os.TempDir()); err == nil {
+		tmps = append(tmps, r)
+	}
+	for _, t := range tmps {
+		if t = strings.TrimSuffix(t, "/"); strings.HasPrefix(exe, t+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+var errTemporary = errors.New("this ebb is a temporary build: install it first (brew install doguyilmaz/tap/ebb), then set up the service")
 
 func LogPath(stateDir string) string { return filepath.Join(stateDir, "daemon.log") }
 
@@ -86,6 +101,9 @@ func (s Service) run(ctx context.Context, args ...string) (string, error) {
 func (s Service) Install(ctx context.Context) (string, error) {
 	if s.Env.OS() != "darwin" {
 		return "", ErrUnsupported
+	}
+	if temporary(s.Exe) {
+		return "", errTemporary
 	}
 	path, content := s.Definition()
 	if err := state.WriteAtomic(path, []byte(content), 0o644); err != nil {

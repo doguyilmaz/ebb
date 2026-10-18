@@ -7,7 +7,7 @@ import (
 
 func TestNextWork(t *testing.T) {
 	now := time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
-	base := Conditions{Now: now, OnAC: true, Idle: 20 * time.Minute, Changed: 300, Known: true,
+	base := Conditions{Now: now, OnAC: true, Idle: 20 * time.Minute, Changed: 300,
 		LastScan: now.Add(-time.Hour), LastFull: now.Add(-24 * time.Hour)}
 	cases := []struct {
 		name string
@@ -19,7 +19,8 @@ func TestNextWork(t *testing.T) {
 		{"someone is working", func(c *Conditions) { c.Idle = 5 * time.Minute }, Nothing},
 		{"scanned a few minutes ago", func(c *Conditions) { c.LastScan = now.Add(-10 * time.Minute) }, Nothing},
 		{"nothing changed", func(c *Conditions) { c.Changed = 0 }, Nothing},
-		{"changes unknown", func(c *Conditions) { c.Known = false }, Full},
+		{"changes unknown", func(c *Conditions) { c.Lost = true }, Full},
+		{"still replaying what changed", func(c *Conditions) { c.Pending = true }, Nothing},
 		{"a week since the last full scan", func(c *Conditions) { c.LastFull = now.Add(-8 * 24 * time.Hour) }, Full},
 		{"never scanned", func(c *Conditions) { c.LastScan, c.LastFull = time.Time{}, time.Time{} }, Nothing},
 	}

@@ -1,7 +1,7 @@
 # ebb local API
 
 Base `http://127.0.0.1:<port>/api/v1` (default port 47340). JSON bodies, 1 MB limit. Every route except
-`GET /health` and `POST /pair` needs `Authorization: Bearer <token>` (or `?token=` on `/events`). Errors are
+`GET /health` and `POST /pair` needs `Authorization: Bearer <token>` (or `?token=` on `/events` and `/report` only). Errors are
 `Error {error, code?}` with a matching HTTP status. Types are defined in `internal/api/types.go` and generated into
 `ui/src/api/types.gen.ts`; this table names them.
 
@@ -12,7 +12,7 @@ callers must be on the allowed origins list and paired (see Pairing).
 |---|---|---|---|---|
 | GET | `/health` | — | `Health` | — |
 | GET | `/status` | — | `Status` | — |
-| POST | `/scans` | `ScanRequest` | `ScanState` (202) | 409 `scan-running` |
+| POST | `/scans` | `ScanRequest` | `ScanState` (202) | 409 `scan-running`, 409 `cleaning` |
 | GET | `/scans/current` | — | `ScanState` | — |
 | DELETE | `/scans/current` | — | `ScanState` (202; `scan.done` follows with `stopped: true`, the last result stays) | 409 `no-scan` |
 | GET | `/volume` | — | `Breakdown` | 409 `never-scanned` |
@@ -29,12 +29,14 @@ callers must be on the allowed origins list and paired (see Pairing).
 | POST | `/choose-folder` | `ChooseRequest {purpose: scan\|protect}` | `ChooseResponse {path}` (empty when cancelled; shows the macOS chooser on this Mac) | 400, 409 `sandboxed` |
 | GET | `/history` | — | `HistoryResponse` | — |
 | GET | `/history/diff?from&to` | — | `DiffResponse` (`from` is null while there is no earlier scan of the same folder; empty IDs mean the newest and the one before) | 404 |
-| GET/POST | `/settings` | `Settings` | `Settings` | 400 |
+| GET/POST | `/settings` | `Settings` (fields left out keep their value) | `Settings` | 400 |
+| GET | `/daemon` | — | `Daemon` (installed, running or waiting for another ebb to close, what it did last, log path) | — |
+| POST | `/daemon/install\|restart\|uninstall` | — | `Daemon` (202 when the server answering is the service itself; it acts right after) | 400, 409 `unsupported` |
 | GET | `/presets` | — | `PresetView[]` | — |
 | POST | `/plans` | `PlanRequest {findingIds?, paths?, preset?, source?}` | `Plan` | 400, 409 `never-scanned` |
 | GET | `/plans/{id}` | — | `Plan` | 404 `no-plan` |
 | POST | `/plans/{id}/approve` | — | `Plan` | 404 `no-plan` |
-| POST | `/plans/{id}/execute` | — | `PlanResult` (events `plan.progress` per item, `plan.done`) | 404, 409 `needs-approval`, 410 `plan-expired` |
+| POST | `/plans/{id}/execute` | — | `PlanResult` (events `plan.progress` per item, `plan.done`) | 404, 409 `needs-approval`, 409 `scan-running`, 409 `cleaning`, 410 `plan-expired` |
 | GET | `/ops?limit` | — | `OpsResponse` | — |
 | POST | `/ops/{id}/undo` | — | 204 | 400 |
 | GET/POST | `/notes` | `NoteRequest {key, text}` (empty text removes) | `{key: text}` | 400 |
@@ -48,8 +50,12 @@ system object (device and inode) the plan saw, pass the guard (protected locatio
 list, case and symlink variants included) and its owner app must not be running. `GET /findings?ignored=1` also
 returns ignored findings, flagged.
 
-Routes that manage web access (`/pair/*`, `/web/allow`, `/web/deny`) accept only this machine's own token, never a
-token issued to a paired page.
+Routes that manage web access (`GET /web`, `/pair/*`, `/web/allow`, `/web/deny`) and the background service
+(`/daemon/*` POSTs) accept only this machine's own token, never a token issued to a paired page.
+
+A plan item is also blocked when the last scan does not vouch for it: a path it never saw, a mounted disk or a
+folder holding one, anything inside a cloud-synced folder, or ebb's own settings and history. A cleanup and a scan
+never run at the same time, and only one cleanup runs at a time.
 
 Paths are accepted in display form (`/Users/me/...`) or real form (`/System/Volumes/Data/Users/me/...`) and must lie
 inside the scanned root.

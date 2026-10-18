@@ -205,6 +205,23 @@ export interface Settings {
   staleDays: number;
   largeFile: string;
   protect: string[] | null;
+  backgroundScans: boolean;
+  lowSpaceGb: number;
+}
+
+export interface Daemon {
+  supported: boolean;
+  installed: boolean;
+  running: boolean;
+  waiting: boolean;
+  pid: number;
+  started: string;
+  lastCheck: string;
+  lastWork: string;
+  lastWorkAt: string;
+  lastAlert: string;
+  error: string;
+  log: string;
 }
 
 export interface PresetView {

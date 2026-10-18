@@ -6,6 +6,7 @@ package api
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/doguyilmaz/ebb/internal/clean"
 	"github.com/doguyilmaz/ebb/internal/finding"
@@ -188,11 +189,30 @@ type DiffResponse struct {
 }
 
 type Settings struct {
-	Root      string   `json:"root"`
-	Threads   int      `json:"threads"`
-	StaleDays int      `json:"staleDays"`
-	LargeFile string   `json:"largeFile"`
-	Protect   []string `json:"protect"`
+	Root            string   `json:"root"`
+	Threads         int      `json:"threads"`
+	StaleDays       int      `json:"staleDays"`
+	LargeFile       string   `json:"largeFile"`
+	Protect         []string `json:"protect"`
+	BackgroundScans bool     `json:"backgroundScans"`
+	LowSpaceGB      int      `json:"lowSpaceGb"`
+}
+
+// Daemon is the background service: whether it is set up, running, and what
+// it did last. Supported, Installed and Running are worked out when read.
+type Daemon struct {
+	Supported  bool      `json:"supported"`
+	Installed  bool      `json:"installed"`
+	Running    bool      `json:"running"`
+	Waiting    bool      `json:"waiting"` // another ebb serves the window; the service takes over when it closes
+	PID        int       `json:"pid"`
+	Started    time.Time `json:"started"`
+	LastCheck  time.Time `json:"lastCheck"`
+	LastWork   string    `json:"lastWork"` // update or full
+	LastWorkAt time.Time `json:"lastWorkAt"`
+	LastAlert  time.Time `json:"lastAlert"`
+	Error      string    `json:"error"`
+	Log        string    `json:"log"`
 }
 
 type PresetView struct {
@@ -259,7 +279,7 @@ const (
 // Types lists everything the UI receives or sends, for the TS generator.
 var Types = []any{
 	Status{}, ScanRequest{}, SliceResponse{}, AgesResponse{}, AskRequest{}, AskResponse{}, Explain{}, FilesResponse{}, ChooseRequest{}, ChooseResponse{}, ChildrenResponse{}, SearchResponse{}, FindingsResponse{},
-	HistoryResponse{}, DiffResponse{}, Settings{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
+	HistoryResponse{}, DiffResponse{}, Settings{}, Daemon{}, PresetView{}, PathRequest{}, WebAccess{}, PairRequest{}, PairResponse{}, Health{},
 	Error{}, volume.Breakdown{}, PlanRequest{}, Plan{}, PlanEvent{}, PlanResult{}, NoteRequest{}, IgnoreRequest{}, OpsResponse{},
 }
 

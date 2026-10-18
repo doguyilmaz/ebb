@@ -110,9 +110,18 @@ func (s *Server) startScan(_ http.ResponseWriter, r *http.Request) (any, error) 
 			return nil, err
 		}
 	}
+	if err := s.StartScan(app.ScanOptions{Root: req.Root, Threads: req.Threads, Gentle: req.Gentle, Full: req.Full}); err != nil {
+		return nil, err
+	}
+	return accepted{s.app.ScanState()}, nil
+}
+
+// StartScan runs a scan in the background and tells every open window how it
+// goes, for a click in the window and for the background service alike.
+func (s *Server) StartScan(opt app.ScanOptions) error {
 	var mu sync.Mutex
 	var last time.Time
-	err := s.app.StartScan(app.ScanOptions{Root: req.Root, Threads: req.Threads, Gentle: req.Gentle, Full: req.Full},
+	return s.app.StartScan(opt,
 		func(p api.Progress) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -130,10 +139,6 @@ func (s *Server) startScan(_ http.ResponseWriter, r *http.Request) (any, error) 
 			s.Notify(api.EventFindingsChanged, nil)
 			s.Notify(api.EventHistoryChanged, nil)
 		})
-	if err != nil {
-		return nil, err
-	}
-	return accepted{s.app.ScanState()}, nil
 }
 
 func (s *Server) tree(_ http.ResponseWriter, r *http.Request) (any, error) {

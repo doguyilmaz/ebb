@@ -1,0 +1,11 @@
+# Before setup the service is neither installed nor running.
+exec ebb daemon status
+stdout 'Installed\s+no'
+stdout 'State\s+not running'
+exec ebb daemon status --json
+stdout '"installed": false'
+
+# A binary from go run, go test or a temp folder disappears; the service never points at one.
+! exec ebb daemon install
+stderr 'temporary build'
+! exists $HOME/Library/LaunchAgents/com.doguyilmaz.ebb.plist

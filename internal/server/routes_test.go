@@ -177,3 +177,22 @@ func TestStopScanRoute(t *testing.T) {
 		t.Fatalf("stop: %d", resp.StatusCode)
 	}
 }
+
+func TestDaemonRoutes(t *testing.T) {
+	c := newClient(t)
+	var st api.Daemon
+	if code, raw := c.get("/api/v1/daemon", &st); code != 200 || !st.Supported || st.Installed || st.Running {
+		t.Fatalf("%d %s", code, raw)
+	}
+	// The test binary lives in a temp folder; a service must never point at it.
+	if code, out := c.post("/api/v1/daemon/install", "", true, ""); code != 400 || !strings.Contains(out["error"].(string), "temporary") {
+		t.Fatalf("install: %d %v", code, out)
+	}
+	tok := pairedToken(t, c)
+	r, _ := http.NewRequest("POST", c.srv.URL+"/api/v1/daemon/uninstall", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	r.Header.Set("Origin", hosted)
+	if resp, err := http.DefaultClient.Do(r); err != nil || resp.StatusCode != 403 {
+		t.Fatalf("a paired page may not manage the service: %v %v", resp, err)
+	}
+}

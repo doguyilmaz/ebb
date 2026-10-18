@@ -192,6 +192,27 @@ await scenario("settings add and remove a protected folder", async () => {
   check(!(s.body.protect ?? []).includes("~/Documents/**"), "protect removed");
 });
 
+await scenario("the background service turns on and off, and its settings save", async () => {
+  await nav("Settings");
+  const card = page.locator("section.setting", { has: page.getByRole("heading", { name: "Background service" }) });
+  await card.getByRole("switch", { name: "Keep the last scan fresh" }).click();
+  await settle();
+  check((await api("/settings")).body.backgroundScans === false, "fresh scans turned off");
+  const gb = card.getByRole("spinbutton");
+  await gb.fill("25");
+  await gb.press("Enter");
+  await settle();
+  check((await api("/settings")).body.lowSpaceGb === 25, "warning limit saved");
+  // Sandboxed: the plist lands in the demo home and launchctl never runs.
+  const plist = join(HOME, "Library", "LaunchAgents", "com.doguyilmaz.ebb.plist");
+  await card.getByRole("button", { name: "Run in the background" }).click();
+  await card.getByRole("button", { name: "Turn off" }).waitFor({ timeout: 4000 });
+  check(existsSync(plist), "service definition written");
+  await card.getByRole("button", { name: "Turn off" }).click();
+  await card.getByRole("button", { name: "Run in the background" }).waitFor({ timeout: 4000 });
+  check(!existsSync(plist), "service definition removed");
+});
+
 await scenario("command palette opens with ⌘K and closes with Escape", async () => {
   await page.keyboard.press("Meta+k");
   await page.locator("dialog.palette[open]").waitFor({ timeout: 2000 });

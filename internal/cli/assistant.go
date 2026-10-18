@@ -2,12 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/doguyilmaz/ebb/internal/assistant"
+	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
 func newAssistantCmd(g *globals) *cobra.Command {
@@ -22,14 +21,7 @@ func newAssistantCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			exe, err := os.Executable()
-			if err != nil {
-				return err
-			}
-			if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-				exe = resolved
-			}
-			steps, err := assistant.Install(cmd.Context(), a.Env, exe, dryRun)
+			steps, err := assistant.Install(cmd.Context(), a.Env, sys.Executable(a.Env), dryRun)
 			for _, s := range steps {
 				fmt.Fprintln(cmd.OutOrStdout(), s)
 			}

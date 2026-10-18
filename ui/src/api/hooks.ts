@@ -4,6 +4,7 @@ import type {
   AgesResponse,
   Breakdown,
   ChildrenResponse,
+  Daemon,
   DiffResponse,
   FindingsResponse,
   HistoryResponse,
@@ -65,7 +66,8 @@ export const useSearch = (term: string) =>
 export const usePresets = () => useQuery({ queryKey: ["presets"], queryFn: () => api.get<PresetView[]>("/presets") });
 export const useOps = () => useQuery({ queryKey: ["ops"], queryFn: () => api.get<OpsResponse>("/ops?limit=500") });
 export const useSettings = () => useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
-export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web") });
+export const useWebAccess = () => useQuery({ queryKey: ["web"], queryFn: () => api.get<WebAccess>("/web"), retry: false });
+export const useDaemon = () => useQuery({ queryKey: ["daemon"], queryFn: () => api.get<Daemon>("/daemon"), refetchInterval: 15_000 });
 export const useHistory = () => useQuery({ queryKey: ["history"], queryFn: () => api.get<HistoryResponse>("/history") });
 /** The newest scan against the one before it of the same folder; fails while there is only one. */
 export const useLatestDiff = () => useQuery({ queryKey: ["diff", "latest"], queryFn: () => api.get<DiffResponse>("/history/diff"), retry: false });
@@ -138,6 +140,15 @@ export function useIgnore() {
   return useMutation({
     mutationFn: ({ id, undo }: { id: string; undo?: boolean }) => (undo ? api.del(`/ignores/${q(id)}`) : api.post("/ignores", { findingId: id })),
     onSuccess: refresh,
+  });
+}
+
+/** Install, restart or uninstall the background service; when it is the one serving, it answers before it goes. */
+export function useDaemonAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (act: "install" | "restart" | "uninstall") => api.post<Daemon>(`/daemon/${act}`, {}),
+    onSuccess: (d) => qc.setQueryData(["daemon"], d),
   });
 }
 

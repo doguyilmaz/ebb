@@ -61,6 +61,7 @@ const terms = {
   small: ["Small files", "Files under 1 MB are counted together per folder, which keeps the scan fast."],
   ages: ["Age", "When files last changed. Data nothing touched for a year is often safe to archive or remove."],
   activity: ["Activity", "Everything ebb has cleaned. Trashed items can be put back until the Trash is emptied."],
+  daemon: ["Background service", "ebb started by macOS at login. It serves this window, follows what changes on disk, updates the last scan while the Mac is idle on power and warns when space runs low. It never cleans anything on its own."],
   web: ["Web access", "Web pages that may talk to ebb on this Mac. A page needs your confirmation once before it can see anything."],
 } as const;
 

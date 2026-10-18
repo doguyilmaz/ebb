@@ -58,3 +58,11 @@ func TestInstallInSandboxOnlyWritesTheFile(t *testing.T) {
 		t.Fatal("uninstall removes the plist")
 	}
 }
+
+func TestInstallRefusesATemporaryBuild(t *testing.T) {
+	env, _ := fake(t)
+	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/var/folders/x/T/go-build123/b001/exe/ebb", UID: 501}
+	if _, err := s.Install(context.Background()); err == nil || s.Installed() {
+		t.Fatal("a go run binary disappears; the service must not point at it")
+	}
+}
