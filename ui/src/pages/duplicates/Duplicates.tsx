@@ -63,7 +63,7 @@ export default function Duplicates() {
             <Square size={13} aria-hidden /> Stop
           </button>
         ) : (
-          <button className="btn primary" disabled={find.isPending} onClick={() => find.mutate({ path: folder || undefined, minSize })}>
+          <button className="btn primary" disabled={find.isPending} onClick={() => find.mutate({ path: folder || undefined, minSize })} data-tour="dupes">
             <Search size={14} aria-hidden /> {st.result ? "Search again" : "Find duplicates"}
           </button>
         )}

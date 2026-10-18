@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export interface Step {
-  route: "/" | "/explore" | "/findings";
+  route: "/" | "/explore" | "/findings" | "/apps" | "/duplicates" | "/sources";
   /** data-tour value of the element the step points at. */
   target: string;
   title: string;
@@ -15,11 +15,14 @@ export const steps: Step[] = [
   { route: "/", target: "ages", title: "How old it is", body: "Data nothing touched for a year is often safe to archive. Explore can colour folders by age." },
   { route: "/", target: "presets", title: "Quick cleanups", body: "Ready-made groups, like every cache that rebuilds itself. A click shows the plan; nothing runs until you approve it." },
   { route: "/explore", target: "chart", title: "Explore any folder", body: "Click a slice to go in and the middle to come back. Hover for size, share and age." },
-  { route: "/explore", target: "views", title: "Four ways to look", body: "Sunburst, treemap, icicle and list show the same folder. ebb remembers the one you like." },
+  { route: "/explore", target: "views", title: "Five ways to look", body: "Sunburst, treemap, icicle and list show the same folder; Files lists the biggest and oldest files below it. ebb remembers your choice." },
   { route: "/explore", target: "metric", title: "Allocated or unique", body: "Unique leaves out space shared with clones and hardlinks, which deleting would not free." },
   { route: "/findings", target: "finding", title: "Every finding explains itself", body: "Why it is large, what removing it costs, and how safe it is. Tick it or press Clean." },
   { route: "/findings", target: "select", title: "Pick, then review", body: "Tick findings to collect them in the tray below. You always see the exact plan first; things go to the Trash, and Activity can put them back." },
-  { route: "/findings", target: "help", title: "Come back any time", body: "Start this tour again from here. ⌘K jumps to any folder, page or cleanup." },
+  { route: "/apps", target: "apps", title: "Apps and what they leave", body: "Each app with the data it keeps in your Library. Uninstall moves both to the Trash." },
+  { route: "/duplicates", target: "dupes", title: "Copies of the same file", body: "ebb compares content, not names. You choose which copy stays; the others go to the Trash." },
+  { route: "/sources", target: "flows", title: "Where space comes from", body: "Folders on the left, the tool or app that filled them in the middle, the kind of data on the right." },
+  { route: "/sources", target: "help", title: "Come back any time", body: "Start this tour again from here. ⌘K jumps to any folder, page or cleanup." },
 ];
 
 const KEY = "ebb.tour";

@@ -29,7 +29,7 @@ export default function Sources() {
           <Loading />
         ) : (
           <>
-            <section className="card flows-card">
+            <section className="card flows-card" data-tour="flows">
               <FlowChart flows={flows.data} />
             </section>
             <details className="card flows-table">
