@@ -128,3 +128,24 @@ func TestOwnTrashOnAnUnlistableTrashes(t *testing.T) {
 		}
 	}
 }
+
+func TestOwnTrashLinkIsNotFollowed(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := filepath.Join(root, "elsewhere")
+	os.MkdirAll(elsewhere, 0o755)
+	os.WriteFile(filepath.Join(elsewhere, "doc"), make([]byte, 1<<20), 0o644)
+	trashes := filepath.Join(root, ".Trashes")
+	os.Mkdir(trashes, 0o755)
+	if err := os.Symlink(elsewhere, filepath.Join(trashes, strconv.Itoa(os.Getuid()))); err != nil {
+		t.Fatal(err)
+	}
+	os.Chmod(trashes, 0o1333)
+	t.Cleanup(func() { os.Chmod(trashes, 0o755) })
+	res := scan(t, root, Options{})
+	if _, ok := res.Tree.Lookup(filepath.Join(trashes, strconv.Itoa(os.Getuid()), "doc")); ok {
+		t.Fatal("followed a link in .Trashes")
+	}
+}

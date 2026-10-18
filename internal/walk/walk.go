@@ -514,7 +514,8 @@ func (s *Session) ownTrash(b *batch) bool {
 		return false
 	}
 	name := strconv.Itoa(os.Getuid())
-	fi, err := os.Stat(childPath(b.path, []byte(name)))
+	// Lstat: a link here (on a disk anyone could have prepared) is not followed.
+	fi, err := os.Lstat(childPath(b.path, []byte(name)))
 	if err != nil || !fi.IsDir() {
 		return true
 	}
