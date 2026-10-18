@@ -1,0 +1,13 @@
+{
+  "name": "ebb-web",
+  "private": true,
+  "type": "module",
+  "description": "Deploys ebb's web UI to Cloudflare Workers. cf runs on Node.js only, so this folder uses npm.",
+  "scripts": {
+    "deploy": "cf deploy"
+  },
+  "devDependencies": {
+    "cf": "1.0.0-beta.18",
+    "wrangler": "4.151.1"
+  }
+}

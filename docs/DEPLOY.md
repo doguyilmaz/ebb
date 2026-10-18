@@ -12,15 +12,18 @@ The output goes to `internal/server/assets/dist`, the same files ebb embeds. Its
 
 ## Cloudflare
 
-Any static host works if it can do two things:
+ebb's own copy runs as a Worker with static assets, set up in `web/`. Cloudflare's `cf` CLI runs on Node.js only, so
+that folder uses npm:
 
-- send the rules in `_headers`;
-- answer every unknown path with `index.html`, because the app does its own routing.
+```sh
+cd ui && bun install --frozen-lockfile && bun run build
+cd ../web && npm ci && npx cf deploy
+```
 
-Cloudflare reads `_headers` either way:
+`web/wrangler.config.ts` points at the same build the Go binary embeds. `web/cloudflare.config.ts` names the Worker
+and answers unknown paths with `index.html`. Cloudflare reads `_headers` from the build.
 
-- **Workers static assets:** set `assets.directory` to `internal/server/assets/dist` and `assets.not_found_handling` to `single-page-application`.
-- **Pages:** use the build command above with output directory `internal/server/assets/dist`. With no `404.html`, Pages answers unknown paths with `index.html` on its own.
+Any other static host works too if it sends the rules in `_headers` and answers every unknown path with `index.html`.
 
 ## Letting a machine use it
 
