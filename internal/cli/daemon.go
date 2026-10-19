@@ -100,11 +100,28 @@ func newDaemonCmd(g *globals) *cobra.Command {
 			return daemon.Run(ctx, a, daemon.Options{Version: Version, Out: cmd.OutOrStdout()})
 		},
 	}
+	restore := &cobra.Command{
+		Use:    "restore",
+		Short:  "Set the service up again after an upgrade removed it, when it was on (Homebrew runs this)",
+		Args:   cobra.NoArgs,
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			a, err := g.app()
+			if err != nil {
+				return err
+			}
+			done, err := svc.Local(a.Env).Restore(cmd.Context())
+			if done {
+				fmt.Fprintln(cmd.OutOrStdout(), "ebb runs in the background again, now with this version.")
+			}
+			return err
+		},
+	}
 	cmd.AddCommand(
 		act("install", "Start ebb at login and keep it running", "ebb now runs in the background. Open it with: ebb open", svc.Service.Install),
 		act("restart", "Restart the service, for example after an upgrade", "Restarted.", svc.Service.Restart),
 		act("uninstall", "Stop the service and remove it from login", "The background service is gone.", svc.Service.Uninstall),
-		status, run,
+		status, run, restore,
 	)
 	return cmd
 }

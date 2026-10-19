@@ -63,6 +63,12 @@ homebrew_casks:
     # The background service runs this binary; it must stop with it.
     uninstall:
       launchctl: [com.doguyilmaz.ebb]
+    # Homebrew uninstalls on every upgrade too, so the new version sets the
+    # service up again when the person had it on.
+    hooks:
+      post:
+        install: |
+          system_command "#{HOMEBREW_PREFIX}/bin/ebb", args: ["daemon", "restore"], must_succeed: false
     zap:
       trash: ["~/.config/ebb", "~/.local/state/ebb"]
 

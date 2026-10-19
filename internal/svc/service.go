@@ -51,6 +51,11 @@ var errTemporary = errors.New("this ebb is a temporary build: install it first (
 
 func LogPath(stateDir string) string { return filepath.Join(stateDir, "daemon.log") }
 
+// wantedPath marks that the person turned the service on. Homebrew removes the
+// service on every upgrade as well as on uninstall, so this is how the new
+// version tells which one it was.
+func wantedPath(stateDir string) string { return filepath.Join(stateDir, "service-wanted") }
+
 // Definition is the launchd plist and where it goes.
 func (s Service) Definition() (path, content string) {
 	home := s.Env.Home()
@@ -107,6 +112,9 @@ func (s Service) Install(ctx context.Context) (string, error) {
 	if err := state.WriteAtomic(path, []byte(content), 0o644); err != nil {
 		return "", err
 	}
+	if err := state.WriteAtomic(wantedPath(s.StateDir), nil, 0o600); err != nil {
+		return "", err
+	}
 	// A previous copy may still be loaded; bootstrap fails on a loaded label.
 	if !sys.Sandboxed(s.Env) {
 		_, _ = s.Env.Run(ctx, "", "launchctl", "bootout", fmt.Sprintf("gui/%d/%s", s.UID, Label))
@@ -131,7 +139,20 @@ func (s Service) Current() bool {
 	return err == nil && string(got) == want
 }
 
+// Restore sets the service up again after an upgrade removed it, when the
+// person had it on; it reports whether it did.
+func (s Service) Restore(ctx context.Context) (bool, error) {
+	if _, err := os.Stat(wantedPath(s.StateDir)); err != nil {
+		return false, nil
+	}
+	_, err := s.Install(ctx)
+	return err == nil, err
+}
+
 func (s Service) Uninstall(ctx context.Context) (string, error) {
+	if err := os.Remove(wantedPath(s.StateDir)); err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
 	path, _ := s.Definition()
 	// Not loaded is fine: removing the plist is what keeps it from coming back.
 	note, _ := s.run(ctx, "launchctl", "bootout", fmt.Sprintf("gui/%d/%s", s.UID, Label))

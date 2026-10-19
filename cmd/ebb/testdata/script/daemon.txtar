@@ -9,3 +9,7 @@ stdout '"installed": false'
 ! exec ebb daemon install
 stderr 'temporary build'
 ! exists $HOME/Library/LaunchAgents/com.doguyilmaz.ebb.plist
+
+# After an upgrade Homebrew asks for the service back; nobody turned it on here.
+exec ebb daemon restore
+! stdout .

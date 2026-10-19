@@ -93,3 +93,28 @@ func TestInstallRefusesATemporaryBuild(t *testing.T) {
 		t.Fatal("a go run binary disappears; the service must not point at it")
 	}
 }
+
+func TestRestoreBringsBackOnlyAWantedService(t *testing.T) {
+	env, _ := fake(t)
+	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/opt/ebb", UID: 501}
+	if done, err := s.Restore(context.Background()); err != nil || done || s.Installed() {
+		t.Fatalf("restored a service nobody turned on: %v %v", done, err)
+	}
+	if _, err := s.Install(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// Homebrew's uninstall step removes the definition on every upgrade.
+	path, _ := s.Definition()
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if done, err := s.Restore(context.Background()); err != nil || !done || !s.Installed() {
+		t.Fatalf("a wanted service was not restored: %v %v", done, err)
+	}
+	if _, err := s.Uninstall(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if done, _ := s.Restore(context.Background()); done || s.Installed() {
+		t.Fatal("a service turned off came back")
+	}
+}
