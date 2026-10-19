@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/doguyilmaz/ebb/internal/state"
 	"github.com/doguyilmaz/ebb/internal/sys"
@@ -120,9 +121,17 @@ func (s Service) Install(ctx context.Context) (string, error) {
 	if err := state.WriteAtomic(wantedPath(s.StateDir), nil, 0o600); err != nil {
 		return "", err
 	}
-	// A previous copy may still be loaded; bootstrap fails on a loaded label.
+	// A previous copy may still be loaded; bootstrap fails on a loaded label,
+	// also while bootout, which returns early, is still taking it down.
 	if !sys.Sandboxed(s.Env) {
-		_, _ = s.Env.Run(ctx, "", "launchctl", "bootout", fmt.Sprintf("gui/%d/%s", s.UID, Label))
+		job := fmt.Sprintf("gui/%d/%s", s.UID, Label)
+		_, _ = s.Env.Run(ctx, "", "launchctl", "bootout", job)
+		for range 50 {
+			if _, err := s.Env.Run(ctx, "", "launchctl", "print", job); err != nil {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 	return s.run(ctx, "launchctl", "bootstrap", fmt.Sprintf("gui/%d", s.UID), path)
 }
