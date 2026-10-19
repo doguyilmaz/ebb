@@ -34,7 +34,6 @@ function linkFromURL(): Link {
   if (!link.token && !link.key) return link;
   history.replaceState(null, "", location.pathname + location.search);
   if (link.token) store("session")?.setItem(TOKEN_KEY, link.token);
-  if (link.port) setApiPort(link.port);
   return link;
 }
 
@@ -50,7 +49,7 @@ export const apiBase = () => base;
 export const isRemote = () => base !== "";
 export const token = () => tok;
 export const setTokenForTests = (t: string) => void (tok = t);
-export const setLinkKeyForTests = (k: string) => void (linkKey = k);
+export const setLinkForTests = (key: string, port = 0) => void ((linkKey = key), (link.port = port));
 /** True when this page connected to ebb before, so a failed check means ebb stopped rather than was never set up. */
 export const pairedBefore = () => !!store("local")?.getItem(TOKEN_KEY);
 
@@ -117,6 +116,18 @@ export async function connect(): Promise<Connection | null> {
     }
     return { remote: false, health: here };
   }
+  // A port from a link counts once ebb there accepts the link's key; until then this page's token stays away from it.
+  if (linkKey && link.port && link.port !== apiPort()) {
+    const at = `http://127.0.0.1:${link.port}`;
+    const health = await healthAt(at);
+    if (health) {
+      base = at;
+      tok = "";
+      return { remote: true, health };
+    }
+    // ebb open opens a link only once ebb answers, so nothing there means a stale or forged link.
+    linkKey = "";
+  }
   const at = `http://127.0.0.1:${apiPort()}`;
   const health = await healthAt(at);
   if (!health) return null;
@@ -141,7 +152,14 @@ export async function claim(): Promise<"none" | "claimed" | "refused"> {
   if (!res.ok || !body?.token) return "refused";
   tok = body.token;
   store("local")?.setItem(TOKEN_KEY, tok);
+  if (link.port) setApiPort(link.port);
   return "claimed";
+}
+
+/** Drops a token ebb no longer accepts, so the page asks for a new link instead of trying it again. */
+export function forgetToken() {
+  tok = "";
+  store("local")?.removeItem(TOKEN_KEY);
 }
 
 /** Calls f when another tab of this page stores a token, so a tab still waiting connects at once. */

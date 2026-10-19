@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, MessageSquareText, RefreshCw, ScanSearch, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { listen } from "#/api/events.ts";
-import { apiPort, claim, connect, isRemote, onAuthRejected, onTokenFromOtherTab, pairedBefore, setApiPort, token, wasEmbedded } from "#/api/client.ts";
+import { apiPort, claim, connect, forgetToken, isRemote, onAuthRejected, onTokenFromOtherTab, pairedBefore, setApiPort, token, wasEmbedded } from "#/api/client.ts";
 import { detectOS, isSafari } from "#/lib/os.ts";
 import { isBehind, pageVersion, versionLabel } from "#/lib/version.ts";
 import { Command } from "#/ui/Command.tsx";
@@ -92,13 +92,18 @@ export function Connect({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.kind !== "ready") return;
-    const off = onAuthRejected(() => setState(isRemote() ? { kind: "connecting" } : { kind: "no-token" }));
+    const off = onAuthRejected(() => {
+      if (!isRemote()) return setState({ kind: "no-token" });
+      forgetToken();
+      setState({ kind: "connecting" });
+      void attempt();
+    });
     const unlisten = listen(qc);
     return () => {
       off();
       unlisten();
     };
-  }, [state.kind, qc]);
+  }, [state.kind, qc, attempt]);
 
   if (state.kind === "ready") return <>{children}</>;
 
