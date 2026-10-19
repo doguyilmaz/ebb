@@ -14,7 +14,7 @@ export const steps: Step[] = [
   { route: "/", target: "categories", title: "What can be cleaned", body: "Everything ebb's findings can free, by kind. Click a bar to see the findings behind it." },
   { route: "/", target: "ages", title: "How old it is", body: "Data nothing touched for a year is often safe to archive. Explore can colour folders by age." },
   { route: "/", target: "presets", title: "Quick cleanups", body: "Ready-made groups, like every cache that rebuilds itself. A click shows the plan; nothing runs until you approve it." },
-  { route: "/explore", target: "chart", title: "Explore any folder", body: "Click a slice to go in and the middle to come back. Hover for size, share and age." },
+  { route: "/explore", target: "chart", title: "Explore any folder", body: "Click a folder to go in and the path above to come back. Hover for size, share and age." },
   { route: "/explore", target: "views", title: "Five ways to look", body: "Sunburst, treemap, icicle and list show the same folder; Files lists the biggest and oldest files below it. ebb remembers your choice." },
   { route: "/explore", target: "metric", title: "Allocated or unique", body: "Unique leaves out space shared with clones and hardlinks, which deleting would not free." },
   { route: "/findings", target: "finding", title: "Every finding explains itself", body: "Why it is large, what removing it costs and how safe it is. Tick it or press Clean." },
@@ -24,6 +24,9 @@ export const steps: Step[] = [
   { route: "/sources", target: "flows", title: "Where space comes from", body: "Folders on the left, the tool or app that filled them in the middle, the kind of data on the right." },
   { route: "/sources", target: "help", title: "Come back any time", body: "Start this tour again from here. ⌘K jumps to any folder, page or cleanup." },
 ];
+
+/** True while the tour points at target, so its page can show what the step talks about. */
+export const useTouring = (target: string) => useTour((t) => t.step !== null && steps[t.step].target === target);
 
 const KEY = "ebb.tour";
 

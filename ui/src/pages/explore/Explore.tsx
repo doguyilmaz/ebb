@@ -93,7 +93,7 @@ export default function Explore() {
           ))}
         </div>
       </div>
-      <div className="explore-body">
+      <div className="explore-body" data-tour="chart">
         {view === "list" ? (
           <ListView path={here} onOpen={open} onPick={setPicked} />
         ) : view === "files" ? (

@@ -260,7 +260,7 @@ export function Chart(props: Props) {
   const total = Math.max(1, root[metric]);
   const label = `${view} of ${root.name}: ${(root.children ?? []).slice(0, 8).map((c) => `${c.name} ${bytes(c[metric])}`).join(", ")}`;
   return (
-    <div className={`chart${stale ? " stale" : ""}`} ref={wrap} data-tour="chart">
+    <div className={`chart${stale ? " stale" : ""}`} ref={wrap}>
       <canvas
         ref={canvas}
         style={{ width: size.w, height: size.h, cursor: center && props.upLabel ? "pointer" : tip ? "pointer" : "default" }}

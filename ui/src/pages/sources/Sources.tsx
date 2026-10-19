@@ -2,6 +2,7 @@ import { useState } from "react";
 import { usePackages, useSources } from "#/api/hooks.ts";
 import { bytes } from "#/lib/format.ts";
 import { readPrefs, savePrefs } from "#/lib/prefs.ts";
+import { useTouring } from "#/app/tour.ts";
 import { PageHead } from "#/ui/PageHead.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
 import { FlowChart, kindLabel } from "./FlowChart.tsx";
@@ -10,7 +11,8 @@ import { Packages } from "./Packages.tsx";
 type Tab = "flows" | "packages";
 
 export default function Sources() {
-  const [tab, setTab] = useState<Tab>(() => readPrefs().sourcesTab ?? "flows");
+  const [chosen, setTab] = useState<Tab>(() => readPrefs().sourcesTab ?? "flows");
+  const tab = useTouring("flows") ? "flows" : chosen;
   const flows = useSources();
   const pkgs = usePackages(tab === "packages");
   const pick = (t: Tab) => (setTab(t), savePrefs({ sourcesTab: t }));

@@ -610,6 +610,8 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 /* ---------- tour ---------- */
 .tour { position: fixed; inset: 0; z-index: 50; cursor: default; }
 .tour-spot { position: fixed; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--tide) 70%, transparent), 0 0 0 9999px rgba(10, 10, 12, 0.55); transition: opacity 200ms ease; }
+/* While a step looks for its target the page stays dimmed, with no ring pointing anywhere. */
+.tour-spot[data-waiting] { box-shadow: 0 0 0 9999px rgba(10, 10, 12, 0.55); }
 /* Glide only from one step to the next; while the page scrolls the light stays on its target. */
 .tour-spot[data-moving] { transition: top 320ms var(--ease-in-out), left 320ms var(--ease-in-out), width 320ms var(--ease-in-out), height 320ms var(--ease-in-out), opacity 200ms ease; }
 .tour-card { position: fixed; z-index: 51; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-3); box-shadow: var(--shadow-3); }
