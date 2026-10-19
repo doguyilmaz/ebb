@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -177,13 +179,23 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 			return "", errors.New("no command to run")
 		}
 		// Tools read project config from their working folder (yarnPath, a
-		// bunfig cache dir), so they never run where ebb was started.
+		// bunfig cache dir), so they never run where ebb was started. bun pm
+		// refuses to run outside a project, so the folder holds an empty one.
 		cwd, err := os.MkdirTemp("", "ebb-run-")
 		if err != nil {
 			return "", err
 		}
 		defer os.RemoveAll(cwd)
+		if err := os.WriteFile(filepath.Join(cwd, "package.json"), []byte("{}\n"), 0o600); err != nil {
+			return "", err
+		}
 		_, err = e.Env.Run(cctx, cwd, it.Command[0], it.Command[1:]...)
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			if line, _, _ := strings.Cut(strings.TrimSpace(string(exit.Stderr)), "\n"); line != "" {
+				return "", fmt.Errorf("%s: %s", it.Command[0], line)
+			}
+		}
 		return "", err
 	}
 	return "", fmt.Errorf("unknown action %q", it.Action.Kind)

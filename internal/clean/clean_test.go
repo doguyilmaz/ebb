@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -552,13 +553,15 @@ func TestCommandRunsInAnEmptyFolder(t *testing.T) {
 	env, home := sandboxEnv(t)
 	mkfile(t, filepath.Join(home, "w", "cache", "f"), 10)
 	env.Bins = map[string]string{"bun": "/opt/bun"}
-	var dir string
+	var dir, pkg string
 	var entries int
 	env.RunFn = func(d, name string, _ ...string) ([]byte, error) {
 		if name == "bun" {
 			dir = d
 			des, _ := os.ReadDir(d)
 			entries = len(des)
+			b, _ := os.ReadFile(filepath.Join(d, "package.json"))
+			pkg = string(b)
 		}
 		return nil, nil
 	}
@@ -569,10 +572,34 @@ func TestCommandRunsInAnEmptyFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	cwd, _ := os.Getwd()
-	if dir == "" || dir == cwd || entries != 0 {
-		t.Fatalf("ran in %q with %d entries", dir, entries)
+	// bun pm refuses to run outside a project, so the folder holds an empty one and nothing else.
+	if dir == "" || dir == cwd || entries != 1 || strings.TrimSpace(pkg) != "{}" {
+		t.Fatalf("ran in %q with %d entries, package.json %q", dir, entries, pkg)
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Fatalf("working folder left behind: %v", err)
+	}
+}
+
+func TestCommandFailureSaysWhatTheToolSaid(t *testing.T) {
+	env, home := sandboxEnv(t)
+	mkfile(t, filepath.Join(home, "w", "cache", "f"), 10)
+	env.Bins = map[string]string{"bun": "/opt/bun"}
+	env.RunFn = func(_, name string, _ ...string) ([]byte, error) {
+		return nil, &exec.ExitError{Stderr: []byte("error: the cache is locked\nnote: try again later\n")}
+	}
+	f := findingFor(filepath.Join(home, "w", "cache"), finding.Regenerable, finding.Action{Kind: "command", Argv: []string{"bun", "pm", "cache", "rm"}, Requires: "bun"})
+	p, _ := planner(env, f).Plan(Request{FindingIDs: []string{f.ID}})
+	p.Approved = true
+	var failed string
+	if _, err := executor(env).Execute(context.Background(), p, func(e Event) {
+		if e.State == "failed" {
+			failed = e.Err
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(failed, "the cache is locked") {
+		t.Fatalf("failure reads %q", failed)
 	}
 }
