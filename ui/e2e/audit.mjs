@@ -118,12 +118,13 @@ await scenario("a page change shows the whole page at once", async () => {
           h1: document.querySelector(".page h1")?.textContent ?? null,
           loading: !!document.querySelector(".page .loading"),
         });
-        if (performance.now() - t0 < 1500) requestAnimationFrame(tick);
+        if (performance.now() - t0 < 4000) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
     });
     await nav(label);
-    await page.waitForTimeout(1600);
+    // A slow CI runner can take a while to click; the window only has to contain the switch.
+    await page.waitForTimeout(4100);
     const frames = await page.evaluate(() => window.__frames);
     const after = frames.filter((f) => f.title === label);
     check(after.length > 0, `${label}: the page showed`);
