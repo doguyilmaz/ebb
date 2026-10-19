@@ -16,8 +16,10 @@ func newVersionCmd(g *globals) *cobra.Command {
 			if g.json {
 				return emitJSON(cmd.OutOrStdout(), map[string]string{"version": Version, "os": runtime.GOOS, "arch": runtime.GOARCH})
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "ebb %s %s/%s\n", Version, runtime.GOOS, runtime.GOARCH)
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), versionLine())
 			return err
 		},
 	}
 }
+
+func versionLine() string { return fmt.Sprintf("ebb %s %s/%s", Version, runtime.GOOS, runtime.GOARCH) }

@@ -2,3 +2,7 @@ exec ebb version
 stdout '^ebb dev'
 exec ebb version --json
 stdout '"version": "dev"'
+exec ebb -v
+stdout '^ebb dev '
+exec ebb --version
+stdout '^ebb dev '

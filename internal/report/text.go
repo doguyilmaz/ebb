@@ -55,8 +55,10 @@ func WriteText(w io.Writer, r *Report, width int) error {
 			line("             %s", f.Why)
 		}
 	}
-	line("")
-	line("Largest folders")
+	if len(r.Breakdown) > 1 {
+		line("")
+		line("Largest folders")
+	}
 	for _, row := range r.Breakdown[1:] {
 		if row.Depth > 2 {
 			continue

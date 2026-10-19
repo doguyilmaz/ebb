@@ -53,7 +53,9 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 	pf := root.PersistentFlags()
 	pf.BoolVar(&g.json, "json", false, "machine-readable JSON output")
 	pf.StringVar(&g.home, "home", "", "treat DIR as the home directory (same as EBB_HOME)")
-	pf.BoolVarP(&g.verbose, "verbose", "v", false, "verbose diagnostics on stderr")
+	pf.BoolVar(&g.verbose, "verbose", false, "verbose diagnostics on stderr")
+	root.Version = Version
+	root.SetVersionTemplate(versionLine() + "\n")
 
 	root.AddCommand(
 		newScanCmd(g),
