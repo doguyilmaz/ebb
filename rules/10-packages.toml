@@ -142,7 +142,8 @@ paths = ["~/Library/Caches/Homebrew"]
 safety = "regenerable"
 why = "Homebrew keeps downloaded bottles and source archives of installed and upgraded formulae."
 impact = "Reinstalling an old version downloads it again."
-action = { kind = "command", argv = ["brew", "cleanup", "--prune=all"], requires = "brew", fallback = "delete" }
+# Not brew cleanup: it also uninstalls older versions of formulae and casks, which this finding does not show.
+action = { kind = "delete" }
 
 [[rule]]
 id = "maven.repo"
@@ -209,7 +210,7 @@ paths = ["~/.nuget/packages"]
 safety = "regenerable"
 why = ".NET keeps every NuGet package version any project restored."
 impact = "The next dotnet restore downloads packages again."
-action = { kind = "command", argv = ["dotnet", "nuget", "locals", "all", "--clear"], requires = "dotnet", fallback = "delete" }
+action = { kind = "command", argv = ["dotnet", "nuget", "locals", "global-packages", "--clear"], requires = "dotnet", fallback = "delete" }
 
 [[rule]]
 id = "pub.cache"
