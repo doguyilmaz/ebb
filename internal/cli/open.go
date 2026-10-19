@@ -27,8 +27,8 @@ func newOpenCmd(g *globals) *cobra.Command {
 	return &cobra.Command{
 		Use:   "open [origin]",
 		Short: "Open ebb's window, starting ebb first when it is not running",
-		Long: "Opens the hosted page connected to ebb on this Mac through a one-time link, or ebb's own window when no " +
-			"web page is allowed or the default browser is Safari. When ebb is not running it starts the background " +
+		Long: "Opens the hosted page connected to ebb on this Mac through a one-time link. ebb's own window opens instead " +
+			"when no web page is allowed or the default browser is Safari. When ebb is not running it starts the background " +
 			"service, offering to set it up the first time. Give an origin to open your own copy of the page.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -74,7 +74,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 				return show(st.Port)
 			}
 			if !interactive() {
-				return errors.New("ebb is not running. Keep it running in the background with: ebb daemon install, or run it in this terminal with: ebb serve")
+				return errors.New("ebb is not running. Keep it running in the background with: ebb daemon install. Run it in this terminal with: ebb serve")
 			}
 			background, answered := ask(cmd, "ebb is not running. Keep it running in the background and start it at login? [Y/n] ")
 			switch {

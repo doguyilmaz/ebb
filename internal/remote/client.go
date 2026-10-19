@@ -22,7 +22,7 @@ type Client struct {
 	HTTP  *http.Client
 }
 
-var ErrNoServer = errors.New("ebb is not running; start it with: ebb serve")
+var ErrNoServer = errors.New("ebb is not running; start it with: ebb open")
 
 // Discover finds the running server through its status file.
 func Discover(env sys.Env) (*Client, error) {

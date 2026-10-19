@@ -49,7 +49,7 @@ func errNeedsApproval(id string) error {
 // errNoOneToApprove: a plan made in this process lives only here, where the
 // person cannot see or approve it.
 var errNoOneToApprove = errors.New("needs the person's approval, and no ebb is running to collect it: ask them to start ebb " +
-	"(`ebb serve --open`, or `ebb daemon install` to keep it running), then make the plan again; they approve it in ebb's window " +
+	"(`ebb open`), then make the plan again; they approve it in ebb's window " +
 	"or with `ebb approve <id>`")
 
 type auto struct {

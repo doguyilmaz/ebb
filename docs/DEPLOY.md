@@ -53,11 +53,11 @@ ebb trusts `https://ebb.apps.doguyilmaz.com` out of the box. A copy on your own 
 ebb web allow https://ebb.example.com
 ```
 
-The first visit shows a pairing code. Confirm it at the machine, either with `ebb web confirm <code>` or in the local window. The page then keeps a token of its own and can do everything the local window can. `ebb web deny <origin>` removes the origin and every token it was given. That works for the built-in origin too.
+Then `ebb open https://ebb.example.com` opens it through a one-time link that connects it. The page then keeps a token of its own and can do everything the local window can. `ebb web deny <origin>` removes the origin and every token it was given. That works for the built-in origin too.
 
 ## Limits
 
-- **Safari** does not let an https page reach `http://127.0.0.1`. Use Chrome, Edge or Firefox. The local window (`ebb serve --open`) works in any browser.
+- **Safari** does not let an https page reach `http://127.0.0.1`. Use Chrome, Edge or Firefox. The local window works in any browser. `ebb open` opens it when Safari is the default browser.
 - **Chrome** may ask once whether the site may reach devices on your local network. Without that permission the page cannot find ebb.
 - **The content security policy** allows only the bundle's own scripts. That also blocks extensions that inject into the page, React DevTools among them.
 

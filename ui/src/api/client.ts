@@ -19,8 +19,8 @@ export interface Link {
 const secret = (v: string | null) => (v && /^[0-9a-f]{32,}$/.test(v) ? v : "");
 
 /**
- * Reads the hash of a link ebb opened, which never reaches a server: ebb's own window gets the token, a hosted
- * page a one-time key to claim a token of its own, and the port ebb listens on.
+ * Reads the hash of a link ebb opened, which never reaches a server: the token for ebb's own window or a one-time
+ * key a hosted page claims a token with, plus the port ebb listens on.
  */
 export function readLink(hash: string): Link {
   const p = new URLSearchParams(hash.replace(/^#/, ""));

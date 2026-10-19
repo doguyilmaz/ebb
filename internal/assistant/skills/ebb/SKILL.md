@@ -32,7 +32,7 @@ Access for the app that runs ebb shows more of it. "Purgeable" space is freed by
 - **Then** `ebb_cleanup_execute {planId}`. Plans made only of rebuildable caches run directly. Anything else returns
   "needs approval": ebb's window shows the person the plan as ebb holds it; ask them to review and approve it there
   (or with `ebb approve <id>` in their terminal), then execute again. If no ebb is running, ask them to start it
-  (`ebb serve --open`) and make the plan again. Never approve, confirm or answer a prompt on their behalf.
+  (`ebb open`) and make the plan again. Never approve, confirm or answer a prompt on their behalf.
 - Never remove `user-data` or anything the person did not clearly choose. Prefer presets and findings over raw paths.
   A path that a finding covers gets that finding's action (which can delete outright); any other path goes to the Trash.
 - Items that went to the Trash can be put back with `ebb_undo {opId}` (the op ids are in the execute result).
@@ -52,4 +52,4 @@ Access for the app that runs ebb shows more of it. "Purgeable" space is freed by
 | ebb_undo | `ebb undo [op-id]` |
 | ebb_report | `ebb report --format text\|json\|csv\|html` |
 
-`ebb serve --open` opens the window, where the person can see everything and approve plans.
+`ebb open` opens the window, where the person can see everything and approve plans.

@@ -80,14 +80,12 @@ or no longer does). A `: ping` comment is sent every 25 s.
 ## Pairing (hosted web app)
 
 1. `GET /health` from the page tells "no server" apart from "server, origin not allowed" (`allowed`).
-2. The page makes a random nonce (≥ 24 characters), keeps it and sends `POST /pair` `PairRequest {nonce}` with
-   its `Origin` header and no token. Unknown origin → 403; another page already waiting → 409 `pair-busy`.
-   Otherwise → `PairResponse {pending, code, expires, confirm}`; repeating the same nonce returns the same code.
-3. The person confirms on the machine: `ebb web confirm <code>` or the local UI
-   (`GET /pair/pending`, `POST /pair/confirm {code}`, `POST /pair/reject`). Confirmation from a non-loopback origin
-   is refused, so a page can never approve itself. Codes are 6 digits, valid 5 minutes, 5 attempts.
-4. The page repeats `POST /pair` with the same nonce and receives `{token, device, version}`: a token issued to
-   that origin (only its hash is stored), once. An `Origin` header alone never releases a token: any local process
-   can send one.
-5. `GET /web`, `POST /web/allow {origin}`, `POST /web/deny {origin}` manage the list (`WebAccess`); deny also
+2. `ebb open` on the machine stores the hash of a one-time key for an allowed origin and opens
+   `<origin>/#key=<key>&port=<port>`. The fragment never reaches a server. A key works once, for 5 minutes and only
+   for the origin it was made for. Running the command is the consent: only someone at the machine can.
+3. The page sends `POST /pair` `PairRequest {key}` with its `Origin` header and no token. It receives
+   `PairResponse {token, device, version}`: a token issued to that origin (only its hash is stored). Unknown origin →
+   403 `origin-not-allowed`; no key → 400; an unknown, used or expired key → 403 `link-expired`. An `Origin` header
+   alone never releases a token: any local process can send one.
+4. `GET /web`, `POST /web/allow {origin}`, `POST /web/deny {origin}` manage the list (`WebAccess`); deny also
    revokes every token issued to that origin.

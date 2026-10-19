@@ -16,10 +16,11 @@ Or download the archive from [Releases](https://github.com/doguyilmaz/ebb/releas
 ## Start
 
 ```sh
-ebb serve --open      # the window, on 127.0.0.1:47340
-ebb daemon install    # or keep it in the background: starts at login, keeps scans fresh, warns when space runs low
-ebb                   # the overview in the terminal
+ebb open    # starts ebb when it is not running and opens the window
+ebb         # the overview in the terminal
 ```
+
+The first `ebb open` asks whether ebb should keep running in the background. It then starts at login, keeps scans fresh and warns when space runs low. `ebb serve` runs it in a terminal instead, on 127.0.0.1:47340.
 
 The first scan reads the whole data volume, in about a minute for 6 million files. Later scans read only the folders that changed, usually in seconds.
 
@@ -83,7 +84,7 @@ Every command takes `--json`.
 
 ## Hosted window
 
-[ebb.apps.doguyilmaz.com](https://ebb.apps.doguyilmaz.com) is the same window served as a static page. It runs in your browser and talks to ebb on your own machine after you confirm a pairing code there. It works in Chrome, Edge and Firefox. Safari does not let a hosted page reach loopback. To host your own copy, see [docs/DEPLOY.md](docs/DEPLOY.md).
+[ebb.apps.doguyilmaz.com](https://ebb.apps.doguyilmaz.com) is the same window served as a static page. It runs in your browser and talks to ebb on your own machine. `ebb open` opens it through a one-time link that connects it. It stays connected after that. It works in Chrome, Edge and Firefox. Safari does not let a hosted page reach loopback, so when Safari is the default browser `ebb open` opens ebb's own window instead. To host your own copy, see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Files
 
