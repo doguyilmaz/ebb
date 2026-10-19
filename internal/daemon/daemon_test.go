@@ -76,7 +76,7 @@ func waitScan(t *testing.T, a *app.App) {
 
 func TestCheckScansOnlyOnPowerWhileIdle(t *testing.T) {
 	a, env, m, root := sandbox(t)
-	d := &daemon{a: a, s: server.New(a, "test", "tok"), dir: sys.StateDir(env), opt: Options{Out: &strings.Builder{}}}
+	d := &daemon{a: a, s: server.New(a, "test", "tok"), dir: sys.StateDir(env), opt: Options{Out: &strings.Builder{}}, access: func(string) bool { return true }}
 
 	d.check(context.Background())
 	if d.st.LastWork != "" {
@@ -106,6 +106,20 @@ func TestCheckScansOnlyOnPowerWhileIdle(t *testing.T) {
 	waitScan(t, a)
 	if st := a.ScanState(); st.Error != "" {
 		t.Fatal(st.Error)
+	}
+}
+
+func TestCheckWaitsForFullDiskAccess(t *testing.T) {
+	a, env, _, root := sandbox(t)
+	d := &daemon{a: a, s: server.New(a, "test", "tok"), dir: sys.StateDir(env), opt: Options{Out: &strings.Builder{}}, access: func(string) bool { return false }}
+	if _, err := a.Scan(context.Background(), app.ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	env.Time = env.Time.Add(2 * time.Hour)
+	d.check(context.Background())
+	// Without access macOS would ask about each protected folder while nobody is there to answer.
+	if d.st.LastWork != "" {
+		t.Fatalf("scanned without Full Disk Access: %+v", d.st)
 	}
 }
 

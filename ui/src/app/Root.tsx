@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "@tanstack/react-router";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
+import { FdaAsk } from "./FdaAsk.tsx";
 import { Palette } from "./Palette.tsx";
 import { SheetHost } from "./SheetHost.tsx";
 import { Shell } from "./Shell.tsx";
@@ -16,6 +17,7 @@ export function Root() {
       </Shell>
       <Palette />
       <SheetHost />
+      <FdaAsk />
       <Tour />
     </>
   );

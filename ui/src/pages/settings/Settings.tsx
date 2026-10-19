@@ -2,11 +2,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FolderOpen, Plus, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "#/api/client.ts";
-import { useDaemon, useDaemonAction, useDisks, useFindings, useIgnore, useSaveSettings, useSettings, useStartScan, useStatus, useWebAccess } from "#/api/hooks.ts";
+import { useDaemon, useDaemonAction, useDisks, useFindings, useIgnore, useSaveSettings, useSettings, useStatus, useWebAccess } from "#/api/hooks.ts";
 import type { ChooseResponse, Settings as S } from "#/api/types.gen.ts";
 import { ago, bytes } from "#/lib/format.ts";
 import type { TermId } from "#/lib/glossary.ts";
 import { FdaSteps, OpenFda } from "#/app/FullDiskAccess.tsx";
+import { useScan } from "#/lib/fda.ts";
 import { PageHead } from "#/ui/PageHead.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
 import { Info } from "#/ui/Tip.tsx";
@@ -62,7 +63,7 @@ function Field({ label, help, children }: { label: string; help: string; childre
 function Scan() {
   const settings = useSettings();
   const save = useSaveSettings();
-  const start = useStartScan();
+  const { run: scan, start } = useScan();
   const status = useStatus();
   const picker = useChooseFolder();
   const disks = useDisks();
@@ -127,7 +128,7 @@ function Scan() {
             const last = status.data?.last?.root;
             const moved = last && (draft.root || status.data?.defaultRoot) !== last;
             start.reset();
-            save.mutate(draft, { onSuccess: () => moved && start.mutate({ root: draft.root || undefined }) });
+            save.mutate(draft, { onSuccess: () => moved && scan({ root: draft.root || undefined }) });
           }}
         >
           Save

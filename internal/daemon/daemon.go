@@ -19,6 +19,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/svc"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/units"
+	"github.com/doguyilmaz/ebb/internal/volume"
 	"github.com/doguyilmaz/ebb/internal/window"
 )
 
@@ -38,6 +39,8 @@ type daemon struct {
 	dir   string
 	st    api.Daemon
 	alert Alert
+	// access reports Full Disk Access; tests replace it.
+	access func(home string) bool
 }
 
 // ErrRunning: one service per state folder, or two would scan and serve at once.
@@ -48,7 +51,7 @@ var ErrRunning = errors.New("the background service is already running")
 // which launchd would answer by starting it again at once.
 func Run(ctx context.Context, a *app.App, opt Options) error {
 	env := a.Env
-	d := &daemon{a: a, opt: opt, dir: sys.StateDir(env), st: api.Daemon{PID: os.Getpid(), Exe: realExe(), Started: env.Now()}}
+	d := &daemon{a: a, opt: opt, dir: sys.StateDir(env), st: api.Daemon{PID: os.Getpid(), Exe: realExe(), Started: env.Now()}, access: volume.HasFullDiskAccess}
 	if cur := svc.Local(env).Read(); cur.Running && cur.PID != os.Getpid() {
 		return ErrRunning
 	}
@@ -145,7 +148,9 @@ func (d *daemon) check(ctx context.Context) {
 			d.logf("low space notification: %v", err)
 		}
 	}
-	if !cfg.Daemon.Scans {
+	// Without Full Disk Access a scan makes macOS ask about each protected
+	// folder, and a background scan runs while nobody is there to answer.
+	if !cfg.Daemon.Scans || !d.access(env.Home()) {
 		return
 	}
 	last, err := d.a.Last()

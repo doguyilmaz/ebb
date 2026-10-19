@@ -592,7 +592,6 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .welcome-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .welcome-steps li { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); }
 .welcome-n { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--tide-soft); color: var(--tide); margin-bottom: 4px; }
-.welcome-fda { display: flex; align-items: center; gap: 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface-2); }
 .welcome-go { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 0; }
 .readout > div { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-3); background: var(--surface); }
@@ -604,7 +603,6 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 .readout dd { font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) {
   .welcome-steps, .readout { grid-template-columns: 1fr; }
-  .welcome-fda { flex-direction: column; align-items: flex-start; }
   .welcome-title { font-size: 28px; }
 }
 
@@ -623,6 +621,7 @@ dialog:not(.palette)::backdrop { transition: background-color 220ms ease, displa
 /* ---------- palette ---------- */
 /* Sits where Spotlight does, centred over the content rather than the window. */
 .palette { max-width: 640px; margin: 20vh auto auto; }
+.fda-ask { max-width: 560px; padding: 24px; }
 @media (min-width: 761px) { .palette { translate: calc(var(--sidebar) / 2) 0; } }
 .palette-input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 16px 18px; font-size: 16px; outline: none; }
 .palette-list { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow: auto; }

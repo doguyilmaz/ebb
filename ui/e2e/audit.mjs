@@ -83,14 +83,16 @@ async function scenario(name, fn) {
 await scenario("opens with its link and welcomes a first run", async () => {
   await page.goto(`${BASE}/#token=${TOKEN}`);
   await page.getByText("See where your disk space went").waitFor({ timeout: 8000 });
-  // Without Full Disk Access the welcome screen asks for it first and still offers to scan without it.
-  const fda = (await api("/status")).body.fullDiskAccess;
-  check(fda || (await page.getByText("First, let ebb see everything").count()) === 1, "welcome asks for Full Disk Access first");
   await shot("welcome");
 });
 
 await scenario("first scan shows live progress, then the overview and the tour", async () => {
   await page.locator(".welcome-go button").click();
+  // Without Full Disk Access the scan asks for it first and still offers to go on without it.
+  if (!(await api("/status")).body.fullDiskAccess) {
+    await page.getByText("First, let ebb see everything").waitFor({ timeout: 4000 });
+    await page.getByRole("button", { name: "Scan without it" }).click();
+  }
   await page.locator(".hero-figure").waitFor({ timeout: 20000 });
   await page.locator(".tour-card").waitFor({ timeout: 8000 });
   await page.keyboard.press("Escape");

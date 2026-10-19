@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useDisks, usePresets, useSearch, useStartScan, useStatus } from "#/api/hooks.ts";
+import { useDisks, usePresets, useSearch, useStatus } from "#/api/hooks.ts";
+import { useScan } from "#/lib/fda.ts";
 import { bytes } from "#/lib/format.ts";
 import { usePalette } from "#/lib/palette.ts";
 import { useSheet } from "#/lib/sheet.ts";
@@ -21,7 +22,7 @@ export function Palette() {
   const openSheet = useSheet((s) => s.open);
   const dialog = useRef<HTMLDialogElement>(null);
   const navigate = useNavigate();
-  const scan = useStartScan();
+  const scan = useScan();
   const startTour = useTour((s) => s.start);
   const presets = usePresets();
   // Disks are only looked up while the palette is open.
@@ -57,11 +58,11 @@ export function Palette() {
       { id: "history", label: "History", run: go("/history") },
       { id: "activity", label: "Activity", run: go("/activity") },
       { id: "settings", label: "Settings", run: go("/settings") },
-      { id: "scan", label: "Scan again", hint: "only what changed", run: () => (close(), scan.mutate({ root: lastRoot })) },
-      { id: "scan-full", label: "Scan everything again", hint: "every folder", run: () => (close(), scan.mutate({ root: lastRoot, full: true })) },
+      { id: "scan", label: "Scan again", hint: "only what changed", run: () => (close(), scan.run({ root: lastRoot })) },
+      { id: "scan-full", label: "Scan everything again", hint: "every folder", run: () => (close(), scan.run({ root: lastRoot, full: true })) },
       ...(disks.data ?? [])
         .filter((d) => d.path !== lastRoot)
-        .map((d) => ({ id: `disk-${d.path}`, label: `Scan ${d.name}`, hint: `${bytes(d.free)} free of ${bytes(d.capacity)}`, run: () => (close(), scan.mutate({ root: d.path })) })),
+        .map((d) => ({ id: `disk-${d.path}`, label: `Scan ${d.name}`, hint: `${bytes(d.free)} free of ${bytes(d.capacity)}`, run: () => (close(), scan.run({ root: d.path })) })),
       { id: "tour", label: "Take the tour", run: () => (close(), startTour()) },
       ...(presets.data ?? [])
         .filter((p) => p.bytes > 0)

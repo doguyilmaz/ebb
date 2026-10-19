@@ -1,7 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Activity, AppWindow, Bot, ChartLine, CircleArrowUp, Copy, Waypoints, CircleHelp, Compass, Gauge, ListChecks, RefreshCw, Search, Settings, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { usePendingPlans, useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
+import { usePendingPlans, useStatus, useStopScan } from "#/api/hooks.ts";
+import { useScan } from "#/lib/fda.ts";
 import { ago, bytes, count, diskName, percent } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
 import { usePalette } from "#/lib/palette.ts";
@@ -138,7 +139,7 @@ function DiskMeter() {
 
 function TopBar({ title }: { title: string }) {
   const status = useStatus();
-  const start = useStartScan();
+  const { run: scan, start } = useScan();
   const stop = useStopScan();
   const live = useLive((s) => s.scan);
   const openPalette = usePalette((s) => s.setOpen);
@@ -185,7 +186,7 @@ function TopBar({ title }: { title: string }) {
       {!running && (
         <button
           className="btn primary"
-          onClick={() => start.mutate({ root: status.data?.last?.root })}
+          onClick={() => scan({ root: status.data?.last?.root })}
           data-tip={last ? (quick ? "Reads again only the folders that changed since the last scan, usually in seconds. ⌘K has “Scan everything again”." : "Reads every folder; ebb does not know yet what changed.") : undefined}
         >
           <RefreshCw size={14} aria-hidden />
