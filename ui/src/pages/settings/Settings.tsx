@@ -6,7 +6,7 @@ import { useDaemon, useDaemonAction, useDisks, useFindings, useIgnore, useSaveSe
 import type { ChooseResponse, Settings as S } from "#/api/types.gen.ts";
 import { ago, bytes } from "#/lib/format.ts";
 import type { TermId } from "#/lib/glossary.ts";
-import { Command } from "#/ui/Command.tsx";
+import { FdaSteps, OpenFda } from "#/app/FullDiskAccess.tsx";
 import { PageHead } from "#/ui/PageHead.tsx";
 import { Loading, Problem } from "#/ui/states.tsx";
 import { Info } from "#/ui/Tip.tsx";
@@ -314,30 +314,20 @@ function Ignored() {
 
 function Access() {
   const status = useStatus();
-  const daemon = useDaemon();
   if (!status.data) return null;
-  const service = daemon.data?.running && !daemon.data.waiting ? daemon.data.exe : "";
   return (
     <section className="card setting">
       <Head title="Full Disk Access" term="fda" />
       {status.data.fullDiskAccess ? (
         <p className="muted">ebb can read app containers, Mail and Messages data.</p>
-      ) : service ? (
-        <>
-          <p className="muted">
-            Without it, app containers and some Library folders count as “not visible”. The background service does the scanning, so macOS asks
-            about ebb itself: open{" "}
-            <a href="x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles">Privacy &amp; Security → Full Disk Access</a>, press +,
-            then ⌘⇧G and paste this path. After an upgrade, add it again.
-          </p>
-          <Command value={service} prompt={false} />
-        </>
       ) : (
-        <p className="muted">
-          Without it, app containers and some Library folders count as “not visible”. Open{" "}
-          <a href="x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles">Privacy &amp; Security → Full Disk Access</a>, add the app
-          that runs ebb (your terminal), then scan again.
-        </p>
+        <>
+          <p className="muted">Without it, app containers and some Library folders count as “not visible”.</p>
+          <FdaSteps access={status.data.access} />
+          <div className="row">
+            <OpenFda />
+          </div>
+        </>
       )}
     </section>
   );

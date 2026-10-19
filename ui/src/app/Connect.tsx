@@ -19,7 +19,6 @@ const RETRY_MS = 2500;
 const MAX_RETRY_MS = 30_000;
 const RELEASES = "https://github.com/doguyilmaz/ebb/releases/latest";
 const SITE = "https://ebb.doguyilmaz.com";
-const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
 
 /**
  * Finds ebb on this Mac and holds the app back until it may talk to it. Every
@@ -196,15 +195,6 @@ function InstallGuide() {
             Starts ebb, offers to keep it running in the background and opens this page connected. Until you approve a cleanup, ebb only reads.
           </p>
         </Step>
-        <Step n={3} title="Let it see everything" optional>
-          <p className="muted small-text">
-            macOS hides some folders (Mail, Safari, other apps' data) until ebb has Full Disk Access. Without it ebb still works; that space shows as
-            “Not visible”. Settings in ebb shows what to add.
-          </p>
-          <a className="btn small" href={FDA_SETTINGS}>
-            Open Full Disk Access settings <ExternalLink size={13} aria-hidden />
-          </a>
-        </Step>
       </ol>
       {isSafari() && (
         <p className="gate-note small-text">
@@ -216,14 +206,13 @@ function InstallGuide() {
   );
 }
 
-function Step({ n, title, optional, children }: { n: number; title: string; optional?: boolean; children: ReactNode }) {
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="step">
       <span className="step-n" aria-hidden>{n}</span>
       <div className="stack" style={{ gap: 8, minWidth: 0, flex: 1 }}>
         <span className="step-title">
           {title}
-          {optional && <span className="faint"> · optional</span>}
         </span>
         {children}
       </div>

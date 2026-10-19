@@ -32,6 +32,12 @@ export interface Meta {
   changed?: number;
 }
 
+export interface Access {
+  kind: string;
+  path?: string;
+  name?: string;
+}
+
 export interface Changes {
   folders: number;
   lost: boolean;
@@ -44,6 +50,7 @@ export interface Status {
   last: Meta | null;
   defaultRoot: string;
   fullDiskAccess: boolean;
+  access: Access;
   askAvailable: boolean;
   sandboxed: boolean;
   changes: Changes | null;

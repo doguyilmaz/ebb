@@ -1,11 +1,11 @@
-import { ExternalLink, MessageSquareText, ScanSearch, ShieldCheck, Square } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Check, MessageSquareText, ScanSearch, ShieldCheck, Square } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useStartScan, useStatus, useStopScan } from "#/api/hooks.ts";
+import { statusQuery, useStartScan, useStopScan } from "#/api/hooks.ts";
 import { term } from "#/lib/glossary.ts";
 import { bytes, count } from "#/lib/format.ts";
 import { useLive } from "#/lib/live.ts";
-
-const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
+import { FdaSteps, OpenFda } from "./FullDiskAccess.tsx";
 
 const steps = [
   { icon: ScanSearch, title: "Scan", text: "ebb reads every folder once, in about a minute. It only reads: nothing is changed or uploaded." },
@@ -13,9 +13,13 @@ const steps = [
   { icon: ShieldCheck, title: "Clean safely", text: "You review a plan before anything runs. Things go to the Trash, so they can be put back." },
 ];
 
-/** The first screen: what ebb does, what it needs, and one button to begin. */
+/**
+ * The first screen: what ebb does, what it needs, and one button to begin. Full Disk Access comes first:
+ * without it macOS asks about each protected folder on its own while ebb reads them.
+ */
 export function Welcome() {
-  const status = useStatus();
+  // Checked often while waiting, so the screen moves on as soon as access is on.
+  const status = useQuery({ ...statusQuery, refetchInterval: (q) => (q.state.data?.fullDiskAccess === false ? 2000 : 15_000) });
   const start = useStartScan();
   const live = useLive((s) => s.scan);
   if (status.data?.scan.running || start.isPending || live) return <ScanProgress />;
@@ -37,23 +41,40 @@ export function Welcome() {
           </li>
         ))}
       </ol>
-      {st && !st.fullDiskAccess && (
-        <div className="welcome-fda">
-          <div className="stack" style={{ gap: 4 }}>
-            <h2>Optional: let it see everything</h2>
-            <p className="muted">{term("fda")?.body} Add the app you run ebb from (Terminal, iTerm…), then come back.</p>
+      {st && !st.fullDiskAccess ? (
+        <>
+          <div className="welcome-fda">
+            <div className="stack" style={{ gap: 6 }}>
+              <h2>First, let ebb see everything</h2>
+              <p className="muted">
+                Without Full Disk Access, macOS hides app data, Mail and Messages from ebb and asks about each protected folder separately
+                while it scans.
+              </p>
+              <FdaSteps access={st.access} />
+            </div>
+            <OpenFda primary />
           </div>
-          <a className="btn" href={FDA_SETTINGS}>
-            Open Full Disk Access <ExternalLink size={13} aria-hidden />
-          </a>
+          <div className="welcome-go">
+            <p className="waiting small-text" role="status">
+              <span className="pulse" aria-hidden /> Continues as soon as it is on
+            </p>
+            <button className="btn ghost" disabled={start.isPending} onClick={() => start.mutate({})} data-tip="macOS then asks about each protected folder">
+              Scan without it
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="welcome-go">
+          <button className="btn primary big" disabled={start.isPending} onClick={() => start.mutate({})}>
+            <ScanSearch size={17} aria-hidden /> Scan this Mac
+          </button>
+          {st && (
+            <span className="faint small-text row" style={{ gap: 6 }}>
+              <Check size={14} aria-hidden /> Full Disk Access is on · Reads {st.defaultRoot}
+            </span>
+          )}
         </div>
       )}
-      <div className="welcome-go">
-        <button className="btn primary big" disabled={start.isPending} onClick={() => start.mutate({})}>
-          <ScanSearch size={17} aria-hidden /> Scan this Mac
-        </button>
-        {st && <span className="faint small-text">Reads {st.defaultRoot}</span>}
-      </div>
     </div>
   );
 }

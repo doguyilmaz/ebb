@@ -41,9 +41,18 @@ type Status struct {
 	Last           *history.Meta `json:"last"`
 	DefaultRoot    string        `json:"defaultRoot"`
 	FullDiskAccess bool          `json:"fullDiskAccess"`
+	Access         Access        `json:"access"`
 	AskAvailable   bool          `json:"askAvailable"`
 	Sandboxed      bool          `json:"sandboxed"`
 	Changes        *Changes      `json:"changes"`
+}
+
+// Access names what to turn on in Full Disk Access: the app or binary the
+// background service runs, or the terminal ebb runs in.
+type Access struct {
+	Kind string `json:"kind"` // app | binary | terminal
+	Path string `json:"path,omitempty"`
+	Name string `json:"name,omitempty"`
 }
 
 // Changes counts folders that changed on disk since the last scan, while ebb
