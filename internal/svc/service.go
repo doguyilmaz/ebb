@@ -56,15 +56,20 @@ func LogPath(stateDir string) string { return filepath.Join(stateDir, "daemon.lo
 // version tells which one it was.
 func wantedPath(stateDir string) string { return filepath.Join(stateDir, "service-wanted") }
 
-// Definition is the launchd plist and where it goes.
+// Definition is the launchd plist and where it goes. Run from ebb.app, it names
+// the app, so Login Items shows ebb instead of whoever signed it.
 func (s Service) Definition() (path, content string) {
 	home := s.Env.Home()
 	log := LogPath(s.StateDir)
+	app := ""
+	if sys.InAppBundle(s.Exe) {
+		app = "\n  <key>AssociatedBundleIdentifiers</key><array><string>" + Label + "</string></array>"
+	}
 	return filepath.Join(home, "Library", "LaunchAgents", Label+".plist"), fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>%s</string>
+  <key>Label</key><string>%s</string>%s
   <key>ProgramArguments</key>
   <array>
     <string>%s</string>
@@ -81,7 +86,7 @@ func (s Service) Definition() (path, content string) {
   <key>StandardErrorPath</key><string>%s</string>
 </dict>
 </plist>
-`, Label, xmlEscape(s.Exe), xmlEscape(home), xmlEscape(home), xmlEscape(log), xmlEscape(log))
+`, Label, app, xmlEscape(s.Exe), xmlEscape(home), xmlEscape(home), xmlEscape(log), xmlEscape(log))
 }
 
 func xmlEscape(v string) string {

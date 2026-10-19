@@ -118,3 +118,16 @@ func TestRestoreBringsBackOnlyAWantedService(t *testing.T) {
 		t.Fatal("a service turned off came back")
 	}
 }
+
+func TestPlistNamesTheAppItRunsFrom(t *testing.T) {
+	env, _ := fake(t)
+	bare := Service{Env: env, StateDir: "/state", Exe: "/opt/homebrew/bin/ebb", UID: 501}
+	if _, content := bare.Definition(); strings.Contains(content, "AssociatedBundleIdentifiers") {
+		t.Fatal("a bare binary has no app to name")
+	}
+	app := Service{Env: env, StateDir: "/state", Exe: "/Applications/ebb.app/Contents/MacOS/ebb", UID: 501}
+	_, content := app.Definition()
+	if !strings.Contains(content, "<key>AssociatedBundleIdentifiers</key><array><string>com.doguyilmaz.ebb</string></array>") {
+		t.Fatalf("Login Items would show the signer's name instead of ebb:\n%s", content)
+	}
+}
