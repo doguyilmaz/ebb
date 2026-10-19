@@ -39,17 +39,30 @@ describe("api client", () => {
     expect(err).toBeInstanceOf(c.ApiError);
   });
 
-  test("pairing sends a stable nonce and stores the issued token", async () => {
+  test("claims a token once with the key from the link", async () => {
     const c = await import("./client.ts");
-    responses.push(json({ pending: true, code: "123456", confirm: "ebb web confirm 123456" }), json({ token: "issued" }));
-    const first = await c.pair();
-    expect(first).toEqual({ paired: false, code: "123456", confirm: "ebb web confirm 123456" });
-    const second = await c.pair();
-    expect(second).toEqual({ paired: true });
-    const n1 = JSON.parse(String(calls[0].init?.body)).nonce;
-    const n2 = JSON.parse(String(calls[1].init?.body)).nonce;
-    expect(n1.length).toBeGreaterThanOrEqual(32);
-    expect(n2).toBe(n1);
+    c.setLinkKeyForTests("k".repeat(4));
+    responses.push(json({ token: "issued" }));
+    expect(await c.claim()).toBe("claimed");
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ key: "kkkk" });
     expect(c.token()).toBe("issued");
+    expect(await c.claim()).toBe("none");
+    expect(calls.length).toBe(1);
+  });
+
+  test("an expired or used link is refused", async () => {
+    const c = await import("./client.ts");
+    c.setLinkKeyForTests("used");
+    responses.push(json({ error: "this link has expired or was used already", code: "link-expired" }, 403));
+    expect(await c.claim()).toBe("refused");
+  });
+
+  test("reads only well formed secrets and ports from a link", async () => {
+    const { readLink } = await import("./client.ts");
+    const key = "ab".repeat(24);
+    expect(readLink(`#key=${key}&port=47341`)).toEqual({ token: "", key, port: 47341 });
+    expect(readLink(`#token=${key}`)).toEqual({ token: key, key: "", port: 0 });
+    expect(readLink("#key=<script>&port=99999")).toEqual({ token: "", key: "", port: 0 });
+    expect(readLink("")).toEqual({ token: "", key: "", port: 0 });
   });
 });

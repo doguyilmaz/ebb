@@ -87,7 +87,7 @@ function UpdateNotice() {
       <span>
         This page is from ebb {shortVersion(pageVersion)} and this Mac runs {shortVersion(local ?? "")}. Some parts may not work until you update and start ebb again.
       </span>
-      <Command value="brew upgrade ebb" />
+      <Command value="brew upgrade ebb && ebb open" />
     </div>
   );
 }

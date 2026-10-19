@@ -346,23 +346,22 @@ function Access() {
 function Web() {
   const web = useWebAccess();
   const qc = useQueryClient();
-  const [code, setCode] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const act = (path: string, body: unknown) =>
     api
       .post(path, body)
       .then(() => {
         setMsg(null);
-        setCode("");
         qc.invalidateQueries({ queryKey: ["web"] });
       })
       .catch((e: ApiError) => setMsg(e.message));
   if (!web.data) return null;
-  const pending = web.data.pending;
   return (
     <section className="card setting">
       <Head title="Web access" term="web" />
-      <p className="muted">Pages that may connect to ebb on this Mac. A page gets in only after you confirm the code it shows.</p>
+      <p className="muted">
+        Pages that may connect to ebb on this Mac. A page gets in only through the one-time link <code>ebb open</code> makes.
+      </p>
       <ul className="chips">
         {(web.data.allowed ?? []).map((o) => (
           <li key={o}>
@@ -372,18 +371,6 @@ function Web() {
           </li>
         ))}
       </ul>
-      {pending && (
-        <form className="stack pairing" onSubmit={(e) => (e.preventDefault(), act("/pair/confirm", { code }))}>
-          <p>
-            <code>{pending.origin}</code> wants to connect. Type the code that page shows:
-          </p>
-          <div className="row">
-            <input className="input" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} aria-label="Pairing code" />
-            <button className="btn primary" disabled={code.length !== 6}>Confirm</button>
-            <button type="button" className="btn" onClick={() => act("/pair/reject", {})}>Reject</button>
-          </div>
-        </form>
-      )}
       {msg && <p className="error">{msg}</p>}
     </section>
   );

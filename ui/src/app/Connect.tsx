@@ -2,22 +2,21 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, MessageSquareText, RefreshCw, ScanSearch, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { listen } from "#/api/events.ts";
-import { apiPort, connect, isRemote, onAuthRejected, pair, setApiPort, token, wasEmbedded } from "#/api/client.ts";
+import { apiPort, claim, connect, isRemote, onAuthRejected, onTokenFromOtherTab, pairedBefore, setApiPort, token, wasEmbedded } from "#/api/client.ts";
 import { detectOS, isSafari } from "#/lib/os.ts";
-import { pageVersion, versionLabel } from "#/lib/version.ts";
+import { isBehind, pageVersion, versionLabel } from "#/lib/version.ts";
 import { Command } from "#/ui/Command.tsx";
 
 type State =
   | { kind: "connecting" }
   | { kind: "absent" }
   | { kind: "not-allowed" }
-  | { kind: "pairing"; code: string; confirm: string }
+  | { kind: "unpaired"; expired: boolean }
   | { kind: "no-token" }
   | { kind: "ready" };
 
 const RETRY_MS = 2500;
 const MAX_RETRY_MS = 30_000;
-const PAIRING_MS = 2000;
 const RELEASES = "https://github.com/doguyilmaz/ebb/releases/latest";
 const SITE = "https://ebb.doguyilmaz.com";
 const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
@@ -25,7 +24,7 @@ const FDA_SETTINGS = "x-apple.systempreferences:com.apple.preference.security?Pr
 /**
  * Finds ebb on this Mac and holds the app back until it may talk to it. Every
  * state says what is going on and the one thing to do; the page keeps checking
- * on its own, so starting ebb or confirming the page is enough.
+ * on its own, so running the command it shows is enough.
  */
 export function Connect({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ kind: "connecting" });
@@ -42,8 +41,12 @@ export function Connect({ children }: { children: ReactNode }) {
     if (!c.remote) return setState(token() ? { kind: "ready" } : { kind: "no-token" });
     if (token()) return setState({ kind: "ready" });
     try {
-      const r = await pair();
-      setState(r.paired ? { kind: "ready" } : { kind: "pairing", code: r.code, confirm: r.confirm });
+      const r = await claim();
+      if (r === "claimed") return setState({ kind: "ready" });
+      setState((s) => {
+        const expired = r === "refused" || (s.kind === "unpaired" && s.expired);
+        return s.kind === "unpaired" && s.expired === expired ? s : { kind: "unpaired", expired };
+      });
     } catch {
       setState({ kind: "absent" });
     }
@@ -58,20 +61,19 @@ export function Connect({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.kind === "ready" || state.kind === "connecting" || state.kind === "no-token") return;
     if (state.kind === "absent" && !wasEmbedded() && detectOS() !== "mac") return;
-    const first = state.kind === "pairing" ? PAIRING_MS : RETRY_MS;
-    let delay = first;
+    let delay = RETRY_MS;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
       if (document.visibilityState === "visible") await attempt();
       if (stopped) return;
-      if (state.kind !== "pairing") delay = Math.min(delay * 2, MAX_RETRY_MS);
+      delay = Math.min(delay * 2, MAX_RETRY_MS);
       timer = setTimeout(tick, delay);
     };
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       clearTimeout(timer);
-      delay = first;
+      delay = RETRY_MS;
       void tick();
     };
     timer = setTimeout(tick, delay);
@@ -81,6 +83,11 @@ export function Connect({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
+  }, [state.kind, attempt]);
+
+  useEffect(() => {
+    if (state.kind === "ready") return;
+    return onTokenFromOtherTab(() => void attempt());
   }, [state.kind, attempt]);
 
   useEffect(() => {
@@ -102,7 +109,6 @@ export function Connect({ children }: { children: ReactNode }) {
     setBusy(false);
   };
   const where = `127.0.0.1:${port}`;
-  const serve = port === 47340 ? "ebb serve" : `ebb serve --port ${port}`;
   const pickPort = (p: number) => {
     setPort(p);
     if (p > 0 && p < 65536) setApiPort(p);
@@ -121,9 +127,8 @@ export function Connect({ children }: { children: ReactNode }) {
       );
     case "no-token":
       return (
-        <Gate version={version} title="Open ebb from its link" sub="This window has no access key. The link ebb prints carries one, which keeps other pages on this Mac from using ebb.">
-          <Command value="ebb serve --open" />
-          <p className="faint small-text">Already running? Use the link it printed in Terminal.</p>
+        <Gate version={version} title="Open ebb from its link" sub="This window has no access key. The link ebb opens carries one, which keeps other pages on this Mac from using ebb.">
+          <Command value="ebb open" />
         </Gate>
       );
     case "not-allowed":
@@ -134,31 +139,30 @@ export function Connect({ children }: { children: ReactNode }) {
           {footer}
         </Gate>
       );
-    case "pairing":
+    case "unpaired": {
+      const behind = isBehind(running);
       return (
-        <Gate version={version} title="Confirm this page on your Mac" sub="ebb never hands its data to a web page until you confirm it once. Run this in Terminal:">
-          <Command value={state.confirm} />
-          <p className="muted">Terminal shows a code. It must match this one:</p>
-          <div className="code" aria-label={`Code ${state.code.split("").join(" ")}`}>{state.code}</div>
-          <p className="faint small-text">
-            A different code means something else asked. Run <code>ebb web reject</code>, then reload this page.
-          </p>
-          <Waiting where={where} text="Connects as soon as you confirm" />
+        <Gate version={version} title="Connect this page to ebb" sub="ebb is running on this Mac. Run this once in Terminal to let this page in. It stays connected after that.">
+          <Command value={behind ? "brew upgrade ebb && ebb open" : "ebb open"} />
+          {behind && <p className="faint small-text">The ebb running on this Mac is older than this page, so it needs an update first.</p>}
+          {state.expired && <p className="faint small-text">The link you opened has expired or was used already. Running the command makes a new one.</p>}
+          <Waiting where={where} text="Connects as soon as you run it" />
           {footer}
         </Gate>
       );
+    }
     default:
-      if (wasEmbedded())
+      if (wasEmbedded() || pairedBefore())
         return (
-          <Gate version={version} title="ebb stopped" sub="This window was talking to ebb on this Mac. ebb is not running right now. Start it again; this page reconnects by itself.">
-            <Command value={serve} />
+          <Gate version={version} title="ebb is not running" sub="This page was connected to ebb on this Mac. Start it again and this page reconnects by itself.">
+            <Command value="ebb open" />
             <Waiting where={where} text="Reconnects on its own" />
             {footer}
           </Gate>
         );
       return detectOS() === "mac" ? (
         <Gate version={version} title="Start ebb on this Mac" sub="This page works with ebb running on your own Mac. Your files and what ebb finds about them never leave it." intro>
-          <InstallGuide serve={serve} />
+          <InstallGuide />
           <Waiting where={where} text="Connects on its own" />
           {footer}
         </Gate>
@@ -168,7 +172,7 @@ export function Connect({ children }: { children: ReactNode }) {
   }
 }
 
-function InstallGuide({ serve }: { serve: string }) {
+function InstallGuide() {
   return (
     <>
       <ol className="steps">
@@ -181,14 +185,16 @@ function InstallGuide({ serve }: { serve: string }) {
             <a href={RELEASES} target="_blank" rel="noreferrer">latest release</a> and put <code>ebb</code> on your PATH.
           </p>
         </Step>
-        <Step n={2} title="Start it">
-          <Command value={serve} />
-          <p className="faint small-text">It runs in that Terminal window and this page connects to it. Until you approve a cleanup, ebb only reads.</p>
+        <Step n={2} title="Open it">
+          <Command value="ebb open" />
+          <p className="faint small-text">
+            Starts ebb, offers to keep it running in the background and opens this page connected. Until you approve a cleanup, ebb only reads.
+          </p>
         </Step>
         <Step n={3} title="Let it see everything" optional>
           <p className="muted small-text">
-            macOS hides some folders (Mail, Safari, other apps' data) until Terminal has Full Disk Access. Without it ebb still works; that space shows as
-            “Not visible”.
+            macOS hides some folders (Mail, Safari, other apps' data) until ebb has Full Disk Access. Without it ebb still works; that space shows as
+            “Not visible”. Settings in ebb shows what to add.
           </p>
           <a className="btn small" href={FDA_SETTINGS}>
             Open Full Disk Access settings <ExternalLink size={13} aria-hidden />
@@ -197,7 +203,8 @@ function InstallGuide({ serve }: { serve: string }) {
       </ol>
       {isSafari() && (
         <p className="gate-note small-text">
-          Safari does not let web pages reach your own Mac. Use Chrome, Edge or Firefox for this page. The window <code>ebb serve --open</code> opens works in Safari too.
+          Safari does not let web pages reach your own Mac. Use Chrome, Edge or Firefox for this page. When Safari is your default browser,{" "}
+          <code>ebb open</code> opens ebb's own window, which works there.
         </p>
       )}
     </>

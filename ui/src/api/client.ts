@@ -1,6 +1,5 @@
 const TOKEN_KEY = "ebb.token";
 const PORT_KEY = "ebb.port";
-const NONCE_KEY = "ebb.nonce";
 const DEFAULT_PORT = 47340;
 
 function store(kind: "local" | "session"): Storage | null {
@@ -11,18 +10,37 @@ function store(kind: "local" | "session"): Storage | null {
   }
 }
 
-// The local link carries the token in the hash, which never reaches the server.
-function tokenFromURL(): string | null {
-  if (typeof location === "undefined") return null;
-  const m = location.hash.match(/token=([0-9a-f]+)/);
-  if (!m) return null;
-  history.replaceState(null, "", location.pathname + location.search);
-  store("session")?.setItem(TOKEN_KEY, m[1]);
-  return m[1];
+export interface Link {
+  token: string;
+  key: string;
+  port: number;
 }
 
-const urlToken =
-  tokenFromURL() ?? (import.meta.env?.VITE_EBB_TOKEN as string | undefined) ?? store("session")?.getItem(TOKEN_KEY) ?? "";
+const secret = (v: string | null) => (v && /^[0-9a-f]{32,}$/.test(v) ? v : "");
+
+/**
+ * Reads the hash of a link ebb opened, which never reaches a server: ebb's own window gets the token, a hosted
+ * page a one-time key to claim a token of its own, and the port ebb listens on.
+ */
+export function readLink(hash: string): Link {
+  const p = new URLSearchParams(hash.replace(/^#/, ""));
+  const port = Number(p.get("port"));
+  return { token: secret(p.get("token")), key: secret(p.get("key")), port: port > 0 && port < 65536 ? port : 0 };
+}
+
+function linkFromURL(): Link {
+  if (typeof location === "undefined") return { token: "", key: "", port: 0 };
+  const link = readLink(location.hash);
+  if (!link.token && !link.key) return link;
+  history.replaceState(null, "", location.pathname + location.search);
+  if (link.token) store("session")?.setItem(TOKEN_KEY, link.token);
+  if (link.port) setApiPort(link.port);
+  return link;
+}
+
+const link = linkFromURL();
+const urlToken = link.token || (import.meta.env?.VITE_EBB_TOKEN as string | undefined) || store("session")?.getItem(TOKEN_KEY) || "";
+let linkKey = link.key;
 
 let base = "";
 let tok = urlToken;
@@ -32,6 +50,9 @@ export const apiBase = () => base;
 export const isRemote = () => base !== "";
 export const token = () => tok;
 export const setTokenForTests = (t: string) => void (tok = t);
+export const setLinkKeyForTests = (k: string) => void (linkKey = k);
+/** True when this page connected to ebb before, so a failed check means ebb stopped rather than was never set up. */
+export const pairedBefore = () => !!store("local")?.getItem(TOKEN_KEY);
 
 export function apiPort(): number {
   return Number(store("local")?.getItem(PORT_KEY) ?? "") || DEFAULT_PORT;
@@ -104,39 +125,30 @@ export async function connect(): Promise<Connection | null> {
   return { remote: true, health };
 }
 
-// A pairing request is bound to this nonce: ebb releases the token only to the
-// page that asked, after someone at the machine confirmed the code it shows.
-let memNonce = "";
-
-function nonce(): string {
-  let n = store("local")?.getItem(NONCE_KEY) ?? memNonce;
-  if (!n) {
-    const b = new Uint8Array(24);
-    crypto.getRandomValues(b);
-    n = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
-    store("local")?.setItem(NONCE_KEY, n);
-  }
-  memNonce = n;
-  return n;
-}
-
-export type PairResult = { paired: true } | { paired: false; code: string; confirm: string };
-
-export async function pair(): Promise<PairResult> {
+/**
+ * Trades the key from the link `ebb open` opened for a token of this page's own. The key works once, so it is
+ * dropped after ebb answers; "refused" means the link expired or was used already.
+ */
+export async function claim(): Promise<"none" | "claimed" | "refused"> {
+  if (!linkKey) return "none";
   const res = await fetch(`${apiBase()}/api/v1/pair`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ nonce: nonce() }),
+    body: JSON.stringify({ key: linkKey }),
   });
-  const body = (await res.json().catch(() => null)) as { token?: string; pending?: boolean; code?: string; confirm?: string; error?: string } | null;
-  if (!res.ok) throw new ApiError(res.status, body?.error ?? res.statusText);
-  if (body?.pending) return { paired: false, code: body.code ?? "", confirm: body.confirm ?? "ebb web confirm" };
-  if (!body?.token) throw new ApiError(500, "ebb returned no token");
+  linkKey = "";
+  const body = (await res.json().catch(() => null)) as { token?: string } | null;
+  if (!res.ok || !body?.token) return "refused";
   tok = body.token;
   store("local")?.setItem(TOKEN_KEY, tok);
-  store("local")?.removeItem(NONCE_KEY);
-  memNonce = "";
-  return { paired: true };
+  return "claimed";
+}
+
+/** Calls f when another tab of this page stores a token, so a tab still waiting connects at once. */
+export function onTokenFromOtherTab(f: () => void): () => void {
+  const h = (e: StorageEvent) => void (e.key === TOKEN_KEY && e.newValue && f());
+  addEventListener("storage", h);
+  return () => removeEventListener("storage", h);
 }
 
 const rejected = new Set<() => void>();

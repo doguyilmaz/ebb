@@ -63,7 +63,7 @@ const terms = {
   ages: ["Age", "When files last changed. Data nothing touched for a year is often safe to archive or remove."],
   activity: ["Activity", "Everything ebb has cleaned. Trashed items can be put back until the Trash is emptied."],
   daemon: ["Background service", "ebb started by macOS at login. It serves this window, follows what changes on disk, updates the last scan while the Mac is idle on power and warns when space runs low. It never cleans anything on its own."],
-  web: ["Web access", "Web pages that may talk to ebb on this Mac. A page needs your confirmation once before it can see anything."],
+  web: ["Web access", "Web pages that may talk to ebb on this Mac. A page sees nothing until it is opened once through the link ebb open makes."],
 } as const;
 
 type CategoryId = keyof typeof categories;
