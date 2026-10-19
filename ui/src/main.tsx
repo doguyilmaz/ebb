@@ -3,6 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Connect } from "./app/Connect.tsx";
+import { TipHost } from "./ui/Tip.tsx";
 import { router } from "./router.tsx";
 import "./styles/tokens.css";
 import "./styles/app.css";
@@ -16,6 +17,7 @@ createRoot(document.getElementById("app")!).render(
       <Connect>
         <RouterProvider router={router} context={{ queryClient }} />
       </Connect>
+      <TipHost />
     </QueryClientProvider>
   </StrictMode>,
 );

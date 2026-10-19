@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { listen } from "#/api/events.ts";
 import { apiPort, connect, isRemote, onAuthRejected, pair, setApiPort, token, wasEmbedded } from "#/api/client.ts";
 import { detectOS, isSafari } from "#/lib/os.ts";
+import { pageVersion, versionLabel } from "#/lib/version.ts";
 import { Command } from "#/ui/Command.tsx";
 
 type State =
@@ -30,10 +31,12 @@ export function Connect({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ kind: "connecting" });
   const [port, setPort] = useState(apiPort());
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState("");
   const qc = useQueryClient();
 
   const attempt = useCallback(async () => {
     const c = await connect();
+    setRunning(c?.health.version ?? "");
     if (!c) return setState({ kind: "absent" });
     if (!c.health.allowed) return setState({ kind: "not-allowed" });
     if (!c.remote) return setState(token() ? { kind: "ready" } : { kind: "no-token" });
@@ -104,12 +107,13 @@ export function Connect({ children }: { children: ReactNode }) {
     setPort(p);
     if (p > 0 && p < 65536) setApiPort(p);
   };
+  const version = running ? { label: versionLabel(running), tip: "The version of ebb running on this Mac" } : pageVersion ? { label: versionLabel(pageVersion), tip: "The ebb release this page comes from" } : undefined;
   const footer = <Footer port={port} setPort={pickPort} onRetry={retry} busy={busy} />;
 
   switch (state.kind) {
     case "connecting":
       return (
-        <Gate title="Looking for ebb…">
+        <Gate version={version} title="Looking for ebb…">
           <p className="muted row" role="status">
             <Loader2 size={15} className="spin" aria-hidden /> Checking this Mac
           </p>
@@ -117,14 +121,14 @@ export function Connect({ children }: { children: ReactNode }) {
       );
     case "no-token":
       return (
-        <Gate title="Open ebb from its link" sub="This window has no access key. The link ebb prints carries one, which keeps other pages on this Mac from using ebb.">
+        <Gate version={version} title="Open ebb from its link" sub="This window has no access key. The link ebb prints carries one, which keeps other pages on this Mac from using ebb.">
           <Command value="ebb serve --open" />
           <p className="faint small-text">Already running? Use the link it printed in Terminal.</p>
         </Gate>
       );
     case "not-allowed":
       return (
-        <Gate title="Allow this page first" sub="ebb is running, but it only talks to pages you allow, so no other website can look at your disk. Run this on your Mac:">
+        <Gate version={version} title="Allow this page first" sub="ebb is running, but it only talks to pages you allow, so no other website can look at your disk. Run this on your Mac:">
           <Command value={`ebb web allow ${location.origin}`} />
           <Waiting where={where} text="Connects as soon as you allow it" />
           {footer}
@@ -132,7 +136,7 @@ export function Connect({ children }: { children: ReactNode }) {
       );
     case "pairing":
       return (
-        <Gate title="Confirm this page on your Mac" sub="ebb never hands its data to a web page until you confirm it once. Run this in Terminal:">
+        <Gate version={version} title="Confirm this page on your Mac" sub="ebb never hands its data to a web page until you confirm it once. Run this in Terminal:">
           <Command value={state.confirm} />
           <p className="muted">Terminal shows a code. It must match this one:</p>
           <div className="code" aria-label={`Code ${state.code.split("").join(" ")}`}>{state.code}</div>
@@ -146,20 +150,20 @@ export function Connect({ children }: { children: ReactNode }) {
     default:
       if (wasEmbedded())
         return (
-          <Gate title="ebb stopped" sub="This window was talking to ebb on this Mac. ebb is not running right now. Start it again; this page reconnects by itself.">
+          <Gate version={version} title="ebb stopped" sub="This window was talking to ebb on this Mac. ebb is not running right now. Start it again; this page reconnects by itself.">
             <Command value={serve} />
             <Waiting where={where} text="Reconnects on its own" />
             {footer}
           </Gate>
         );
       return detectOS() === "mac" ? (
-        <Gate title="Start ebb on this Mac" sub="This page works with ebb running on your own Mac. Your files and what ebb finds about them never leave it." intro>
+        <Gate version={version} title="Start ebb on this Mac" sub="This page works with ebb running on your own Mac. Your files and what ebb finds about them never leave it." intro>
           <InstallGuide serve={serve} />
           <Waiting where={where} text="Connects on its own" />
           {footer}
         </Gate>
       ) : (
-        <Gate title="ebb runs on macOS" sub="It reads what only macOS knows about a disk: APFS clones and snapshots, purgeable space and the caches Xcode and simulators leave behind. Open this page on your Mac to get started." intro />
+        <Gate version={version} title="ebb runs on macOS" sub="It reads what only macOS knows about a disk: APFS clones and snapshots, purgeable space and the caches Xcode and simulators leave behind. Open this page on your Mac to get started." intro />
       );
   }
 }
@@ -232,14 +236,20 @@ const features = [
   { icon: ShieldCheck, text: "Cleans only what you approve" },
 ];
 
-function Gate({ title, sub, intro, children }: { title: string; sub?: string; intro?: boolean; children?: ReactNode }) {
+type Version = { label: string; tip: string };
+
+function Gate({ title, sub, intro, version, children }: { title: string; sub?: string; intro?: boolean; version?: Version; children?: ReactNode }) {
+  const wide = intro && !!children;
   return (
     <main className="gate">
-      <div className="gate-wrap">
+      <div className={wide ? "gate-wrap wide" : "gate-wrap"}>
         <div className="gate-brand">
           <img src="/favicon.svg" width={36} height={36} alt="" />
           <div className="stack" style={{ gap: 0 }}>
-            <span className="gate-name">ebb</span>
+            <span className="gate-name">
+              ebb
+              {version && <span className="brand-version num" data-tip={version.tip}>{version.label}</span>}
+            </span>
             <span className="faint small-text">Where your disk space went and how to get it back</span>
           </div>
           <span className="grow" />
@@ -248,20 +258,22 @@ function Gate({ title, sub, intro, children }: { title: string; sub?: string; in
           </a>
         </div>
         <div className="gate-card">
-          <div className="stack" style={{ gap: 6 }}>
-            <h1>{title}</h1>
-            {sub && <p className="muted">{sub}</p>}
+          <div className="gate-head">
+            <div className="stack" style={{ gap: 6 }}>
+              <h1>{title}</h1>
+              {sub && <p className="muted">{sub}</p>}
+            </div>
+            {intro && (
+              <ul className="gate-features">
+                {features.map(({ icon: Icon, text }) => (
+                  <li key={text}>
+                    <Icon size={17} aria-hidden />
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          {intro && (
-            <ul className="gate-features">
-              {features.map(({ icon: Icon, text }) => (
-                <li key={text}>
-                  <Icon size={17} aria-hidden />
-                  {text}
-                </li>
-              ))}
-            </ul>
-          )}
           {children}
         </div>
       </div>

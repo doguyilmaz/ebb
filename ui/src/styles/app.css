@@ -166,7 +166,8 @@ textarea.input { height: auto; padding: 8px 11px; resize: vertical; width: 100%;
 .gate-wrap > * { animation: rise 520ms var(--ease-out) both; }
 .gate-wrap > :nth-child(2) { animation-delay: 70ms; }
 .gate-brand { display: flex; align-items: center; gap: 12px; }
-.gate-name { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.gate-name { display: flex; align-items: baseline; gap: 10px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.gate-head { display: flex; flex-direction: column; gap: 18px; }
 .gate-card { display: flex; flex-direction: column; gap: 18px; padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-2); }
 .gate-features { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .gate-features li { display: flex; align-items: flex-start; gap: 8px; padding: 12px; border-radius: var(--r-2); background: var(--surface-2); font-size: 13px; line-height: 1.35; color: var(--text-2); }
@@ -184,6 +185,14 @@ textarea.input { height: auto; padding: 8px 11px; resize: vertical; width: 100%;
 .gate-note { padding: 10px 12px; border-radius: var(--r-2); background: var(--warning-soft); color: var(--text); }
 .gate-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .gate-foot .grow { flex: 1; }
+@media (min-width: 1000px) {
+  .gate-wrap.wide { max-width: 1040px; }
+  .gate-wrap.wide .gate-card { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 18px 48px; align-items: start; }
+  .gate-wrap.wide .gate-card > * { grid-column: 1 / -1; }
+  .gate-wrap.wide .gate-card > .gate-head { grid-area: 1 / 1; }
+  .gate-wrap.wide .gate-card > .steps { grid-area: 1 / 2; }
+  .gate-wrap.wide .gate-features { grid-template-columns: 1fr; }
+}
 .code { font: 600 30px/1 var(--mono); letter-spacing: 0.3em; text-align: center; padding: 16px 0; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--surface-2); }
 
 /* ---------- dialogs ---------- */
