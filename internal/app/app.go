@@ -39,7 +39,7 @@ type App struct {
 	Links   volume.Firmlinks
 
 	mu       sync.Mutex
-	keysMu   sync.Mutex
+	pairMu   sync.Mutex
 	running  bool
 	cleaning bool
 	packages struct {

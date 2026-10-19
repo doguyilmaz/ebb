@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -169,5 +171,23 @@ func TestPairLinkKeyBoundToOrigin(t *testing.T) {
 	}
 	if _, err := c.app.IssueLinkKey("https://evil.example"); err == nil {
 		t.Fatal("issued a key for an origin that is not allowed")
+	}
+}
+
+func TestPairLinkKeyOnceUnderRace(t *testing.T) {
+	c := newClient(t)
+	key := c.linkKey(hosted)
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if _, ok, _ := c.app.ClaimLinkKey(hosted, key); ok {
+				wins.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+	if wins.Load() != 1 {
+		t.Fatalf("%d claims won one key", wins.Load())
 	}
 }

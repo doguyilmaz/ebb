@@ -5,7 +5,10 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/state"
@@ -29,23 +32,18 @@ func (a *App) issueWebToken(origin string) (string, error) {
 // LinkWindow is how long the link `ebb open` opens can connect its page.
 const LinkWindow = 5 * time.Minute
 
-// linkKey lets the page `ebb open` opened claim a token once. Only its hash is
-// stored; the key itself travels in the link's fragment, which no server sees.
+// linkKey lets the page `ebb open` opened claim a token once. The key itself
+// travels only in the link's fragment. Each key is a file named by its hash, so
+// the CLI adding one never rewrites another the server is claiming.
 type linkKey struct {
 	Origin  string    `json:"origin"`
-	Hash    string    `json:"hash"`
 	Created time.Time `json:"created"`
 }
 
-func (a *App) linkKeysPath() string { return a.statePath("link-keys.json") }
+func (a *App) linkKeyDir() string { return a.statePath("link-keys") }
 
-func (a *App) liveLinkKeys() ([]linkKey, error) {
-	var ks []linkKey
-	if err := state.LoadJSON(a.linkKeysPath(), &ks); err != nil && !state.IsNotExist(err) {
-		return nil, err
-	}
-	now := a.Env.Now()
-	return slices.DeleteFunc(ks, func(k linkKey) bool { return now.Sub(k.Created) > LinkWindow }), nil
+func (a *App) linkKeyPath(key string) string {
+	return filepath.Join(a.linkKeyDir(), hashSecret(key)+".json")
 }
 
 // IssueLinkKey makes the key for a link that connects a page on origin.
@@ -59,39 +57,49 @@ func (a *App) IssueLinkKey(origin string) (string, error) {
 	if !a.WebOriginAllowed(norm) {
 		return "", fmt.Errorf("this machine has not allowed %s; run: ebb web allow %s", norm, norm)
 	}
-	a.keysMu.Lock()
-	defer a.keysMu.Unlock()
-	ks, err := a.liveLinkKeys()
-	if err != nil {
-		return "", err
-	}
+	a.pruneLinkKeys()
 	key := state.NewToken()
-	ks = append(ks, linkKey{Origin: norm, Hash: hashSecret(key), Created: a.Env.Now()})
-	return key, state.SaveJSON(a.linkKeysPath(), ks)
+	return key, state.SaveJSON(a.linkKeyPath(key), linkKey{Origin: norm, Created: a.Env.Now()})
+}
+
+func (a *App) pruneLinkKeys() {
+	es, _ := os.ReadDir(a.linkKeyDir())
+	for _, e := range es {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		var k linkKey
+		p := filepath.Join(a.linkKeyDir(), e.Name())
+		if state.LoadJSON(p, &k) != nil || a.Env.Now().Sub(k.Created) > LinkWindow {
+			_ = os.Remove(p)
+		}
+	}
 }
 
 // ClaimLinkKey trades a key from IssueLinkKey for a token of the page's own.
 // The key works once, within LinkWindow and only for the origin it was made
-// for; a claim from another origin leaves it in place.
+// for; a claim from another origin leaves it in place. Claims come only from
+// the server, so a lock makes them one at a time: unlink does not, since APFS
+// lets concurrent unlinks of one file all succeed.
 func (a *App) ClaimLinkKey(origin, key string) (string, bool, error) {
 	norm, ok := NormalizeOrigin(origin)
 	if !ok {
 		return "", false, errInvalidOrigin(origin)
 	}
-	a.keysMu.Lock()
-	defer a.keysMu.Unlock()
-	ks, err := a.liveLinkKeys()
-	if err != nil {
+	a.pairMu.Lock()
+	defer a.pairMu.Unlock()
+	p := a.linkKeyPath(key)
+	var k linkKey
+	if err := state.LoadJSON(p, &k); err != nil {
+		if state.IsNotExist(err) {
+			return "", false, nil
+		}
 		return "", false, err
 	}
-	h := []byte(hashSecret(key))
-	i := slices.IndexFunc(ks, func(k linkKey) bool {
-		return k.Origin == norm && subtle.ConstantTimeCompare([]byte(k.Hash), h) == 1
-	})
-	if i < 0 {
+	if k.Origin != norm || a.Env.Now().Sub(k.Created) > LinkWindow {
 		return "", false, nil
 	}
-	if err := state.SaveJSON(a.linkKeysPath(), slices.Delete(ks, i, i+1)); err != nil {
+	if err := os.Remove(p); err != nil {
 		return "", false, err
 	}
 	tok, err := a.issueWebToken(norm)
@@ -135,6 +143,8 @@ func (a *App) WebTokenValid(tok string) bool {
 
 // RevokeWebTokens drops every token issued to origin.
 func (a *App) RevokeWebTokens(origin string) error {
+	a.pairMu.Lock()
+	defer a.pairMu.Unlock()
 	ts, err := a.webTokens()
 	if err != nil {
 		return err
