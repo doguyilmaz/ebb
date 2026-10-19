@@ -32,6 +32,13 @@ describe("api client", () => {
     expect(err.code).toBe("outside-root");
   });
 
+  test("rejects a successful reply that is not JSON", async () => {
+    const c = await import("./client.ts");
+    responses.push(new Response("<!doctype html><html></html>", { status: 200, headers: { "Content-Type": "text/html" } }));
+    const err = await c.api.get("/status").catch((e) => e);
+    expect(err).toBeInstanceOf(c.ApiError);
+  });
+
   test("pairing sends a stable nonce and stores the issued token", async () => {
     const c = await import("./client.ts");
     responses.push(json({ pending: true, code: "123456", confirm: "ebb web confirm 123456" }), json({ token: "issued" }));

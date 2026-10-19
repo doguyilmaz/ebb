@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { Connect } from "./app/Connect.tsx";
 import { router } from "./router.tsx";
 import "./styles/tokens.css";
 import "./styles/app.css";
@@ -11,7 +12,10 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30
 createRoot(document.getElementById("app")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} context={{ queryClient }} />
+      {/* Outside the router, so no route loader asks ebb anything before the page knows where ebb is. */}
+      <Connect>
+        <RouterProvider router={router} context={{ queryClient }} />
+      </Connect>
     </QueryClientProvider>
   </StrictMode>,
 );

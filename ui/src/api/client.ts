@@ -156,6 +156,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
+    // A 2xx page instead of JSON means something other than ebb answered, such as the hosted page's own server.
+    if (res.ok) throw new ApiError(res.status, "The reply did not come from ebb");
     data = { error: text };
   }
   if (!res.ok) {
