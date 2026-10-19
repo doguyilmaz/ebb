@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/appkit"
 	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
@@ -53,7 +54,13 @@ func free(path string) (uint64, bool) {
 }
 
 // notify shows a macOS notification. The text is ebb's own, never a path.
+// From ebb.app it is ebb's own notification, and a click opens the window;
+// osascript's belongs to Script Editor, which a click opens instead.
 func notify(ctx context.Context, env sys.Env, text string) error {
+	if appkit.Bundled() {
+		appkit.Notify("ebb", text)
+		return nil
+	}
 	text = strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(text)
 	_, err := env.Run(ctx, "", "osascript", "-e", `display notification "`+text+`" with title "ebb"`)
 	return err

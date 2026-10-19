@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/doguyilmaz/ebb/internal/appkit"
 	"github.com/doguyilmaz/ebb/internal/daemon"
 	"github.com/doguyilmaz/ebb/internal/svc"
 )
@@ -97,7 +98,25 @@ func newDaemonCmd(g *globals) *cobra.Command {
 			}
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			return daemon.Run(ctx, a, daemon.Options{Version: Version, Out: cmd.OutOrStdout()})
+			opt := daemon.Options{Version: Version, Out: cmd.OutOrStdout()}
+			if !appkit.Bundled() {
+				return daemon.Run(ctx, a, opt)
+			}
+			// From ebb.app the main thread belongs to AppKit, which never returns: the service runs beside it.
+			go func() {
+				code := 0
+				if err := daemon.Run(ctx, a, opt); err != nil {
+					fmt.Fprintln(cmd.ErrOrStderr(), "error:", err)
+					code = 1
+				}
+				os.Exit(code)
+			}()
+			appkit.Run(func() {
+				if err := daemon.OpenWindow(context.Background(), a); err != nil {
+					fmt.Fprintln(cmd.ErrOrStderr(), "open the window:", err)
+				}
+			})
+			return nil
 		},
 	}
 	restore := &cobra.Command{

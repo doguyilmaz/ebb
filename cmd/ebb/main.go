@@ -2,10 +2,15 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"runtime/debug"
 
 	"github.com/doguyilmaz/ebb/internal/cli"
 )
+
+// AppKit only runs on the main thread, and the background service gives it the
+// main goroutine; locking it here, before main, keeps that goroutine there.
+func init() { runtime.LockOSThread() }
 
 func main() {
 	// Collect at 50 % heap growth instead of 100 %: a full-disk scan then

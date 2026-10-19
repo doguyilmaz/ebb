@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/doguyilmaz/ebb/internal/appkit"
 	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
@@ -23,6 +25,9 @@ type globals struct {
 
 // Main runs the CLI and returns the process exit code.
 func Main(args []string, stdout, stderr io.Writer) int {
+	if launchedAsApp(args) {
+		args = []string{"open", "--yes"}
+	}
 	root := newRoot(stdout, stderr)
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
@@ -84,4 +89,11 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 		newVersionCmd(g),
 	)
 	return root
+}
+
+// launchedAsApp: Finder, Spotlight or a notification click start ebb.app with
+// no arguments (older macOS adds -psn_…) and no terminal, which means "open ebb".
+func launchedAsApp(args []string) bool {
+	noArgs := len(args) == 0 || (len(args) == 1 && strings.HasPrefix(args[0], "-psn_"))
+	return noArgs && os.Getppid() == 1 && !interactive() && appkit.Bundled()
 }

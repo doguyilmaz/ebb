@@ -22,7 +22,8 @@ const startTimeout = 15 * time.Second
 var errNotStarted = errors.New("the background service did not start; see: ebb daemon status")
 
 func newOpenCmd(g *globals) *cobra.Command {
-	return &cobra.Command{
+	var yes bool
+	cmd := &cobra.Command{
 		Use:   "open [origin]",
 		Short: "Open ebb's window, starting ebb first when it is not running",
 		Long: "Opens the hosted page connected to ebb on this Mac through a one-time link. ebb's own window opens instead " +
@@ -71,10 +72,13 @@ func newOpenCmd(g *globals) *cobra.Command {
 				}
 				return show(st.Port)
 			}
-			if !interactive() {
+			if !yes && !interactive() {
 				return errors.New("ebb is not running. Keep it running in the background with: ebb daemon install. Run it in this terminal with: ebb serve")
 			}
-			background, answered := ask(cmd, "ebb is not running. Keep it running in the background and start it at login? [Y/n] ")
+			background, answered := true, true
+			if !yes {
+				background, answered = ask(cmd, "ebb is not running. Keep it running in the background and start it at login? [Y/n] ")
+			}
 			switch {
 			case !answered:
 				return errors.New("nothing started")
@@ -96,6 +100,8 @@ func newOpenCmd(g *globals) *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "keep ebb running in the background without asking")
+	return cmd
 }
 
 // refreshService restarts a background ebb older than this one, or one an

@@ -19,6 +19,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/svc"
 	"github.com/doguyilmaz/ebb/internal/sys"
 	"github.com/doguyilmaz/ebb/internal/units"
+	"github.com/doguyilmaz/ebb/internal/window"
 )
 
 type Options struct {
@@ -201,4 +202,30 @@ func realExe() string {
 		return real
 	}
 	return exe
+}
+
+// OpenWindow opens the window connected to the ebb serving it, the way ebb
+// open does: for a notification click or ebb.app opened again.
+func OpenWindow(ctx context.Context, a *app.App) error {
+	st, ok := server.Live(a.Env)
+	if !ok {
+		return errors.New("ebb is not serving the window")
+	}
+	token, err := server.LoadOrCreateToken(a.Env)
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(a.Env)
+	if err != nil {
+		cfg = a.Config
+	}
+	origin, err := window.Target(ctx, a.Env, cfg.Server.WebOrigins, "")
+	if err != nil {
+		return err
+	}
+	link, err := window.Link(a, origin, st.Port, token)
+	if err != nil {
+		return err
+	}
+	return window.Open(a.Env, link)
 }
