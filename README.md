@@ -3,7 +3,7 @@
 <p align="center">See where your Mac's disk space went and win it back safely.</p>
 <p align="center"><a href="https://ebb.doguyilmaz.com">ebb.doguyilmaz.com</a></p>
 
-ebb is a single binary for macOS 12 or later. It has a fast parallel scanner and findings that explain what is large and whether it is safe to remove. It also has a local web window, a background service, a CLI and an MCP server for AI agents. Nothing leaves your Mac.
+ebb is a small macOS app (12 or later) with the `ebb` command inside. It has a fast parallel scanner and findings that explain what is large and whether it is safe to remove. It also has a local web window, a background service, a CLI and an MCP server for AI agents. Nothing leaves your Mac.
 
 ## Install
 
@@ -11,7 +11,7 @@ ebb is a single binary for macOS 12 or later. It has a fast parallel scanner and
 brew install doguyilmaz/tap/ebb
 ```
 
-Or download the archive from [Releases](https://github.com/doguyilmaz/ebb/releases/latest) (one binary for Apple silicon and Intel) and put `ebb` on your PATH.
+This puts `ebb.app` in Applications and the `ebb` command on your PATH. Or download the archive from [Releases](https://github.com/doguyilmaz/ebb/releases/latest) (one build for Apple silicon and Intel), move `ebb.app` to Applications and link `ebb.app/Contents/MacOS/ebb` onto your PATH.
 
 ## Start
 
@@ -26,10 +26,10 @@ The first scan reads the whole data volume, in about a minute for 6 million file
 
 ### Full Disk Access
 
-Without Full Disk Access, macOS hides app containers and Mail, Messages and Safari data. ebb shows that space as "Not visible". Grant it in System Settings → Privacy & Security → Full Disk Access to whatever runs ebb:
+Without Full Disk Access, macOS hides app containers and Mail, Messages and Safari data, and asks about each protected folder separately while ebb scans. ebb asks for it before a scan and goes on as soon as it is on. In System Settings → Privacy & Security → Full Disk Access, turn on:
 
-- **Without the background service:** your terminal.
-- **With the background service:** the ebb binary itself. Settings shows its exact path. Homebrew installs every version to a new path, so add it again after an upgrade.
+- **With the background service:** ebb. It stays on across upgrades.
+- **Without it:** your terminal, since macOS asks about the app ebb runs in.
 
 ## What it finds
 

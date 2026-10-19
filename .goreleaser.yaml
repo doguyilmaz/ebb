@@ -88,4 +88,4 @@ release:
     owner: doguyilmaz
     name: ebb
   header: |
-    Install with `brew install doguyilmaz/tap/ebb`. The macOS binary is universal (Apple silicon and Intel), signed with a Developer ID and notarized.
+    Install with `brew install doguyilmaz/tap/ebb`. `ebb.app` and the bare `ebb` binary are universal (Apple silicon and Intel), signed with a Developer ID and notarized.
