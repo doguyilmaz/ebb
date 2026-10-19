@@ -1,0 +1,8 @@
+# Without a terminal to ask in, ebb open does not start anything on its own.
+! exec ebb open
+stderr 'ebb is not running'
+stderr 'ebb daemon install'
+
+# Only a page this machine allowed can be opened.
+! exec ebb open https://evil.example
+stderr 'not allowed'

@@ -101,7 +101,7 @@ func newDaemonCmd(g *globals) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		act("install", "Start ebb at login and keep it running", "ebb now runs in the background. Open it with: ebb serve --open", svc.Service.Install),
+		act("install", "Start ebb at login and keep it running", "ebb now runs in the background. Open it with: ebb open", svc.Service.Install),
 		act("restart", "Restart the service, for example after an upgrade", "Restarted.", svc.Service.Restart),
 		act("uninstall", "Stop the service and remove it from login", "The background service is gone.", svc.Service.Uninstall),
 		status, run,
