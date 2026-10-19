@@ -339,7 +339,8 @@ export interface WebAccess {
 }
 
 export interface PairRequest {
-  nonce: string;
+  nonce?: string;
+  key?: string;
 }
 
 export interface PairResponse {

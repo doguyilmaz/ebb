@@ -265,7 +265,8 @@ type PendingPair struct {
 }
 
 type PairRequest struct {
-	Nonce string `json:"nonce"`
+	Nonce string `json:"nonce,omitempty"`
+	Key   string `json:"key,omitempty"` // from the link `ebb open` opened
 }
 
 type PairResponse struct {

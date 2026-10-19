@@ -73,8 +73,18 @@ func (s *Server) pair(_ http.ResponseWriter, r *http.Request) (any, error) {
 	if !s.app.WebOriginAllowed(origin) {
 		return nil, coded(http.StatusForbidden, "origin-not-allowed", "this machine has not allowed "+origin+"; run: ebb web allow "+origin)
 	}
-	var req struct{ Nonce string }
+	var req struct{ Nonce, Key string }
 	_ = decode(r, &req)
+	if req.Key != "" {
+		tok, ok, err := s.app.ClaimLinkKey(origin, req.Key)
+		switch {
+		case err != nil:
+			return nil, err
+		case !ok:
+			return nil, coded(http.StatusForbidden, "link-expired", "this link has expired or was used already; run ebb open again")
+		}
+		return api.PairResponse{Token: tok, Device: s.app.Env.Hostname(), Version: s.version}, nil
+	}
 	if tok, ok, err := s.app.ClaimPair(origin, req.Nonce); err != nil {
 		return nil, err
 	} else if ok {

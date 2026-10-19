@@ -6,6 +6,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/doguyilmaz/ebb/internal/app"
+	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
 func (c *client) post(path, origin string, token bool, body string) (int, map[string]any) {
@@ -201,5 +205,58 @@ func TestPageTokenCannotRemoveProtections(t *testing.T) {
 	}
 	if code := send(`{"protect":["~/Work/**","~/Photos/**"]}`); code != 200 {
 		t.Fatalf("adding protection from a page must work: %d", code)
+	}
+}
+
+func (c *client) linkKey(origin string) string {
+	c.t.Helper()
+	k, err := c.app.IssueLinkKey(origin)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	return k
+}
+
+func TestPairWithLinkKey(t *testing.T) {
+	c := newClient(t)
+	key := `{"key":"` + c.linkKey(hosted) + `"}`
+	status, body := c.post("/api/v1/pair", hosted, false, key)
+	tok, _ := body["token"].(string)
+	if status != 200 || tok == "" {
+		t.Fatalf("%d %v", status, body)
+	}
+	if resp := c.req("GET", "/api/v1/status", map[string]string{"Origin": hosted, "Authorization": "Bearer " + tok}); resp.StatusCode != 200 {
+		t.Fatalf("issued token refused: %d", resp.StatusCode)
+	}
+	if status, body := c.post("/api/v1/pair", hosted, false, key); status != 403 || body["code"] != "link-expired" {
+		t.Fatalf("second use: %d %v", status, body)
+	}
+}
+
+func TestPairLinkKeyExpires(t *testing.T) {
+	c := newClient(t)
+	key := `{"key":"` + c.linkKey(hosted) + `"}`
+	f := c.app.Env.(*sys.Fake)
+	f.Time = f.Time.Add(app.LinkWindow + time.Second)
+	if status, body := c.post("/api/v1/pair", hosted, false, key); status != 403 || body["code"] != "link-expired" {
+		t.Fatalf("%d %v", status, body)
+	}
+}
+
+func TestPairLinkKeyBoundToOrigin(t *testing.T) {
+	c := newClient(t)
+	mine := "https://mine.example"
+	if _, err := c.app.AllowWebOrigin(mine); err != nil {
+		t.Fatal(err)
+	}
+	key := `{"key":"` + c.linkKey(hosted) + `"}`
+	if status, _ := c.post("/api/v1/pair", mine, false, key); status != 403 {
+		t.Fatalf("another origin claimed the key: %d", status)
+	}
+	if status, _ := c.post("/api/v1/pair", hosted, false, key); status != 200 {
+		t.Fatalf("a refused claim from another origin used the key up: %d", status)
+	}
+	if _, err := c.app.IssueLinkKey("https://evil.example"); err == nil {
+		t.Fatal("issued a key for an origin that is not allowed")
 	}
 }
