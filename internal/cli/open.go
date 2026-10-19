@@ -3,11 +3,8 @@ package cli
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +14,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/server"
 	"github.com/doguyilmaz/ebb/internal/svc"
 	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/window"
 )
 
 const startTimeout = 15 * time.Second
@@ -40,7 +38,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 			if len(args) == 1 {
 				asked = args[0]
 			}
-			origin, err := windowOrigin(a.Config.Server.WebOrigins, asked, safari(defaultBrowser(cmd.Context(), a.Env)))
+			origin, err := window.Target(cmd.Context(), a.Env, a.Config.Server.WebOrigins, asked)
 			if err != nil {
 				return err
 			}
@@ -50,7 +48,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 			}
 			out := cmd.OutOrStdout()
 			show := func(port int) error {
-				link, err := windowLink(a, origin, port, token)
+				link, err := window.Link(a, origin, port, token)
 				if err != nil {
 					return err
 				}
@@ -59,7 +57,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 				} else {
 					fmt.Fprintf(out, "Opening ebb in your browser.\nAnother browser? Open this link within %d minutes: %s\n", int(app.LinkWindow.Minutes()), link)
 				}
-				return openURL(a.Env, link)
+				return window.Open(a.Env, link)
 			}
 
 			s := svc.Local(a.Env)
@@ -98,72 +96,6 @@ func newOpenCmd(g *globals) *cobra.Command {
 			}
 		},
 	}
-}
-
-// windowOrigin is the page ebb open sends the browser to; "" means ebb's own
-// window. Safari keeps https pages away from loopback, so it gets the window.
-func windowOrigin(allowed []string, asked string, safari bool) (string, error) {
-	if asked != "" {
-		o, ok := app.NormalizeOrigin(asked)
-		if !ok || !slices.Contains(allowed, o) {
-			return "", fmt.Errorf("this machine has not allowed %s; run: ebb web allow %s", asked, asked)
-		}
-		return o, nil
-	}
-	if safari || len(allowed) == 0 {
-		return "", nil
-	}
-	return allowed[0], nil
-}
-
-// windowLink carries the secret in the fragment, which never reaches a server.
-func windowLink(a *app.App, origin string, port int, token string) (string, error) {
-	if origin == "" {
-		return fmt.Sprintf("http://127.0.0.1:%d/#token=%s", port, token), nil
-	}
-	key, err := a.IssueLinkKey(origin)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s/#key=%s&port=%d", origin, key, port), nil
-}
-
-// defaultBrowser is the bundle id of the app that opens https links, read from
-// LaunchServices; "" when it cannot tell.
-func defaultBrowser(ctx context.Context, env sys.Env) string {
-	if env.OS() != "darwin" {
-		return ""
-	}
-	plist := filepath.Join(env.Home(), "Library", "Preferences", "com.apple.LaunchServices", "com.apple.launchservices.secure.plist")
-	raw, err := env.Run(ctx, "", "plutil", "-convert", "json", "-o", "-", plist)
-	if err != nil {
-		return ""
-	}
-	return httpsHandler(raw)
-}
-
-func httpsHandler(raw []byte) string {
-	var ls struct {
-		LSHandlers []struct {
-			Scheme string `json:"LSHandlerURLScheme"`
-			App    string `json:"LSHandlerRoleAll"`
-		}
-	}
-	if json.Unmarshal(raw, &ls) != nil {
-		return ""
-	}
-	for _, h := range ls.LSHandlers {
-		if h.Scheme == "https" {
-			return h.App
-		}
-	}
-	// Nobody picked another browser.
-	return "com.apple.Safari"
-}
-
-// safari counts an unknown browser too: ebb's own window works in every browser.
-func safari(bundleID string) bool {
-	return bundleID == "" || strings.HasPrefix(strings.ToLower(bundleID), "com.apple.safari")
 }
 
 // refreshService restarts a background ebb older than this one, or one an

@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -12,7 +10,7 @@ import (
 
 	"github.com/doguyilmaz/ebb/internal/app"
 	"github.com/doguyilmaz/ebb/internal/server"
-	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/window"
 )
 
 func newServeCmd(g *globals) *cobra.Command {
@@ -35,7 +33,7 @@ func newServeCmd(g *globals) *cobra.Command {
 				url := st.URL() + "/#token=" + token
 				fmt.Fprintf(cmd.OutOrStdout(), "ebb is already running: %s\n", url)
 				if open {
-					return openURL(a.Env, url)
+					return window.Open(a.Env, url)
 				}
 				return nil
 			}
@@ -45,7 +43,7 @@ func newServeCmd(g *globals) *cobra.Command {
 			return serveHere(cmd, a, token, port, func(url string) {
 				fmt.Fprintf(cmd.OutOrStdout(), "ebb is running: %s\nPress Ctrl-C or close this terminal to stop it. To keep it running in the background: ebb daemon install\n", url)
 				if open {
-					_ = openURL(a.Env, url)
+					_ = window.Open(a.Env, url)
 				}
 			})
 		},
@@ -66,11 +64,4 @@ func serveHere(cmd *cobra.Command, a *app.App, token string, port int, ready fun
 		_ = server.WriteStatus(a.Env, server.Status{PID: os.Getpid(), Port: port, Version: Version, Started: a.Env.Now()})
 		ready(url)
 	})
-}
-
-func openURL(env sys.Env, url string) error {
-	if sys.Sandboxed(env) {
-		return nil
-	}
-	return exec.CommandContext(context.Background(), "open", url).Start()
 }

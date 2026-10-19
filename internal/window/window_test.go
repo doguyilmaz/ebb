@@ -1,4 +1,4 @@
-package cli
+package window
 
 import "testing"
 
@@ -22,7 +22,7 @@ func TestWindowOrigin(t *testing.T) {
 		{"a page that is not allowed", allowed, "https://evil.example", false, "", true},
 	}
 	for _, c := range cases {
-		got, err := windowOrigin(c.allowed, c.asked, c.safari)
+		got, err := origin(c.allowed, c.asked, c.safari)
 		if got != c.want || (err != nil) != c.err {
 			t.Errorf("%s: %q, %v", c.name, got, err)
 		}
