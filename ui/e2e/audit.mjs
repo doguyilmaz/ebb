@@ -361,7 +361,7 @@ await scenario("a scan again lists only what changed", async () => {
 await scenario("foreign pages and forged hosts are refused", async () => {
   const health = await api("/health", "GET", undefined, { Origin: "https://evil.example" });
   check(health.body.allowed === false, "foreign origin not allowed");
-  const pair = await fetch(`${BASE}/api/v1/pair`, { method: "POST", headers: { Origin: "https://evil.example", "Content-Type": "application/json" }, body: JSON.stringify({ nonce: "x".repeat(48) }) });
+  const pair = await fetch(`${BASE}/api/v1/pair`, { method: "POST", headers: { Origin: "https://evil.example", "Content-Type": "application/json" }, body: JSON.stringify({ key: "0".repeat(48) }) });
   check(pair.status >= 400, `pairing refused: ${pair.status}`);
   check((await rawStatus("/api/v1/status", { Host: "evil.example:" + PORT, Authorization: `Bearer ${TOKEN}` })) === 421, "forged Host refused");
   check((await api("/status", "GET", undefined, { Authorization: "Bearer wrong" })).status === 401, "wrong token refused");

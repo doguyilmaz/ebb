@@ -325,33 +325,19 @@ export interface PathRequest {
   path: string;
 }
 
-export interface PendingPair {
-  origin: string;
-  code: string;
-  requested: string;
-  confirmed: boolean;
-}
-
 export interface WebAccess {
   allowed: string[] | null;
   paired: string[] | null;
-  pending: PendingPair | null;
 }
 
 export interface PairRequest {
-  nonce?: string;
-  key?: string;
+  key: string;
 }
 
 export interface PairResponse {
-  pending?: boolean;
-  code?: string;
-  expires?: string;
-  confirm?: string;
-  message?: string;
-  token?: string;
-  device?: string;
-  version?: string;
+  token: string;
+  device: string;
+  version: string;
 }
 
 export interface Health {

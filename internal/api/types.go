@@ -252,32 +252,18 @@ type PathRequest struct {
 }
 
 type WebAccess struct {
-	Allowed []string     `json:"allowed"`
-	Paired  []string     `json:"paired"`
-	Pending *PendingPair `json:"pending"`
-}
-
-type PendingPair struct {
-	Origin    string `json:"origin"`
-	Code      string `json:"code"`
-	Requested string `json:"requested"`
-	Confirmed bool   `json:"confirmed"`
+	Allowed []string `json:"allowed"`
+	Paired  []string `json:"paired"`
 }
 
 type PairRequest struct {
-	Nonce string `json:"nonce,omitempty"`
-	Key   string `json:"key,omitempty"` // from the link `ebb open` opened
+	Key string `json:"key"` // from the link `ebb open` opened
 }
 
 type PairResponse struct {
-	Pending bool   `json:"pending,omitempty"`
-	Code    string `json:"code,omitempty"`
-	Expires string `json:"expires,omitempty"`
-	Confirm string `json:"confirm,omitempty"`
-	Message string `json:"message,omitempty"`
-	Token   string `json:"token,omitempty"`
-	Device  string `json:"device,omitempty"`
-	Version string `json:"version,omitempty"`
+	Token   string `json:"token"`
+	Device  string `json:"device"`
+	Version string `json:"version"`
 }
 
 type Health struct {

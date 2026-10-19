@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/config"
@@ -59,7 +58,7 @@ func (a *App) SaveConfig(cfg config.Config) error {
 }
 
 // WebOriginAllowed reports whether a page on origin may ask this machine for
-// access at all (pairing still needs a confirmation here).
+// access at all (it still needs a link from ebb open).
 func (a *App) WebOriginAllowed(origin string) bool {
 	o, ok := NormalizeOrigin(origin)
 	if !ok {
@@ -68,14 +67,10 @@ func (a *App) WebOriginAllowed(origin string) bool {
 	return slices.Contains(a.reloadConfig().Server.WebOrigins, o)
 }
 
-// WebAccess is what the local UI shows about web pairing; the nonce hash and
-// attempt counter stay in the state file.
+// WebAccess is what the local UI shows about web pairing.
 func (a *App) WebAccess() api.WebAccess {
 	cfg := a.reloadConfig()
 	out := api.WebAccess{Allowed: cfg.Server.WebOrigins, Paired: []string{}}
-	if p, _ := a.PendingPair(); p != nil {
-		out.Pending = &api.PendingPair{Origin: p.Origin, Code: p.Code, Requested: p.Requested.Format(time.RFC3339), Confirmed: p.Confirmed}
-	}
 	ts, _ := a.webTokens()
 	for _, t := range ts {
 		if !slices.Contains(out.Paired, t.Origin) {

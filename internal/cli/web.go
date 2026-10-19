@@ -17,13 +17,6 @@ func newWebCmd(g *globals) *cobra.Command {
 		out := cmd.OutOrStdout()
 		fmt.Fprintln(out, "allowed:", w.Allowed)
 		fmt.Fprintln(out, "paired: ", w.Paired)
-		if w.Pending != nil {
-			state := "waiting for confirmation"
-			if w.Pending.Confirmed {
-				state = "confirmed, waiting for the page"
-			}
-			fmt.Fprintf(out, "pending: %s, code %s (%s)\n", w.Pending.Origin, w.Pending.Code, state)
-		}
 		return nil
 	}
 	cmd.AddCommand(
@@ -34,7 +27,7 @@ func newWebCmd(g *globals) *cobra.Command {
 			}
 			return show(cmd, a.WebAccess())
 		}},
-		&cobra.Command{Use: "allow <origin>", Short: "Let pages on origin ask to pair", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		&cobra.Command{Use: "allow <origin>", Short: "Let pages on origin connect through ebb open", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := g.app()
 			if err != nil {
 				return err
@@ -55,25 +48,6 @@ func newWebCmd(g *globals) *cobra.Command {
 				return err
 			}
 			return show(cmd, w)
-		}},
-		&cobra.Command{Use: "confirm <code>", Short: "Approve the page waiting to pair, by the code it shows", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-			a, err := g.app()
-			if err != nil {
-				return err
-			}
-			p, err := a.ConfirmPair(args[0])
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "confirmed %s; the page connects on its next try\n", p.Origin)
-			return err
-		}},
-		&cobra.Command{Use: "reject", Short: "Discard the page waiting to pair", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-			a, err := g.app()
-			if err != nil {
-				return err
-			}
-			return a.RejectPair()
 		}},
 	)
 	return cmd

@@ -77,9 +77,6 @@ func (s *Server) local(pattern string, h func(http.ResponseWriter, *http.Request
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET "+healthPath, s.json(s.health))
 	s.mux.HandleFunc("POST /api/v1/pair", s.json(s.pair))
-	s.local("GET /api/v1/pair/pending", s.pairPending)
-	s.local("POST /api/v1/pair/confirm", s.pairConfirm)
-	s.local("POST /api/v1/pair/reject", s.pairReject)
 	s.local("GET /api/v1/web", s.webAccess)
 	s.local("POST /api/v1/web/allow", s.webAllow)
 	s.local("POST /api/v1/web/deny", s.webDeny)
