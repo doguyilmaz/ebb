@@ -18,6 +18,11 @@ builds:
 
 universal_binaries:
   - replace: true
+    # ebb.app wraps the same binary; GoReleaser OSS cannot build or notarize an app itself.
+    hooks:
+      post:
+        - cmd: scripts/macapp.sh "{{ .Version }}" "{{ .Path }}" "{{ if .IsSnapshot }}snapshot{{ else }}release{{ end }}"
+          output: true
 
 # Developer ID signature with the hardened runtime, then notarization, so
 # Gatekeeper opens it without a prompt. Releases fail without the secrets;
@@ -38,7 +43,11 @@ notarize:
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_universal"
-    files: [README.md, LICENSE]
+    files:
+      - README.md
+      - LICENSE
+      - src: dist/macapp/ebb.app
+        dst: ebb.app
 
 checksum:
   name_template: checksums.txt
@@ -51,7 +60,9 @@ changelog:
 
 homebrew_casks:
   - name: ebb
-    binaries: [ebb]
+    custom_block: |
+      app "ebb.app"
+    binaries: ["#{appdir}/ebb.app/Contents/MacOS/ebb"]
     repository:
       owner: doguyilmaz
       name: homebrew-tap
