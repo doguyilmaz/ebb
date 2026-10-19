@@ -104,7 +104,7 @@ export function CleanupSheet({ request, onClose, onDone }: { request: SheetReque
                     </span>
                     <span className="num">{bytes(it.bytes)}</span>
                     <Safety level={it.safety} />
-                    <span className="mono ellipsis pi-path" title={it.path}>{it.path}</span>
+                    <span className="mono pi-path">{it.path}</span>
                     {(it.blocked || it.warnings?.length || it.action.hint || ev?.err) && (
                       <span className="pi-note">
                         {it.blocked && <span className="error">{it.blocked}</span>}
@@ -133,13 +133,13 @@ export function CleanupSheet({ request, onClose, onDone }: { request: SheetReque
                 .map((op) => (
                   <li key={op.id}>
                     <span className={op.result === "done" ? "muted" : "error"}>{op.result === "done" ? "In the Trash" : op.result}</span>
-                    <span className="mono ellipsis pi-path">{op.path}</span>
-                    {op.error && <span className="pi-note error">{op.error}</span>}
                     {op.trashUrl && (
                       <button className="btn small" disabled={undo.isPending} onClick={() => undo.mutate(op.id)}>
                         <Undo2 size={13} aria-hidden /> Put back
                       </button>
                     )}
+                    <span className="mono pi-path">{op.path}</span>
+                    {op.error && <span className="pi-note error">{op.error}</span>}
                   </li>
                 ))}
             </ul>
