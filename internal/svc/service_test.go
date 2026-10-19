@@ -30,10 +30,37 @@ func TestPlist(t *testing.T) {
 		t.Fatalf("path %s", path)
 	}
 	for _, want := range []string{"<string>com.doguyilmaz.ebb</string>", "<string>/opt/ebb</string>\n    <string>daemon</string>\n    <string>run</string>",
-		"<key>ProcessType</key><string>Background</string>", "/state/daemon.log", "<key>KeepAlive</key>"} {
+		"/state/daemon.log", "<key>KeepAlive</key>"} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("plist misses %q:\n%s", want, content)
 		}
+	}
+	// The service serves the window and runs the scans a person starts, so it must not be a Background job.
+	for _, never := range []string{"ProcessType", "LowPriorityIO"} {
+		if strings.Contains(content, never) {
+			t.Fatalf("plist has %s:\n%s", never, content)
+		}
+	}
+}
+
+func TestRestartWritesAnOlderDefinitionAgain(t *testing.T) {
+	env, _ := fake(t)
+	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/opt/ebb", UID: 501}
+	path, want := s.Definition()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(want, "<key>KeepAlive</key>", "<key>ProcessType</key><string>Background</string>\n  <key>KeepAlive</key>", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if s.Current() {
+		t.Fatal("an older definition counts as current")
+	}
+	if _, err := s.Restart(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != want || !s.Current() {
+		t.Fatalf("restart kept the older definition:\n%s", got)
 	}
 }
 

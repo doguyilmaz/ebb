@@ -166,17 +166,18 @@ func safari(bundleID string) bool {
 	return bundleID == "" || strings.HasPrefix(strings.ToLower(bundleID), "com.apple.safari")
 }
 
-// refreshService restarts a background ebb older than this one, so an upgrade
-// takes over without a separate step.
+// refreshService restarts a background ebb older than this one, or one an
+// older definition started, so an upgrade takes over without a separate step.
 func refreshService(cmd *cobra.Command, env sys.Env, s svc.Service, st server.Status) server.Status {
-	if !st.Daemon || Version == "dev" || st.Version == Version || sys.Sandboxed(env) {
+	older := Version != "dev" && st.Version != Version
+	if !st.Daemon || sys.Sandboxed(env) || (!older && s.Current()) {
 		return st
 	}
 	if _, err := s.Restart(cmd.Context()); err != nil {
 		return st
 	}
 	if nst, ok := waitLive(env, func(n server.Status) bool { return n.PID != st.PID }); ok {
-		fmt.Fprintf(cmd.OutOrStdout(), "Restarted the background ebb (%s) so %s serves the window.\n", st.Version, Version)
+		fmt.Fprintln(cmd.OutOrStdout(), "Restarted the background ebb so this version serves the window.")
 		return nst
 	}
 	return st

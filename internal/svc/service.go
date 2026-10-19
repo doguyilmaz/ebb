@@ -72,8 +72,6 @@ func (s Service) Definition() (path, content string) {
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Background</string>
-  <key>LowPriorityIO</key><true/>
   <key>StandardOutPath</key><string>%s</string>
   <key>StandardErrorPath</key><string>%s</string>
 </dict>
@@ -116,9 +114,21 @@ func (s Service) Install(ctx context.Context) (string, error) {
 	return s.run(ctx, "launchctl", "bootstrap", fmt.Sprintf("gui/%d", s.UID), path)
 }
 
-// Restart asks launchd to restart the service so a new binary takes over.
+// Restart asks launchd to restart the service so a new binary takes over. A
+// definition an older ebb wrote is written and loaded again: launchd reads it
+// only when the service is loaded, and an upgrade leaves the file as it was.
 func (s Service) Restart(ctx context.Context) (string, error) {
+	if s.Installed() && !s.Current() {
+		return s.Install(ctx)
+	}
 	return s.run(ctx, "launchctl", "kickstart", "-k", fmt.Sprintf("gui/%d/%s", s.UID, Label))
+}
+
+// Current reports whether the installed definition is the one this ebb writes.
+func (s Service) Current() bool {
+	path, want := s.Definition()
+	got, err := os.ReadFile(path)
+	return err == nil && string(got) == want
 }
 
 func (s Service) Uninstall(ctx context.Context) (string, error) {
