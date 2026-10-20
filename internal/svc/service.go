@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -153,14 +155,51 @@ func (s Service) Current() bool {
 	return err == nil && string(got) == want
 }
 
-// Restore sets the service up again after an upgrade removed it, when the
-// person had it on; it reports whether it did.
-func (s Service) Restore(ctx context.Context) (bool, error) {
-	if _, err := os.Stat(wantedPath(s.StateDir)); err != nil {
+// Wanted reports whether the person turned the service on and has not turned
+// it off since.
+func (s Service) Wanted() bool {
+	_, err := os.Stat(wantedPath(s.StateDir))
+	return err == nil
+}
+
+// Heal sets a wanted service up again when launchd lost it: Homebrew removes
+// it on every upgrade and cannot reach launchd from its post-install sandbox,
+// and a definition may name a binary that is gone. It reports whether it did.
+func (s Service) Heal(ctx context.Context) (bool, error) {
+	if s.Env.OS() != "darwin" || !s.Wanted() || s.healthy(ctx) {
 		return false, nil
 	}
 	_, err := s.Install(ctx)
 	return err == nil, err
+}
+
+// healthy: the definition names a binary that exists and launchd has the job.
+// A running service shows both without asking launchd.
+func (s Service) healthy(ctx context.Context) bool {
+	path, _ := s.Definition()
+	def, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	if _, err := os.Stat(program(def)); err != nil {
+		return false
+	}
+	if s.Read().Running {
+		return true
+	}
+	_, err = s.Env.Run(ctx, "", "launchctl", "print", fmt.Sprintf("gui/%d/%s", s.UID, Label))
+	return err == nil
+}
+
+var programArg = regexp.MustCompile(`<key>ProgramArguments</key>\s*<array>\s*<string>([^<]*)</string>`)
+
+// program is the binary a definition starts.
+func program(def []byte) string {
+	m := programArg.FindSubmatch(def)
+	if m == nil {
+		return ""
+	}
+	return html.UnescapeString(string(m[1]))
 }
 
 func (s Service) Uninstall(ctx context.Context) (string, error) {

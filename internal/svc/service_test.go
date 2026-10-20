@@ -2,12 +2,14 @@ package svc
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
@@ -34,6 +36,10 @@ func TestPlist(t *testing.T) {
 		if !strings.Contains(content, want) {
 			t.Fatalf("plist misses %q:\n%s", want, content)
 		}
+	}
+	odd := Service{Env: env, StateDir: "/state", Exe: "/Apps & <Tools>/ebb.app/Contents/MacOS/ebb", UID: 501}
+	if _, c := odd.Definition(); program([]byte(c)) != odd.Exe {
+		t.Fatalf("read back %q from:\n%s", program([]byte(c)), c)
 	}
 	// The service serves the window and runs the scans a person starts, so it must not be a Background job.
 	for _, never := range []string{"ProcessType", "LowPriorityIO"} {
@@ -94,11 +100,11 @@ func TestInstallRefusesATemporaryBuild(t *testing.T) {
 	}
 }
 
-func TestRestoreBringsBackOnlyAWantedService(t *testing.T) {
-	env, _ := fake(t)
-	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/opt/ebb", UID: 501}
-	if done, err := s.Restore(context.Background()); err != nil || done || s.Installed() {
-		t.Fatalf("restored a service nobody turned on: %v %v", done, err)
+func TestHealBringsBackOnlyAWantedService(t *testing.T) {
+	env, ran := fake(t)
+	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/bin/sh", UID: 501}
+	if done, err := s.Heal(context.Background()); err != nil || done || s.Installed() || len(*ran) != 0 {
+		t.Fatalf("healed a service nobody turned on: %v %v %q", done, err, *ran)
 	}
 	if _, err := s.Install(context.Background()); err != nil {
 		t.Fatal(err)
@@ -108,14 +114,75 @@ func TestRestoreBringsBackOnlyAWantedService(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if done, err := s.Restore(context.Background()); err != nil || !done || !s.Installed() {
-		t.Fatalf("a wanted service was not restored: %v %v", done, err)
+	if done, err := s.Heal(context.Background()); err != nil || !done || !s.Current() {
+		t.Fatalf("a wanted service was not set up again: %v %v", done, err)
 	}
 	if _, err := s.Uninstall(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if done, _ := s.Restore(context.Background()); done || s.Installed() {
+	if done, _ := s.Heal(context.Background()); done || s.Installed() {
 		t.Fatal("a service turned off came back")
+	}
+}
+
+func TestHealPointsADefinitionAtThisBinaryWhenItsOwnIsGone(t *testing.T) {
+	env, _ := fake(t)
+	dir := t.TempDir()
+	old := Service{Env: env, StateDir: dir, Exe: "/opt/homebrew/Caskroom/ebb/0.1.0/ebb & co", UID: 501}
+	if _, err := old.Install(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s := Service{Env: env, StateDir: dir, Exe: "/bin/sh", UID: 501}
+	if done, err := s.Heal(context.Background()); err != nil || !done || !s.Current() {
+		t.Fatalf("the definition still names a binary that is gone: %v %v", done, err)
+	}
+}
+
+func TestHealAsksLaunchdOnlyWhenTheServiceIsNotRunning(t *testing.T) {
+	env, ran := fake(t)
+	loaded := true
+	env.RunFn = func(_ string, name string, args ...string) ([]byte, error) {
+		*ran = append(*ran, name+" "+strings.Join(args, " "))
+		if !loaded {
+			return nil, errors.New("could not find service")
+		}
+		return nil, nil
+	}
+	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/bin/sh", UID: 501}
+	if _, err := s.Install(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteStatus(s.StateDir, api.Daemon{PID: os.Getpid()}); err != nil {
+		t.Fatal(err)
+	}
+	if done, err := s.Heal(context.Background()); err != nil || done || len(*ran) != 0 {
+		t.Fatalf("a running service was touched: %v %v %q", done, err, *ran)
+	}
+	if err := WriteStatus(s.StateDir, api.Daemon{}); err != nil {
+		t.Fatal(err)
+	}
+	if done, err := s.Heal(context.Background()); err != nil || done || len(*ran) != 1 || (*ran)[0] != "launchctl print gui/501/com.doguyilmaz.ebb" {
+		t.Fatalf("a loaded service was set up again: %v %v %q", done, err, *ran)
+	}
+	loaded = false
+	if done, err := s.Heal(context.Background()); err != nil || !done {
+		t.Fatalf("a service launchd lost was not set up again: %v %v", done, err)
+	}
+}
+
+func TestHealReportsWhenItCannot(t *testing.T) {
+	env, _ := fake(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(wantedPath(dir), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := Service{Env: env, StateDir: dir, Exe: "/var/folders/x/T/go-build123/b001/exe/ebb", UID: 501}
+	if done, err := s.Heal(context.Background()); err == nil || done || s.Installed() {
+		t.Fatalf("a temporary build took the service: %v %v", done, err)
+	}
+	env.GOOS = "linux"
+	if done, err := s.Heal(context.Background()); err != nil || done {
+		t.Fatalf("healed off macOS: %v %v", done, err)
 	}
 }
 

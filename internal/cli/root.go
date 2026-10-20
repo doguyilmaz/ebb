@@ -47,8 +47,11 @@ func newRoot(stdout, stderr io.Writer) *cobra.Command {
 		Args:          cobra.NoArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if g.home != "" {
-				return os.Setenv(sys.HomeEnv, g.home)
+				if err := os.Setenv(sys.HomeEnv, g.home); err != nil {
+					return err
+				}
 			}
+			healService(cmd, g.verbose)
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error { return runOverview(g, cmd) },

@@ -10,6 +10,10 @@ stdout '"installed": false'
 stderr 'temporary build'
 ! exists $HOME/Library/LaunchAgents/com.doguyilmaz.ebb.plist
 
-# After an upgrade Homebrew asks for the service back; nobody turned it on here.
-exec ebb daemon restore
-! stdout .
+# The person had the service on, but a sandboxed run never sets it up again.
+exists $HOME/.local/state/ebb/service-wanted
+exec ebb version
+! stderr .
+! exists $HOME/Library/LaunchAgents/com.doguyilmaz.ebb.plist
+
+-- home/.local/state/ebb/service-wanted --

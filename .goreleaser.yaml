@@ -71,15 +71,11 @@ homebrew_casks:
     homepage: https://github.com/doguyilmaz/ebb
     description: See where your Mac's disk space went and win it back safely
     license: MIT
-    # The background service runs this binary; it must stop with it.
+    # The background service runs this binary; it must stop with it. Homebrew
+    # uninstalls on every upgrade too, so ebb sets the service up again the
+    # next time it runs when the person had it on.
     uninstall:
       launchctl: [com.doguyilmaz.ebb]
-    # Homebrew uninstalls on every upgrade too, so the new version sets the
-    # service up again when the person had it on.
-    hooks:
-      post:
-        install: |
-          system_command "#{HOMEBREW_PREFIX}/bin/ebb", args: ["daemon", "restore"], must_succeed: false
     zap:
       trash: ["~/.config/ebb", "~/.local/state/ebb"]
 
