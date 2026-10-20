@@ -35,7 +35,3 @@ jobs:
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
-      # Workers Builds deploys the hosted window from this branch, so the page never runs ahead of the latest release.
-      - run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/release" -f sha="$GITHUB_SHA"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
