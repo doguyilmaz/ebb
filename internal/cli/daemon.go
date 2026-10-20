@@ -12,6 +12,7 @@ import (
 	"github.com/doguyilmaz/ebb/internal/appkit"
 	"github.com/doguyilmaz/ebb/internal/daemon"
 	"github.com/doguyilmaz/ebb/internal/svc"
+	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
 func newDaemonCmd(g *globals) *cobra.Command {
@@ -119,28 +120,33 @@ func newDaemonCmd(g *globals) *cobra.Command {
 			return nil
 		},
 	}
-	restore := &cobra.Command{
-		Use:    "restore",
-		Short:  "Set the service up again after an upgrade removed it, when it was on (Homebrew runs this)",
-		Args:   cobra.NoArgs,
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			a, err := g.app()
-			if err != nil {
-				return err
-			}
-			done, err := svc.Local(a.Env).Restore(cmd.Context())
-			if done {
-				fmt.Fprintln(cmd.OutOrStdout(), "ebb runs in the background again, now with this version.")
-			}
-			return err
-		},
-	}
 	cmd.AddCommand(
 		act("install", "Start ebb at login and keep it running", "ebb now runs in the background. Open it with: ebb open", svc.Service.Install),
 		act("restart", "Restart the service, for example after an upgrade", "Restarted.", svc.Service.Restart),
 		act("uninstall", "Stop the service and remove it from login", "The background service is gone.", svc.Service.Uninstall),
-		status, run, restore,
+		status, run,
 	)
 	return cmd
+}
+
+// healService sets the background service up again when the person had it on
+// and an upgrade or a move took it away. Homebrew runs post-install steps in a
+// sandbox that cannot reach launchd, so ebb does it the next time it runs.
+// open and serve start ebb themselves and the daemon commands manage the service.
+func healService(cmd *cobra.Command, verbose bool) {
+	for c := cmd; c != nil; c = c.Parent() {
+		if n := c.Name(); n == "daemon" || n == "open" || n == "serve" {
+			return
+		}
+	}
+	env := sys.Real()
+	if sys.Sandboxed(env) {
+		return
+	}
+	if _, err := svc.Local(env).Heal(cmd.Context()); err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), "ebb's background service stopped and could not start again. Turn it back on with: ebb daemon install")
+		if verbose {
+			fmt.Fprintln(cmd.ErrOrStderr(), err)
+		}
+	}
 }

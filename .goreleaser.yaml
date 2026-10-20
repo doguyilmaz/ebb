@@ -18,10 +18,10 @@ builds:
 
 universal_binaries:
   - replace: true
-    # ebb.app wraps the same binary; GoReleaser OSS cannot build or notarize an app itself.
+    # ebb.app wraps the same binary, signed ad hoc; the tapster hub signs and notarizes it.
     hooks:
       post:
-        - cmd: scripts/macapp.sh "{{ .Version }}" "{{ .Path }}" "{{ if .IsSnapshot }}snapshot{{ else }}release{{ end }}"
+        - cmd: scripts/macapp.sh "{{ .Version }}" "{{ .Path }}"
           output: true
 
 # Developer ID signature with the hardened runtime, then notarization, so
@@ -69,17 +69,13 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_msg_template: "{{ .ProjectName }} {{ .Tag }}"
     homepage: https://github.com/doguyilmaz/ebb
-    description: See where your Mac's disk space went and win it back safely
+    description: See where your disk space went and win it back safely
     license: MIT
-    # The background service runs this binary; it must stop with it.
+    # The background service runs this binary; it must stop with it. Homebrew
+    # uninstalls on every upgrade too, so ebb sets the service up again the
+    # next time it runs when the person had it on.
     uninstall:
       launchctl: [com.doguyilmaz.ebb]
-    # Homebrew uninstalls on every upgrade too, so the new version sets the
-    # service up again when the person had it on.
-    hooks:
-      post:
-        install: |
-          system_command "#{HOMEBREW_PREFIX}/bin/ebb", args: ["daemon", "restore"], must_succeed: false
     zap:
       trash: ["~/.config/ebb", "~/.local/state/ebb"]
 
