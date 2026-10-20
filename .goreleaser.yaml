@@ -69,7 +69,7 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_msg_template: "{{ .ProjectName }} {{ .Tag }}"
     homepage: https://github.com/doguyilmaz/ebb
-    description: See where your Mac's disk space went and win it back safely
+    description: See where your disk space went and win it back safely
     license: MIT
     # The background service runs this binary; it must stop with it. Homebrew
     # uninstalls on every upgrade too, so ebb sets the service up again the
