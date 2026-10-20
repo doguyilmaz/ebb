@@ -161,7 +161,7 @@ func TestHealAsksLaunchdOnlyWhenTheServiceIsNotRunning(t *testing.T) {
 	if err := WriteStatus(s.StateDir, api.Daemon{}); err != nil {
 		t.Fatal(err)
 	}
-	if done, err := s.Heal(context.Background()); err != nil || done || len(*ran) != 1 || (*ran)[0] != "launchctl print gui/501/com.doguyilmaz.ebb" {
+	if done, err := s.Heal(context.Background()); err != nil || done || strings.Join(*ran, "; ") != "launchctl print-disabled gui/501; launchctl print gui/501/com.doguyilmaz.ebb" {
 		t.Fatalf("a loaded service was set up again: %v %v %q", done, err, *ran)
 	}
 	loaded = false
@@ -170,19 +170,96 @@ func TestHealAsksLaunchdOnlyWhenTheServiceIsNotRunning(t *testing.T) {
 	}
 }
 
-func TestHealReportsWhenItCannot(t *testing.T) {
+func TestHealLeavesAServiceThePersonTurnedOff(t *testing.T) {
+	env, ran := fake(t)
+	disabled := "\tdisabled services = {\n\t\t\"com.apple.ScriptMenuApp\" => disabled\n\t\t\"com.doguyilmaz.ebb\" => disabled\n\t}\n"
+	env.RunFn = func(_ string, name string, args ...string) ([]byte, error) {
+		*ran = append(*ran, name+" "+strings.Join(args, " "))
+		if args[0] == "print-disabled" {
+			return []byte(disabled), nil
+		}
+		return nil, errors.New("could not find service")
+	}
+	s := Service{Env: env, StateDir: t.TempDir(), Exe: "/bin/sh", UID: 501}
+	if _, err := s.Install(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, upgraded := range []bool{false, true, true} {
+		if upgraded {
+			path, _ := s.Definition()
+			_ = os.Remove(path)
+		}
+		*ran = nil
+		if done, err := s.Heal(context.Background()); err != nil || done || strings.Join(*ran, "; ") != "launchctl print-disabled gui/501" {
+			t.Fatalf("a service turned off was touched: %v %v %q", done, err, *ran)
+		}
+	}
+	if s.Installed() || !s.Wanted() {
+		t.Fatal("heal changed what the person chose")
+	}
+	disabled = "\"com.doguyilmaz.ebb\" => true\n"
+	if done, err := s.Heal(context.Background()); err != nil || done {
+		t.Fatalf("older macOS: a service turned off came back: %v %v", done, err)
+	}
+	disabled = "\"com.doguyilmaz.ebb.helper\" => disabled\n\"com.doguyilmaz.ebb\" => enabled\n"
+	if done, err := s.Heal(context.Background()); err != nil || !done {
+		t.Fatalf("a service turned on again in Login Items was not set up: %v %v", done, err)
+	}
+}
+
+func TestHealTellsALastingFailureOnce(t *testing.T) {
 	env, _ := fake(t)
 	dir := t.TempDir()
 	if err := os.WriteFile(wantedPath(dir), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := Service{Env: env, StateDir: dir, Exe: "/var/folders/x/T/go-build123/b001/exe/ebb", UID: 501}
-	if done, err := s.Heal(context.Background()); err == nil || done || s.Installed() {
-		t.Fatalf("a temporary build took the service: %v %v", done, err)
+	tmp := Service{Env: env, StateDir: dir, Exe: "/var/folders/x/T/go-build123/b001/exe/ebb", UID: 501}
+	heal := func(s Service) error {
+		t.Helper()
+		done, err := s.Heal(context.Background())
+		if done {
+			t.Fatal("healed")
+		}
+		return err
+	}
+	if err := heal(tmp); err == nil || tmp.Installed() {
+		t.Fatalf("a temporary build took the service: %v", err)
+	}
+	if err := heal(tmp); err != nil {
+		t.Fatalf("the same failure was told twice: %v", err)
+	}
+	// Another failure is told, once.
+	agents := filepath.Join(env.Home(), "Library", "LaunchAgents")
+	if err := os.MkdirAll(filepath.Dir(agents), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(agents, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := Service{Env: env, StateDir: dir, Exe: "/bin/sh", UID: 501}
+	if err := heal(s); err == nil {
+		t.Fatal("a new failure was not told")
+	}
+	if err := heal(s); err != nil {
+		t.Fatalf("the same failure was told twice: %v", err)
+	}
+	// Once the service works, the next failure is told again.
+	if err := os.Remove(agents); err != nil {
+		t.Fatal(err)
+	}
+	if done, err := s.Heal(context.Background()); err != nil || !done {
+		t.Fatalf("not healed: %v %v", done, err)
+	}
+	path, _ := s.Definition()
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := heal(tmp); err == nil {
+		t.Fatal("a failure after a working service was not told")
 	}
 	env.GOOS = "linux"
-	if done, err := s.Heal(context.Background()); err != nil || done {
-		t.Fatalf("healed off macOS: %v %v", done, err)
+	if err := heal(tmp); err != nil {
+		t.Fatalf("healed off macOS: %v", err)
 	}
 }
 

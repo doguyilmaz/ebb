@@ -65,7 +65,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 			if st, ok := server.Live(a.Env); ok {
 				return show(refreshService(cmd, a.Env, s, st).Port)
 			}
-			if s.Installed() || s.Wanted() {
+			if (s.Installed() || s.Wanted()) && !s.Disabled(cmd.Context()) {
 				st, err := startService(cmd.Context(), a.Env, s)
 				if err != nil {
 					return err

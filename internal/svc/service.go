@@ -107,8 +107,9 @@ func (s Service) run(ctx context.Context, args ...string) (string, error) {
 	return note, nil
 }
 
-// Install writes the plist and starts the service; in the sandbox only the
-// file is written and the launchctl command is reported, never run.
+// Install writes the plist and starts the service, turning it back on when
+// launchd has it off; in the sandbox only the file is written and the
+// launchctl command is reported, never run.
 func (s Service) Install(ctx context.Context) (string, error) {
 	if s.Env.OS() != "darwin" {
 		return "", ErrUnsupported
@@ -127,6 +128,7 @@ func (s Service) Install(ctx context.Context) (string, error) {
 	// also while bootout, which returns early, is still taking it down.
 	if !sys.Sandboxed(s.Env) {
 		job := fmt.Sprintf("gui/%d/%s", s.UID, Label)
+		_, _ = s.Env.Run(ctx, "", "launchctl", "enable", job)
 		_, _ = s.Env.Run(ctx, "", "launchctl", "bootout", job)
 		for range 50 {
 			if _, err := s.Env.Run(ctx, "", "launchctl", "print", job); err != nil {
@@ -164,32 +166,71 @@ func (s Service) Wanted() bool {
 
 // Heal sets a wanted service up again when launchd lost it: Homebrew removes
 // it on every upgrade and cannot reach launchd from its post-install sandbox,
-// and a definition may name a binary that is gone. It reports whether it did.
+// and a definition may name a binary that is gone. A service the person
+// turned off in launchd stays off. It reports whether it did, and returns a
+// failure only when it differs from the last one, so a lasting one is told once.
 func (s Service) Heal(ctx context.Context) (bool, error) {
-	if s.Env.OS() != "darwin" || !s.Wanted() || s.healthy(ctx) {
+	if s.Env.OS() != "darwin" || !s.Wanted() {
 		return false, nil
 	}
-	_, err := s.Install(ctx)
-	return err == nil, err
+	if !s.lost(ctx) {
+		s.forgetFailure()
+		return false, nil
+	}
+	if _, err := s.Install(ctx); err != nil {
+		if !s.newFailure(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	s.forgetFailure()
+	return true, nil
 }
 
-// healthy: the definition names a binary that exists and launchd has the job.
-// A running service shows both without asking launchd.
-func (s Service) healthy(ctx context.Context) bool {
+// lost: launchd has no working job for a service the person did not turn off.
+// A running service needs no question to launchd.
+func (s Service) lost(ctx context.Context) bool {
 	path, _ := s.Definition()
 	def, err := os.ReadFile(path)
+	if err == nil {
+		_, err = os.Stat(program(def))
+	}
+	if err == nil && s.Read().Running {
+		return false
+	}
+	if s.Disabled(ctx) {
+		return false
+	}
 	if err != nil {
-		return false
-	}
-	if _, err := os.Stat(program(def)); err != nil {
-		return false
-	}
-	if s.Read().Running {
 		return true
 	}
 	_, err = s.Env.Run(ctx, "", "launchctl", "print", fmt.Sprintf("gui/%d/%s", s.UID, Label))
-	return err == nil
+	return err != nil
 }
+
+var disabledLine = regexp.MustCompile(`(?m)^\s*"` + regexp.QuoteMeta(Label) + `"\s*=>\s*(disabled|true)\s*$`)
+
+// Disabled reports whether launchd has the service turned off. Older macOS
+// prints true for a disabled label.
+func (s Service) Disabled(ctx context.Context) bool {
+	out, err := s.Env.Run(ctx, "", "launchctl", "print-disabled", fmt.Sprintf("gui/%d", s.UID))
+	return err == nil && disabledLine.Match(out)
+}
+
+func failurePath(stateDir string) string { return filepath.Join(stateDir, "service-failure") }
+
+// newFailure records err as the last failure and reports whether it differs
+// from the one before.
+func (s Service) newFailure(err error) bool {
+	p := failurePath(s.StateDir)
+	if last, rerr := os.ReadFile(p); rerr == nil && string(last) == err.Error() {
+		return false
+	}
+	_ = state.WriteAtomic(p, []byte(err.Error()), 0o600)
+	return true
+}
+
+func (s Service) forgetFailure() { _ = os.Remove(failurePath(s.StateDir)) }
 
 var programArg = regexp.MustCompile(`<key>ProgramArguments</key>\s*<array>\s*<string>([^<]*)</string>`)
 
