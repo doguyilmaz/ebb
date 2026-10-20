@@ -29,9 +29,22 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
-          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
-          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
-          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
-          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+      - name: Attest the archives for tapster
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: ${{ !github.event.repository.private }}
+        with:
+          subject-checksums: dist/checksums.txt
+      - name: Ring the tapster hub
+        if: ${{ vars.TAPSTER_DOORBELL != '' }}
+        continue-on-error: true
+        env:
+          DOORBELL: ${{ vars.TAPSTER_DOORBELL }}
+        run: |
+          set -euo pipefail
+          token=$(curl -fsS -G --data-urlencode "audience=$DOORBELL" -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r .value)
+          echo "::add-mask::$token"
+          curl -fsS -X POST -H "Authorization: Bearer $token" "$DOORBELL"
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write

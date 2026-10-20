@@ -24,23 +24,6 @@ universal_binaries:
         - cmd: scripts/macapp.sh "{{ .Version }}" "{{ .Path }}"
           output: true
 
-# Developer ID signature with the hardened runtime, then notarization, so
-# Gatekeeper opens it without a prompt. Releases fail without the secrets;
-# snapshots skip it.
-notarize:
-  macos:
-    - enabled: "{{ not .IsSnapshot }}"
-      sign:
-        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
-        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
-      notarize:
-        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
-        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
-        key: "{{ .Env.MACOS_NOTARY_KEY }}"
-        # The cask points at the archive right away; Gatekeeper must find the ticket.
-        wait: true
-        timeout: 20m
-
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_universal"
     files:
@@ -58,30 +41,10 @@ changelog:
   filters:
     exclude: ["^docs", "^test"]
 
-homebrew_casks:
-  - name: ebb
-    custom_block: |
-      app "ebb.app"
-    binaries: ["#{appdir}/ebb.app/Contents/MacOS/ebb"]
-    repository:
-      owner: doguyilmaz
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    commit_msg_template: "{{ .ProjectName }} {{ .Tag }}"
-    homepage: https://github.com/doguyilmaz/ebb
-    description: See where your disk space went and win it back safely
-    license: MIT
-    # The background service runs this binary; it must stop with it. Homebrew
-    # uninstalls on every upgrade too, so ebb sets the service up again the
-    # next time it runs when the person had it on.
-    uninstall:
-      launchctl: [com.doguyilmaz.ebb]
-    zap:
-      trash: ["~/.config/ebb", "~/.local/state/ebb"]
-
 release:
   github:
     owner: doguyilmaz
     name: ebb
   header: |
     Install with `brew install doguyilmaz/tap/ebb`. `ebb.app` and the bare `ebb` binary are universal (Apple silicon and Intel), signed with a Developer ID and notarized.
+  draft: true
