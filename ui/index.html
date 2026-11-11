@@ -8,9 +8,32 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preload" href="/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- The splash's mark and name, also the sidebar's and the headings': fetched with the stylesheet, so the first
+         paint has them instead of the mark popping in or the name changing font a frame later. -->
+    <link rel="preload" href="/fonts/ibm-plex-sans-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
     <script src="/theme.js"></script>
+    <style>
+      /* The splash is painted before any script runs. Its colours are the theme's own, from the app's stylesheet,
+         which is loaded in the same render-blocking step, so it matches light, dark and a chosen theme. */
+      .splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--bg); color: var(--text); font-family: var(--font); }
+      .splash[hidden] { display: none; }
+      .splash img { display: block; }
+      .splash-name { font-size: 22px; font-weight: 600; line-height: 1; letter-spacing: -0.01em; }
+      /* A start that takes a while says so; a quick one is over before this appears. */
+      .splash-note { font-size: 12.5px; line-height: 1.5; color: var(--text-3); opacity: 0; animation: splash-note 400ms ease-out 900ms forwards; }
+      @keyframes splash-note { to { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { .splash-note { animation: none; opacity: 1; } }
+    </style>
   </head>
   <body>
+    <!-- Outside #app, whose content React replaces: this very node stays on screen until the window ends it
+         (src/app/splash.ts), so it never blinks. -->
+    <div id="splash" class="splash" role="status" aria-busy="true">
+      <img src="/favicon.svg" width="64" height="64" alt="" />
+      <span class="splash-name" aria-hidden="true">ebb</span>
+      <span class="splash-note">Opening ebb…</span>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

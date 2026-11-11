@@ -92,6 +92,19 @@ cold server answering N `/status` requests at once:
 The slowest answer is now the time of one read whatever N is: 0.45–0.47 s against 0.49–0.54 s for N = 1 in the same
 interleaved runs, and up to 0.62 s for N = 8 before.
 
+### opening the window (2026-11-11)
+
+Until the page was ready the window painted only its background, after a frame of the "Looking for ebb" screen.
+index.html now carries a splash (the mark and the name) that stays until the first page is on screen. Headless
+Chrome, warm sandbox server with the real scan, dark scheme, every animation frame sampled:
+
+| | first contentful paint | page | frames with only the background before the page | "Looking for ebb" frames |
+|---|---|---|---|---|
+| before | 84–256 ms | 183–232 ms | 8–10 | 1–2 |
+| after | 40–148 ms (the first paint) | 159–275 ms | 0 | 0 |
+| before, CPU slowed 4× | 588–632 ms | 531–562 ms | 7–10 | 4 |
+| after, CPU slowed 4× | 96–132 ms (the first paint) | 463–484 ms | 0 | 0 |
+
 ## ui (Explore, real scan, 2834×1285 canvas at 2× DPR, sunburst of ~3,500 arcs)
 
 | Change | Hover to next frame, median / p95 |

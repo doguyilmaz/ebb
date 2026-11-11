@@ -3,12 +3,16 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Connect } from "./app/Connect.tsx";
+import { endSplash } from "./app/splash.ts";
 import { TipHost } from "./ui/Tip.tsx";
 import { router } from "./router.tsx";
 import "./styles/tokens.css";
 import "./styles/app.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } } });
+
+// Root ends the splash with the first page; a first load that fails before Root renders must not stay hidden behind it.
+router.subscribe("onResolved", endSplash);
 
 createRoot(document.getElementById("app")!).render(
   <StrictMode>
