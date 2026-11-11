@@ -65,7 +65,9 @@ type App struct {
 	cur      *ScanResult
 	// curGen counts every change of cur, so a read of the saved scan that
 	// started before a newer result was set never puts the older one back.
-	curGen  uint64
+	curGen uint64
+	// curFile is last.json as it was when cur was read from it or saved.
+	curFile os.FileInfo
 	loading *lastLoad
 	plans   map[string]*planEntry
 }

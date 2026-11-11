@@ -158,11 +158,12 @@ func (a *App) conclude(ctx context.Context, root string, t *tree.Tree, problems 
 		return nil, err
 	}
 	out.Meta.ID = snap.Meta.ID
-	if err := a.saveLast(out); err != nil {
+	saved, err := a.saveLast(out)
+	if err != nil {
 		return nil, err
 	}
 	a.mu.Lock()
-	a.cur, a.curGen = out, a.curGen+1
+	a.cur, a.curGen, a.curFile = out, a.curGen+1, saved
 	a.mu.Unlock()
 	return out, nil
 }

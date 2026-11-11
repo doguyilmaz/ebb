@@ -173,6 +173,291 @@ func TestOlderReadDoesNotReplaceNewerScan(t *testing.T) {
 	}
 }
 
+// countReads makes readLast count its calls.
+func countReads(t *testing.T) *atomic.Int32 {
+	t.Helper()
+	read := readLast
+	t.Cleanup(func() { readLast = read })
+	loads := new(atomic.Int32)
+	readLast = func(a *App) (*ScanResult, error) {
+		loads.Add(1)
+		return read(a)
+	}
+	return loads
+}
+
+// waitRead fails instead of hanging when no read of the saved scan starts.
+func waitRead(t *testing.T, reading <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-reading:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the saved scan was not read again")
+	}
+}
+
+// `ebb scan` in a terminal scans in a process of its own while a server
+// already shows an earlier scan.
+func TestLastShowsScanSavedByAnotherProcess(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	terminal, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "docs", "b.txt"), 2000)
+	res, err := terminal.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := a.Last()
+	if err != nil || got.Meta.ID != res.Meta.ID || got.Meta.Files != 3 {
+		t.Fatalf("the server still shows its own scan: %+v %v, saved %s", got.Meta, err, res.Meta.ID)
+	}
+	if st := a.Status("test"); st.Last == nil || st.Last.ID != res.Meta.ID {
+		t.Fatalf("status %+v", st.Last)
+	}
+}
+
+// `ebb clean` in a terminal cleans in a process of its own: the server must
+// stop listing what is gone, its packages included.
+func TestLastShowsCleanupByAnotherProcess(t *testing.T) {
+	a, home := cleanApp(t)
+	write(t, filepath.Join(home, "proj", "package.json"), 20)
+	write(t, filepath.Join(home, "proj", "node_modules", "lib", "package.json"), 20)
+	write(t, filepath.Join(home, "proj", "node_modules", "lib", "index.js"), 2<<20)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: home, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := a.Packages(); err != nil || p.Projects != 1 {
+		t.Fatalf("packages before %+v %v", p, err)
+	}
+	terminal, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone := []string{filepath.Join(home, "w", "cache"), filepath.Join(home, "proj", "node_modules")}
+	p, err := terminal.Plan(clean.Request{Paths: gone, Source: "cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := terminal.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := terminal.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 2 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	got, err := a.Last()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, g := range gone {
+		if _, ok := got.Tree.Lookup(g); ok {
+			t.Fatalf("%s was removed in the terminal and is still listed", g)
+		}
+	}
+	if fr, _ := a.Findings("", 0, true); hasFinding(fr.Findings, "test.cache") {
+		t.Fatal("the finding of a removed folder is still listed")
+	}
+	if p, err := a.Packages(); err != nil || p.Projects != 0 {
+		t.Fatalf("packages after %+v %v", p, err)
+	}
+}
+
+// What this process saves is what it holds already: reading it back would
+// cost a whole tree's worth of memory and time after every scan and cleanup.
+func TestOwnSavesAreNotReadBack(t *testing.T) {
+	a, home := cleanApp(t)
+	loads := countReads(t)
+	if _, err := a.Last(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: home, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Last(); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(home, "w", "new.bin"), 2<<20)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: home}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Last(); err != nil {
+		t.Fatal(err)
+	}
+	p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Execute(context.Background(), p.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Last(); err != nil {
+		t.Fatal(err)
+	}
+	if n := loads.Load(); n != 0 {
+		t.Fatalf("this process read its own saves back %d times", n)
+	}
+}
+
+// A scan or cleanup running here sets a result of its own, newer than the
+// saved one, and a cleanup edits the result in memory: a newer save from
+// elsewhere waits until they are done.
+func TestNewerSaveWaitsForOwnScanOrCleanup(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	mine, _ := a.Last()
+	terminal, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	theirs, err := terminal.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := func(running, cleaning bool) {
+		a.mu.Lock()
+		a.running, a.cleaning = running, cleaning
+		a.mu.Unlock()
+	}
+	loads := countReads(t)
+	for _, busy := range [][2]bool{{true, false}, {false, true}} {
+		set(busy[0], busy[1])
+		if r, _ := a.Last(); r != mine {
+			t.Fatalf("running %v, cleaning %v: the result in memory was replaced", busy[0], busy[1])
+		}
+	}
+	if n := loads.Load(); n != 0 {
+		t.Fatalf("read a save %d times only to throw it away", n)
+	}
+	set(false, false)
+
+	// A scan or cleanup that begins while the newer save is read.
+	_, reading, release := holdReads(t)
+	read := make(chan *ScanResult)
+	go func() {
+		r, _ := a.Last()
+		read <- r
+	}()
+	waitRead(t, reading)
+	set(false, true)
+	close(release)
+	if r := <-read; r != mine {
+		t.Fatal("a read that ended during a cleanup replaced the result it edits")
+	}
+	set(false, false)
+	if r, _ := a.Last(); r == mine || r.Meta.ID != theirs.Meta.ID {
+		t.Fatal("once the cleanup is done the newer save is read")
+	}
+}
+
+// A scan here that finishes while a newer save from elsewhere is read is
+// newer still.
+func TestOwnScanDuringReloadWins(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	terminal, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := terminal.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	loads, reading, release := holdReads(t)
+	read := make(chan *ScanResult)
+	go func() {
+		r, _ := a.Last()
+		read <- r
+	}()
+	waitRead(t, reading)
+	res, err := a.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if r := <-read; r != res {
+		t.Fatal("a read that finished after a scan must return the scan's result")
+	}
+	if r, _ := a.Last(); r != res || loads.Load() != 1 {
+		t.Fatalf("the own scan must stay, read %d times", loads.Load())
+	}
+}
+
+// A save that is gone or cannot be read is no reason to stop showing the
+// scan in memory.
+func TestUnreadableSaveKeepsResult(t *testing.T) {
+	a, root := testApp(t)
+	res, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := filepath.Join(sys.StateDir(a.Env), "last.json")
+	if err := os.Remove(saved); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := a.Last(); r != res || err != nil {
+		t.Fatalf("without last.json: %v", err)
+	}
+	if err := state.WriteAtomic(saved, []byte("garbage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := a.Last(); r != res || err != nil {
+		t.Fatalf("with a damaged last.json: %v", err)
+	}
+}
+
+// Changes are counted from the scan shown: after reading a scan another
+// process made, of another folder here, the watcher follows that one.
+func TestReloadedScanIsWatched(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	watching := make(chan struct{})
+	go func() {
+		a.Watch(ctx)
+		close(watching)
+	}()
+	defer func() {
+		cancel()
+		<-watching
+	}()
+	watched := func() string {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.watch == nil {
+			return ""
+		}
+		return a.watch.root
+	}
+	for end := time.Now().Add(10 * time.Second); watched() == "" && time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+	}
+	if watched() == "" {
+		t.Fatal("not watching")
+	}
+	terminal, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := terminal.Scan(context.Background(), ScanOptions{Root: filepath.Join(root, "docs"), Full: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, err := a.Last(); err != nil || r.Meta.ID != res.Meta.ID {
+		t.Fatalf("%v", err)
+	}
+	if got := watched(); got != res.Tree.RootPath() {
+		t.Fatalf("watching %s, the scan shown is of %s", got, res.Tree.RootPath())
+	}
+}
+
 // Every page request re-reads the settings (a CORS check, a paired page's
 // token), so they change under a scan and under other requests all the time.
 func TestSettingsReloadsDoNotRaceWithScans(t *testing.T) {

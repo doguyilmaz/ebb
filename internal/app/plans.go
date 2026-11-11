@@ -194,7 +194,15 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 	a.mu.Unlock()
 	a.forgetCopies(gone)
 	r.Tree.Compact()
-	return a.saveLast(r)
+	saved, err := a.saveLast(r)
+	if err != nil {
+		return err
+	}
+	// r is the result in memory: Last reloads nothing while a cleanup runs.
+	a.mu.Lock()
+	a.curFile = saved
+	a.mu.Unlock()
+	return nil
 }
 
 func (a *App) Ops(limit int) ([]clean.Op, error) { return a.OpLog().List(limit) }
