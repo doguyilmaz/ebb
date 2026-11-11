@@ -730,3 +730,36 @@ func TestDuplicateSearchAndCleanup(t *testing.T) {
 		t.Fatalf("no scan during a search: %v", err)
 	}
 }
+
+// A search from before a restart is what the window shows until the next
+// one: a cleanup since must not leave a removed copy in it.
+func TestCleanupForgetsCopiesOfSearchBeforeRestart(t *testing.T) {
+	a, root := testApp(t)
+	write(t, filepath.Join(root, "docs", "x.bin"), 3<<20)
+	write(t, filepath.Join(root, "docs", "copy", "x.bin"), 3<<20)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.FindDuplicates(context.Background(), "", 0, nil)
+	if err != nil || len(res.Groups) != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	restarted, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extra := res.Groups[0].Copies[1].Path
+	p, err := restarted.Plan(clean.Request{Paths: []string{extra}, Source: "ui"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := restarted.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := restarted.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if st := restarted.Duplicates(); st.Result == nil || len(st.Result.Groups) != 0 {
+		t.Fatalf("a removed copy is still listed: %+v", st.Result)
+	}
+}

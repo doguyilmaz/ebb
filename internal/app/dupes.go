@@ -134,6 +134,12 @@ func (a *App) StopDuplicates() bool {
 func (a *App) Duplicates() api.DuplicatesState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	return api.DuplicatesState{Running: a.dupes.running, Stopped: a.dupes.stopped, Progress: a.dupes.progress, Result: a.lastDupes(), Error: a.dupes.err}
+}
+
+// lastDupes is the last search, read from duplicates.json the first time it
+// is needed. The caller holds a.mu.
+func (a *App) lastDupes() *dupes.Result {
 	if a.dupes.last == nil && !a.dupes.loaded {
 		a.dupes.loaded = true
 		var res dupes.Result
@@ -141,14 +147,15 @@ func (a *App) Duplicates() api.DuplicatesState {
 			a.dupes.last = &res
 		}
 	}
-	return api.DuplicatesState{Running: a.dupes.running, Stopped: a.dupes.stopped, Progress: a.dupes.progress, Result: a.dupes.last, Error: a.dupes.err}
+	return a.dupes.last
 }
 
 // forgetCopies drops copies a cleanup removed, and groups left with one.
+// The search may be one from before a restart that nobody looked at since.
 func (a *App) forgetCopies(gone []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.dupes.last == nil || len(gone) == 0 {
+	if len(gone) == 0 || a.lastDupes() == nil {
 		return
 	}
 	res := *a.dupes.last
