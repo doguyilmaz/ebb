@@ -115,7 +115,7 @@ func (a *App) update(ctx context.Context, root string, opt walk.Options, progres
 		from.putBack(set)
 		a.mu.Lock()
 		if a.cur == last {
-			a.cur = nil
+			a.cur, a.curGen = nil, a.curGen+1
 		}
 		a.mu.Unlock()
 	}
@@ -161,7 +161,7 @@ func (a *App) conclude(ctx context.Context, root string, t *tree.Tree, problems 
 		return nil, err
 	}
 	a.mu.Lock()
-	a.cur = out
+	a.cur, a.curGen = out, a.curGen+1
 	a.mu.Unlock()
 	return out, nil
 }

@@ -61,6 +61,37 @@ APFS clone groups. `Reclaimable` used to scan every shared group per call (36 s 
 detector); it now reads a per-node cache computed once per write in O(groups × depth): 1.4 s → 0.9 ms per 1,000 calls.
 | `GOGC=50` instead of the fixed memory limit (scales with disk size) | 41.6 s | 43.4 s | 345 MB |
 
+## history diff (real snapshots, 2026-11-11)
+
+`Explaining` compared every pair of changes and built a string for each comparison. It now sorts the changes by
+path once: everything below a folder is one run of that order, found with two binary searches, and a max tree
+gives the largest change of the run in each direction. Same result, byte-identical API responses.
+
+| Comparison | Changes in / kept | `Explaining` before | after | `GET /api/v1/history/diff` before | after |
+|---|---|---|---|---|---|
+| a week (the Overview default) | 9,147 / 4,993 | 2.1 s | 7 ms | 1.87–1.98 s | 31–37 ms |
+| oldest snapshot (3.5 weeks) | 15,054 / 8,369 | 6.2 s | 11 ms | 5.23–5.37 s | 40–48 ms |
+
+`BenchmarkExplaining` (10k synthetic changes, deep paths, mixed signs): 7–10 ms/op, 2.8 MB/op, 10k allocs/op; the
+pairwise version took 3.7 s/op, 9.6 GB/op, 69M allocs/op on the same data. The Overview waits for the week
+comparison before it shows anything, so the window went from ~2 s of empty background to the shell and page at
+170–290 ms (headless Chrome, warm server, dark scheme).
+
+### loading the saved scan (18.5 MB `last.tree`)
+
+Every caller of `Last` that found nothing in memory read its own copy of the tree, including the watcher that
+starts with the server, so even one request loaded it twice. Callers now wait for the read under way. Peak RSS of a
+cold server answering N `/status` requests at once:
+
+| N | before | after |
+|---|---|---|
+| 1 | 246–250 MB | 128–145 MB |
+| 4 | 587–599 MB | 146 MB |
+| 8 | 976–1054 MB | 144–145 MB |
+
+The slowest answer is now the time of one read whatever N is: 0.45–0.47 s against 0.49–0.54 s for N = 1 in the same
+interleaved runs, and up to 0.62 s for N = 8 before.
+
 ## ui (Explore, real scan, 2834×1285 canvas at 2× DPR, sunburst of ~3,500 arcs)
 
 | Change | Hover to next frame, median / p95 |

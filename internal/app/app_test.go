@@ -7,7 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
@@ -82,6 +85,91 @@ func TestLastRoundTrip(t *testing.T) {
 	}
 	if got.Tree.Len() != res.Tree.Len() || got.Meta.ID != res.Meta.ID || len(got.Findings) != len(res.Findings) {
 		t.Fatalf("reloaded %+v vs %+v", got.Meta, res.Meta)
+	}
+}
+
+// holdReads makes readLast count its calls and wait for release.
+func holdReads(t *testing.T) (loads *atomic.Int32, reading <-chan struct{}, release chan struct{}) {
+	t.Helper()
+	read := readLast
+	t.Cleanup(func() { readLast = read })
+	loads, started, release := new(atomic.Int32), make(chan struct{}, 100), make(chan struct{})
+	readLast = func(a *App) (*ScanResult, error) {
+		loads.Add(1)
+		started <- struct{}{}
+		<-release
+		return read(a)
+	}
+	return loads, started, release
+}
+
+func TestColdLastLoadsOnce(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	synctest.Test(t, func(t *testing.T) {
+		loads, _, release := holdReads(t)
+		const callers = 8
+		got := make([]*ScanResult, callers)
+		var wg sync.WaitGroup
+		for i := range callers {
+			wg.Go(func() {
+				r, err := fresh.Last()
+				if err != nil {
+					t.Error(err)
+				}
+				got[i] = r
+			})
+		}
+		// Every caller now reads the saved scan or waits for a read.
+		synctest.Wait()
+		close(release)
+		wg.Wait()
+		if n := loads.Load(); n != 1 {
+			t.Fatalf("%d callers read the saved scan %d times", callers, n)
+		}
+		for _, r := range got {
+			if r == nil || r != got[0] {
+				t.Fatal("every caller must get the same result")
+			}
+		}
+	})
+	if r, err := fresh.Last(); err != nil || r.Tree.Len() == 0 {
+		t.Fatalf("the read result stays in memory: %v", err)
+	}
+}
+
+func TestOlderReadDoesNotReplaceNewerScan(t *testing.T) {
+	a, root := testApp(t)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, reading, release := holdReads(t)
+	read := make(chan *ScanResult)
+	go func() {
+		r, _ := fresh.Last()
+		read <- r
+	}()
+	<-reading
+	res, err := fresh.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if r := <-read; r != res {
+		t.Fatal("a read that finished after a scan must return the scan's result")
+	}
+	if r, _ := fresh.Last(); r != res {
+		t.Fatal("the older saved scan replaced the newer result")
 	}
 }
 

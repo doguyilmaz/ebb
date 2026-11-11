@@ -61,7 +61,11 @@ type App struct {
 	scanErr  string
 	progress *api.Progress
 	cur      *ScanResult
-	plans    map[string]*planEntry
+	// curGen counts every change of cur, so a read of the saved scan that
+	// started before a newer result was set never puts the older one back.
+	curGen  uint64
+	loading *lastLoad
+	plans   map[string]*planEntry
 }
 
 func New(env sys.Env) (*App, error) {
