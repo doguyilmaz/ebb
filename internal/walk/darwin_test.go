@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -70,7 +69,11 @@ func TestCloneUniqueBytes(t *testing.T) {
 }
 
 func TestDuMatches(t *testing.T) {
-	root := runtime.GOROOT()
+	goroot, err := exec.Command("go", "env", "GOROOT").Output()
+	if err != nil {
+		t.Skip("go unavailable")
+	}
+	root := strings.TrimSpace(string(goroot))
 	out, err := exec.Command("du", "-skx", root).Output()
 	if err != nil {
 		t.Skip("du unavailable")

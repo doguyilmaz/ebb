@@ -20,7 +20,7 @@ func TestPrintable(t *testing.T) {
 }
 
 func TestPrintableHidesTerminalAndBidiControls(t *testing.T) {
-	if got := Printable("a\x1b[2Jb‮c"); got != "a?[2Jb?c" {
+	if got := Printable("a\x1b[2Jb\u202ec"); got != "a?[2Jb?c" {
 		t.Fatalf("%q", got)
 	}
 }
