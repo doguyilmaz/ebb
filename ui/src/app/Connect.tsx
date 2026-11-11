@@ -9,8 +9,7 @@ import { Command } from "#/ui/Command.tsx";
 import { showSplash } from "./splash.ts";
 
 type State =
-  // again: the window had ebb and lost it, so it says it is looking instead of showing the splash.
-  | { kind: "connecting"; again?: boolean }
+  | { kind: "connecting" }
   | { kind: "absent" }
   | { kind: "not-allowed" }
   | { kind: "unpaired"; expired: boolean }
@@ -104,7 +103,7 @@ export function Connect({ children }: { children: ReactNode }) {
     const off = onAuthRejected(() => {
       if (!isRemote()) return setState({ kind: "no-token" });
       forgetToken();
-      setState({ kind: "connecting", again: true });
+      setState({ kind: "connecting" });
       void attempt();
     });
     const unlisten = listen(qc);
@@ -114,7 +113,7 @@ export function Connect({ children }: { children: ReactNode }) {
     };
   }, [state.kind, qc, attempt]);
 
-  // The router renders nothing until the first page has all its data; the splash covers that wait and Root ends it.
+  // The router renders nothing until the first page has all its data; the splash covers that wait and main.tsx ends it.
   if (state.kind === "ready")
     return (
       <>
@@ -139,7 +138,7 @@ export function Connect({ children }: { children: ReactNode }) {
 
   switch (state.kind) {
     case "connecting":
-      if (!slow && !state.again) return <Splash />;
+      if (!slow) return <Splash />;
       return (
         <Gate version={version} title="Looking for ebb…">
           <p className="muted row" role="status">

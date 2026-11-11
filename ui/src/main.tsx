@@ -11,7 +11,7 @@ import "./styles/app.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } } });
 
-// Root ends the splash with the first page; a first load that fails before Root renders must not stay hidden behind it.
+// The router resolves once it has rendered the first page, failed or not, and before that frame is painted.
 router.subscribe("onResolved", endSplash);
 
 createRoot(document.getElementById("app")!).render(

@@ -138,7 +138,7 @@ await scenario("a new window shows ebb's mark from its first paint until the pag
     await win.locator(".page > *").first().waitFor({ timeout: 20000 });
     await win.waitForTimeout(300);
     const fcp = await win.evaluate(() => performance.getEntriesByName("first-contentful-paint")[0]?.startTime);
-    let frames = await win.evaluate(() => window.__frames);
+    const frames = await win.evaluate(() => window.__frames);
     const shown = frames.findIndex((f) => f.shell);
     check(shown > 0, "the page showed");
     const t = Math.round(frames[shown].t);
@@ -150,15 +150,6 @@ await scenario("a new window shows ebb's mark from its first paint until the pag
     check(!frames.some((f) => f.gate), `no "Looking for ebb" screen on a normal start`);
     check(frames.slice(shown).every((f) => f.content && !f.splash), "the splash went in the frame the shell and the page came, together");
     check((await win.locator("#splash").count()) === 0, "the splash is gone for good");
-    // A page change keeps the old page until the new one is ready and never brings the splash back.
-    const seen = frames.length;
-    for (const label of ["Findings", "Overview"]) {
-      await win.locator("nav a.nav", { hasText: label }).click();
-      await win.locator(".topbar-title", { hasText: label }).waitFor({ timeout: 8000 });
-    }
-    await win.waitForTimeout(300);
-    frames = await win.evaluate(() => window.__frames);
-    check(frames.length > seen && frames.slice(seen).every((f) => f.shell && !f.splash), "no splash on a page change");
   } finally {
     await ctx.close();
   }

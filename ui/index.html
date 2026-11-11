@@ -8,10 +8,9 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preload" href="/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <!-- The splash's mark and name, also the sidebar's and the headings': fetched with the stylesheet, so the first
-         paint has them instead of the mark popping in or the name changing font a frame later. -->
+    <!-- The splash's name, also the sidebar's and the headings': fetched with the stylesheet instead of only once a
+         layout asks for it, so the name changes font sooner. -->
     <link rel="preload" href="/fonts/ibm-plex-sans-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/favicon.svg" as="image" type="image/svg+xml" />
     <script src="/theme.js"></script>
     <style>
       /* The splash is painted before any script runs. Its colours are the theme's own, from the app's stylesheet,
@@ -20,10 +19,10 @@
       .splash[hidden] { display: none; }
       .splash img { display: block; }
       .splash-name { font-size: 22px; font-weight: 600; line-height: 1; letter-spacing: -0.01em; }
-      /* A start that takes a while says so; a quick one is over before this appears. */
+      /* A start that takes a while says so; a quick one is over before this appears. Reduced motion shows it at once
+         (app.css). */
       .splash-note { font-size: 12.5px; line-height: 1.5; color: var(--text-3); opacity: 0; animation: splash-note 400ms ease-out 900ms forwards; }
       @keyframes splash-note { to { opacity: 1; } }
-      @media (prefers-reduced-motion: reduce) { .splash-note { animation: none; opacity: 1; } }
     </style>
   </head>
   <body>

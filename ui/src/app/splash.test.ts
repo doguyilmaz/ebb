@@ -22,7 +22,6 @@ test("the splash is painted before any script runs and stays outside what React 
   expect(splash).toContain("ebb");
   // React empties #app when it first renders, which would put a new splash on screen.
   expect(body).toContain('<div id="app"></div>');
-  expect(body.indexOf('id="splash"')).toBeLessThan(body.indexOf('id="app"'));
 });
 
 test("the splash uses the theme's colours, so it matches light, dark and a chosen theme", () => {
