@@ -36,9 +36,10 @@ func errInvalidOrigin(o string) error {
 }
 
 // reloadConfig re-reads config.toml so a grant made by the CLI reaches a
-// server that is already running.
+// server that is already running. A file that does not parse, or that New
+// would refuse, leaves the settings as they were.
 func (a *App) reloadConfig() config.Config {
-	if cfg, err := config.Load(a.Env); err == nil {
+	if cfg, err := loadConfig(a.Env); err == nil {
 		a.mu.Lock()
 		a.cfg = cfg
 		a.mu.Unlock()

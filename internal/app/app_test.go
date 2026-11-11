@@ -610,6 +610,26 @@ func TestConfigBadLargeFileFails(t *testing.T) {
 	}
 }
 
+// A typo made while ebb runs cannot stop it, but must not make every file a
+// large one either: the settings stay as they were, as when the file does
+// not parse at all.
+func TestBadLargeFileWhileRunningKeepsTheSettings(t *testing.T) {
+	a, home := cleanApp(t)
+	write(t, filepath.Join(home, "Movies", "clip.mov"), 2<<20)
+	if err := os.WriteFile(filepath.Join(sys.ConfigDir(a.Env), "config.toml"), []byte("[scan]\nlarge_file = \"lots\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if s := a.Settings(); s.LargeFile != "1GiB" {
+		t.Fatalf("settings show large_file %q", s.LargeFile)
+	}
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: home, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if fr, _ := a.Findings("large-file", 0, true); len(fr.Findings) != 0 {
+		t.Fatalf("a 2 MiB file is listed as large: %+v", fr.Findings[0].Evidence)
+	}
+}
+
 func hasFinding(fs []api.FindingView, id string) bool {
 	for _, f := range fs {
 		if f.ID == id {
