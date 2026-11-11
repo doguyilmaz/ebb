@@ -49,12 +49,14 @@ type App struct {
 		result sources.Packages
 	}
 	dupes struct {
-		running, loaded bool
-		stopped         bool
-		stop            context.CancelFunc
-		progress        *dupes.Progress
-		last            *dupes.Result
-		err             string
+		running  bool
+		stopped  bool
+		stop     context.CancelFunc
+		progress *dupes.Progress
+		last     *dupes.Result
+		// file is duplicates.json as it was when last was read from it or saved.
+		file os.FileInfo
+		err  string
 	}
 	stop     context.CancelFunc
 	watch    *watcher

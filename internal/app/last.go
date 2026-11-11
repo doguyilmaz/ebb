@@ -26,20 +26,21 @@ func (a *App) saveLast(r *ScanResult) (os.FileInfo, error) {
 	if err := state.SaveJSON(a.statePath("last.json"), r); err != nil {
 		return nil, err
 	}
-	return a.savedLast(), nil
+	return fileNow(a.statePath("last.json")), nil
 }
 
-// savedLast is last.json as it is on disk now; nil when it is not there.
-func (a *App) savedLast() os.FileInfo {
-	fi, err := os.Stat(a.statePath("last.json"))
+// fileNow is the state file at path as it is on disk now; nil when it is
+// not there.
+func fileNow(path string) os.FileInfo {
+	fi, err := os.Stat(path)
 	if err != nil {
 		return nil
 	}
 	return fi
 }
 
-// sameSave reports whether two looks at last.json saw the same save. Every
-// save writes a new file and renames it into place, so a newer save is
+// sameSave reports whether two looks at a state file saw the same save.
+// Every save writes a new file and renames it into place, so a newer save is
 // another file.
 func sameSave(x, y os.FileInfo) bool {
 	return os.SameFile(x, y) && x.Size() == y.Size() && x.ModTime().Equal(y.ModTime())
@@ -67,7 +68,7 @@ func (a *App) Last() (r *ScanResult, err error) {
 	a.mu.Lock()
 	// Looked at under the lock, so it is never older than a save this
 	// process made and recorded meanwhile.
-	saved := a.savedLast()
+	saved := fileNow(a.statePath("last.json"))
 	cur := a.cur
 	if cur != nil && (sameSave(saved, a.curFile) || a.running || a.cleaning) {
 		a.mu.Unlock()

@@ -108,7 +108,8 @@ func (a *App) endSearch(res *dupes.Result, err error) {
 	defer a.mu.Unlock()
 	a.dupes.running, a.dupes.stop = false, nil
 	if res != nil {
-		a.dupes.last = res
+		// findDuplicates saved it: not news to this process.
+		a.dupes.last, a.dupes.file = res, fileNow(a.statePath("duplicates.json"))
 	}
 	switch {
 	case errors.Is(err, context.Canceled):
@@ -137,15 +138,21 @@ func (a *App) Duplicates() api.DuplicatesState {
 	return api.DuplicatesState{Running: a.dupes.running, Stopped: a.dupes.stopped, Progress: a.dupes.progress, Result: a.lastDupes(), Error: a.dupes.err}
 }
 
-// lastDupes is the last search, read from duplicates.json the first time it
-// is needed. The caller holds a.mu.
+// lastDupes is the last search: the one in memory, or the one in
+// duplicates.json when that is another save, from before a restart or from a
+// search or cleanup in a terminal. Not while a search runs here, which saves
+// a newer one. The caller holds a.mu.
 func (a *App) lastDupes() *dupes.Result {
-	if a.dupes.last == nil && !a.dupes.loaded {
-		a.dupes.loaded = true
-		var res dupes.Result
-		if state.LoadJSON(a.statePath("duplicates.json"), &res) == nil {
-			a.dupes.last = &res
-		}
+	path := a.statePath("duplicates.json")
+	fi := fileNow(path)
+	if fi == nil || a.dupes.running || sameSave(fi, a.dupes.file) {
+		return a.dupes.last
+	}
+	// Once per save, so a file that cannot be read is not read on every request.
+	a.dupes.file = fi
+	var res dupes.Result
+	if state.LoadJSON(path, &res) == nil {
+		a.dupes.last = &res
 	}
 	return a.dupes.last
 }
@@ -175,5 +182,7 @@ func (a *App) forgetCopies(gone []string) {
 		res.Wasted += g.Wasted
 	}
 	a.dupes.last = &res
-	_ = state.SaveJSON(a.statePath("duplicates.json"), res)
+	if state.SaveJSON(a.statePath("duplicates.json"), res) == nil {
+		a.dupes.file = fileNow(a.statePath("duplicates.json"))
+	}
 }

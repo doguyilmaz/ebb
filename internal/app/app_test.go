@@ -759,7 +759,75 @@ func TestCleanupForgetsCopiesOfSearchBeforeRestart(t *testing.T) {
 	if res, err := restarted.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 1 {
 		t.Fatalf("%+v %v", res, err)
 	}
+	restarted.mu.Lock()
+	kept := restarted.dupes.last
+	restarted.mu.Unlock()
 	if st := restarted.Duplicates(); st.Result == nil || len(st.Result.Groups) != 0 {
 		t.Fatalf("a removed copy is still listed: %+v", st.Result)
+	} else if st.Result != kept {
+		t.Fatal("this process read back the search it saved itself")
+	}
+}
+
+// A cleanup or a search in a terminal saves the duplicates from a process of
+// its own; a window already open must not keep listing a copy that is gone.
+func TestDuplicatesShowWhatAnotherProcessSaved(t *testing.T) {
+	a, root := testApp(t)
+	write(t, filepath.Join(root, "docs", "x.bin"), 3<<20)
+	write(t, filepath.Join(root, "docs", "copy", "x.bin"), 3<<20)
+	write(t, filepath.Join(root, "docs", "y.bin"), 4<<20)
+	write(t, filepath.Join(root, "docs", "copy", "y.bin"), 4<<20)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.FindDuplicates(context.Background(), "", 0, nil)
+	if err != nil || len(res.Groups) != 2 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if st := a.Duplicates(); st.Result != res {
+		t.Fatal("this process's own search must not be read back")
+	}
+	terminal, err := New(a.Env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extra := res.Groups[0].Copies[1].Path
+	p, err := terminal.Plan(clean.Request{Paths: []string{extra}, Source: "cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := terminal.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := terminal.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	st := a.Duplicates()
+	if st.Result == nil || len(st.Result.Groups) != 1 {
+		t.Fatalf("a copy removed in the terminal is still listed: %+v", st.Result)
+	}
+	if err := os.Remove(st.Result.Groups[0].Copies[1].Path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := terminal.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	// A search running here saves its own result before it ends: until then
+	// the file says nothing this process needs to read.
+	shown := a.Duplicates().Result
+	a.mu.Lock()
+	a.dupes.running = true
+	a.mu.Unlock()
+	if _, err := terminal.FindDuplicates(context.Background(), "", 0, nil); err != nil {
+		t.Fatal(err)
+	}
+	if st := a.Duplicates(); st.Result != shown {
+		t.Fatal("read the saved search while a search runs here")
+	}
+	a.mu.Lock()
+	a.dupes.running = false
+	a.mu.Unlock()
+	if st := a.Duplicates(); st.Result == nil || len(st.Result.Groups) != 0 {
+		t.Fatalf("the terminal's search is not shown: %+v", st.Result)
 	}
 }
