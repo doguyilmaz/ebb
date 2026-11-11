@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -574,6 +575,35 @@ func TestDefaultRootSandboxed(t *testing.T) {
 		t.Fatalf("sandboxed default root %q", a.DefaultRoot())
 	}
 	_ = state.NewToken
+}
+
+// Grants and settings each read config.toml, change their part and write it
+// all back: two at once must not undo each other.
+func TestConcurrentConfigChangesAllKept(t *testing.T) {
+	a, _ := testApp(t)
+	const grants = 10
+	var wg sync.WaitGroup
+	for i := range grants {
+		wg.Go(func() {
+			if _, err := a.AllowWebOrigin(fmt.Sprintf("https://o%d.example", i)); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Go(func() {
+		s := a.Settings()
+		s.Threads = 3
+		if _, err := a.SaveSettings(s); err != nil {
+			t.Error(err)
+		}
+	})
+	wg.Wait()
+	if got := a.WebAccess().Allowed; len(got) != grants+1 {
+		t.Fatalf("%d of %d allowed origins kept: %v", len(got), grants+1, got)
+	}
+	if s := a.Settings(); s.Threads != 3 {
+		t.Fatalf("threads %d", s.Threads)
+	}
 }
 
 func TestNormalizeOrigin(t *testing.T) {

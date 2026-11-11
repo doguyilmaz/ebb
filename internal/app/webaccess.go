@@ -86,6 +86,8 @@ func (a *App) AllowWebOrigin(origin string) (api.WebAccess, error) {
 	if !ok {
 		return api.WebAccess{}, errInvalidOrigin(origin)
 	}
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	cfg := a.reloadConfig()
 	if !slices.Contains(cfg.Server.WebOrigins, norm) {
 		cfg.Server.WebOrigins = append(slices.Clone(cfg.Server.WebOrigins), norm)
@@ -103,6 +105,8 @@ func (a *App) DenyWebOrigin(origin string) (api.WebAccess, error) {
 	if !ok {
 		return api.WebAccess{}, errInvalidOrigin(origin)
 	}
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	cfg := a.reloadConfig()
 	before := len(cfg.Server.WebOrigins)
 	cfg.Server.WebOrigins = slices.DeleteFunc(slices.Clone(cfg.Server.WebOrigins), func(o string) bool { return o == norm })

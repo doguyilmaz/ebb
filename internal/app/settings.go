@@ -39,6 +39,8 @@ func (a *App) SaveSettings(s api.Settings) (api.Settings, error) {
 			return api.Settings{}, fmt.Errorf("scan root %q is not a folder", s.Root)
 		}
 	}
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	c := a.reloadConfig()
 	c.Scan.Root, c.Scan.Threads, c.Scan.StaleDays, c.Scan.LargeFile, c.Clean.Protect = s.Root, s.Threads, s.StaleDays, s.LargeFile, s.Protect
 	c.Daemon.Scans, c.Daemon.LowSpaceGB = s.BackgroundScans, s.LowSpaceGB

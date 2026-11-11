@@ -40,7 +40,10 @@ type App struct {
 	mu sync.Mutex
 	// cfg is replaced each time config.toml is read again, which page
 	// requests do all the time, so it is read through Config.
-	cfg      config.Config
+	cfg config.Config
+	// cfgMu makes changes to config.toml one at a time: each reads the file
+	// and writes all of it back.
+	cfgMu    sync.Mutex
 	pairMu   sync.Mutex
 	running  bool
 	cleaning bool
