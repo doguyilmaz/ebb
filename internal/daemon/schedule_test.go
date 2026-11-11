@@ -23,6 +23,9 @@ func TestNextWork(t *testing.T) {
 		{"still replaying what changed", func(c *Conditions) { c.Pending = true }, Nothing},
 		{"a week since the last full scan", func(c *Conditions) { c.LastFull = now.Add(-8 * 24 * time.Hour) }, Full},
 		{"never scanned", func(c *Conditions) { c.LastScan, c.LastFull = time.Time{}, time.Time{} }, Nothing},
+		// A scan that failed leaves the saved scan old: the try itself has to count.
+		{"tried a few minutes ago without finishing", func(c *Conditions) { c.Lost, c.LastTry = true, now.Add(-5*time.Minute) }, Nothing},
+		{"tried longer ago than the gap without finishing", func(c *Conditions) { c.Lost, c.LastTry = true, now.Add(-40*time.Minute) }, Full},
 	}
 	for _, tc := range cases {
 		c := base

@@ -42,13 +42,16 @@ const check = (cond, what) => {
 };
 
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const watch = (p) => {
+  p.on("console", (m) => m.type() === "error" && !/status of 409/.test(m.text()) && problems.push(`console: ${m.text()}`));
+  p.on("pageerror", (e) => problems.push(`page error: ${e}`));
+  p.on("response", (r) => {
+    // 409 before the first scan is the "never scanned" state the welcome screen handles.
+    if (r.status() >= 400 && !(r.status() === 409 && r.url().includes("/api/"))) problems.push(`HTTP ${r.status()} ${r.request().method()} ${r.url().replace(/token=[0-9a-f]+/, "token=…")}`);
+  });
+};
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-page.on("console", (m) => m.type() === "error" && !/status of 409/.test(m.text()) && problems.push(`console: ${m.text()}`));
-page.on("pageerror", (e) => problems.push(`page error: ${e}`));
-page.on("response", (r) => {
-  // 409 before the first scan is the "never scanned" state the welcome screen handles.
-  if (r.status() >= 400 && !(r.status() === 409 && r.url().includes("/api/"))) problems.push(`HTTP ${r.status()} ${r.request().method()} ${r.url().replace(/token=[0-9a-f]+/, "token=…")}`);
-});
+watch(page);
 
 let inflight = 0;
 const counted = (r) => r.url().includes("/api/") && !r.url().includes("/events");
@@ -83,6 +86,7 @@ async function scenario(name, fn) {
 await scenario("opens with its link and welcomes a first run", async () => {
   await page.goto(`${BASE}/#token=${TOKEN}`);
   await page.getByText("See where your disk space went").waitFor({ timeout: 8000 });
+  check((await page.locator("#splash").count()) === 0, "the splash made way for the welcome");
   await shot("welcome");
 });
 
@@ -101,6 +105,54 @@ await scenario("first scan shows live progress, then the overview and the tour",
   check(st.body.last && st.body.last.files > 0, "status names the scan");
   await settle();
   await shot("overview");
+});
+
+await scenario("a new window shows ebb's mark from its first paint until the page is ready", async () => {
+  // A fresh window whose overview waits for slow history answers, like a busy ebb or a slow Mac.
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
+  try {
+    await ctx.addInitScript(() => {
+      localStorage.setItem("ebb.tour", "seen");
+      window.__frames = [];
+      const tick = () => {
+        const splash = document.getElementById("splash");
+        window.__frames.push({
+          t: performance.now(),
+          splash: !!splash && !splash.hidden && splash.getBoundingClientRect().width > 0,
+          gate: !!document.querySelector(".gate"),
+          shell: !!document.querySelector(".shell"),
+          content: !!document.querySelector(".page > *"),
+        });
+        if (performance.now() < 30_000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    const delay = 1500;
+    await ctx.route("**/api/v1/history**", async (route) => {
+      await new Promise((r) => setTimeout(r, delay));
+      await route.continue().catch(() => {});
+    });
+    const win = await ctx.newPage();
+    watch(win);
+    await win.goto(`${BASE}/#token=${TOKEN}`);
+    await win.locator(".page > *").first().waitFor({ timeout: 20000 });
+    await win.waitForTimeout(300);
+    const fcp = await win.evaluate(() => performance.getEntriesByName("first-contentful-paint")[0]?.startTime);
+    const frames = await win.evaluate(() => window.__frames);
+    const shown = frames.findIndex((f) => f.shell);
+    check(shown > 0, "the page showed");
+    const t = Math.round(frames[shown].t);
+    // Relative to the page, which waits at least one slow answer: something is on screen long before it.
+    check(fcp !== undefined && fcp < t - delay / 2, `first contentful paint at ${Math.round(fcp)} ms, well before the page at ${t} ms`);
+    const first = frames.findIndex((f) => f.splash);
+    check(first >= 0 && first < shown, "the splash showed before the page");
+    check(frames.slice(first, shown).every((f) => f.splash), "the splash stayed on every frame until the page");
+    check(!frames.some((f) => f.gate), `no "Looking for ebb" screen on a normal start`);
+    check(frames.slice(shown).every((f) => f.content && !f.splash), "the splash went in the frame the shell and the page came, together");
+    check((await win.locator("#splash").count()) === 0, "the splash is gone for good");
+  } finally {
+    await ctx.close();
+  }
 });
 
 await scenario("a page change shows the whole page at once", async () => {

@@ -1,11 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, MessageSquareText, RefreshCw, ScanSearch, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { listen } from "#/api/events.ts";
 import { apiPort, claim, connect, forgetToken, isRemote, onAuthRejected, onTokenFromOtherTab, pairedBefore, setApiPort, token, wasEmbedded } from "#/api/client.ts";
 import { detectOS, isSafari } from "#/lib/os.ts";
 import { isBehind, pageVersion, versionLabel } from "#/lib/version.ts";
 import { Command } from "#/ui/Command.tsx";
+import { showSplash } from "./splash.ts";
 
 type State =
   | { kind: "connecting" }
@@ -15,6 +16,7 @@ type State =
   | { kind: "no-token" }
   | { kind: "ready" };
 
+const LOOKING_MS = 1000;
 const RETRY_MS = 2500;
 const MAX_RETRY_MS = 30_000;
 const RELEASES = "https://github.com/doguyilmaz/ebb/releases/latest";
@@ -31,6 +33,13 @@ export function Connect({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState("");
   const qc = useQueryClient();
+  // ebb usually answers within milliseconds, so "Looking for ebb…" would only flash for a frame; the splash stays
+  // up instead, and that screen appears only once looking takes a while.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), LOOKING_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const attempt = useCallback(async () => {
     const c = await connect();
@@ -104,7 +113,14 @@ export function Connect({ children }: { children: ReactNode }) {
     };
   }, [state.kind, qc, attempt]);
 
-  if (state.kind === "ready") return <>{children}</>;
+  // The router renders nothing until the first page has all its data; the splash covers that wait and main.tsx ends it.
+  if (state.kind === "ready")
+    return (
+      <>
+        {children}
+        <Splash />
+      </>
+    );
 
   const retry = async () => {
     setBusy(true);
@@ -122,6 +138,7 @@ export function Connect({ children }: { children: ReactNode }) {
 
   switch (state.kind) {
     case "connecting":
+      if (!slow) return <Splash />;
       return (
         <Gate version={version} title="Looking for ebb…">
           <p className="muted row" role="status">
@@ -236,6 +253,15 @@ const features = [
   { icon: MessageSquareText, text: "Explains every large item" },
   { icon: ShieldCheck, text: "Cleans only what you approve" },
 ];
+
+/** Keeps the splash from index.html on screen while mounted; a layout effect, so it goes in the frame its successor appears. */
+function Splash() {
+  useLayoutEffect(() => {
+    showSplash(true);
+    return () => showSplash(false);
+  }, []);
+  return null;
+}
 
 type Version = { label: string; tip: string };
 

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
@@ -41,6 +42,10 @@ type daemon struct {
 	alert Alert
 	// access reports Full Disk Access; tests replace it.
 	access func(home string) bool
+	// changes says what the watcher knows; tests replace it, nil means the app's.
+	changes func() *api.Changes
+	// logMu keeps lines whole: a scan reports how it ended from its own goroutine.
+	logMu sync.Mutex
 }
 
 // ErrRunning: one service per state folder, or two would scan and serve at once.
@@ -157,15 +162,16 @@ func (d *daemon) check(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	c := Conditions{Now: now, LastScan: last.Meta.Time, LastFull: d.lastFull(last), OnAC: onAC(ctx, env), Idle: idle(ctx, env), Lost: true}
-	if ch := d.a.Changes(); ch != nil {
-		c.Changed, c.Pending, c.Lost = ch.Folders, !ch.Ready, ch.Lost
+	c := Conditions{Now: now, LastScan: last.Meta.Time, LastFull: d.lastFull(last), LastTry: d.st.LastWorkAt, OnAC: onAC(ctx, env), Idle: idle(ctx, env), Lost: true}
+	why := "ebb was not following what changed"
+	if ch := d.followed(); ch != nil {
+		c.Changed, c.Pending, c.Lost, why = ch.Folders, !ch.Ready, ch.Lost, ch.LostWhy
 	}
 	work := NextWork(c)
 	if work == Nothing {
 		return
 	}
-	err = d.s.StartScan(app.ScanOptions{Root: last.Meta.Root, Gentle: true, Full: work == Full})
+	err = d.s.StartScan(app.ScanOptions{Root: last.Meta.Root, Gentle: true, Full: work == Full}, func(err error) { d.scanEnded(work, err) })
 	if errors.Is(err, app.ErrScanRunning) || errors.Is(err, app.ErrCleaning) || errors.Is(err, app.ErrSearching) {
 		return
 	}
@@ -174,7 +180,28 @@ func (d *daemon) check(ctx context.Context) {
 		return
 	}
 	d.st.LastWork, d.st.LastWorkAt = work.String(), now
+	// A full scan takes minutes: the log says why one was needed.
+	if work == Full && c.Lost && why != "" {
+		d.logf("full scan started (changes unknown: %s)", why)
+		return
+	}
 	d.logf("%s scan started", work)
+}
+
+func (d *daemon) followed() *api.Changes {
+	if d.changes != nil {
+		return d.changes()
+	}
+	return d.a.Changes()
+}
+
+// scanEnded logs why a background scan failed, so the log tells a scan that
+// keeps failing from one that keeps running. A stopped scan is someone's
+// choice, not a failure.
+func (d *daemon) scanEnded(work Work, err error) {
+	if err != nil && !errors.Is(err, app.ErrScanStopped) {
+		d.logf("%s scan failed: %v", work, err)
+	}
 }
 
 // lastFull is when root was last read in full; never means now.
@@ -194,6 +221,8 @@ func (d *daemon) lastFull(last *app.ScanResult) time.Time {
 func (d *daemon) save() { _ = svc.WriteStatus(d.dir, d.st) }
 
 func (d *daemon) logf(format string, args ...any) {
+	d.logMu.Lock()
+	defer d.logMu.Unlock()
 	fmt.Fprintf(d.opt.Out, "%s %s\n", time.Now().Format(time.RFC3339), fmt.Sprintf(format, args...))
 }
 

@@ -2,11 +2,13 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,6 +108,129 @@ func TestCheckScansOnlyOnPowerWhileIdle(t *testing.T) {
 	waitScan(t, a)
 	if st := a.ScanState(); st.Error != "" {
 		t.Fatal(st.Error)
+	}
+}
+
+// logBuf is a log a scan can write to from its own goroutine while the test reads it.
+type logBuf struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (l *logBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *logBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+// waitLog waits until the log holds n lines containing s.
+func waitLog(t *testing.T, l *logBuf, s string, n int) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); strings.Count(l.String(), s) < n; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("waited for %d lines with %q:\n%s", n, s, l.String())
+		}
+	}
+}
+
+func TestCheckWaitsAfterAFailedScan(t *testing.T) {
+	a, env, _, root := sandbox(t)
+	out := &logBuf{}
+	d := &daemon{a: a, s: server.New(a, "test", "tok"), dir: sys.StateDir(env), opt: Options{Out: out}, access: func(string) bool { return true }}
+	if _, err := a.Scan(context.Background(), app.ScanOptions{Root: root}, nil); err != nil {
+		t.Fatal(err)
+	}
+	// A folder where the saved tree goes makes saving the scan fail, the way
+	// a full disk did: the history snapshot is written, the saved scan stays old.
+	saved := filepath.Join(sys.StateDir(env), "last.tree")
+	if err := os.Remove(saved); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(saved, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env.Time = env.Time.Add(2 * time.Hour)
+
+	d.check(context.Background())
+	if d.st.LastWork != "full" {
+		t.Fatalf("idle on power with changes unknown: %+v", d.st)
+	}
+	tried := d.st.LastWorkAt
+	waitLog(t, out, "full scan failed: ", 1)
+	if !strings.Contains(out.String(), "last.tree") {
+		t.Fatalf("the log does not say why:\n%s", out)
+	}
+
+	env.Time = env.Time.Add(5 * time.Minute)
+	d.check(context.Background())
+	if !d.st.LastWorkAt.Equal(tried) || a.ScanState().Running || strings.Count(out.String(), "scan started") != 1 {
+		t.Fatalf("started again 5 minutes after a failed scan: %+v\n%s", d.st, out)
+	}
+	if n := strings.Count(out.String(), "scan failed"); n != 1 {
+		t.Fatalf("%d failure lines for one failed scan:\n%s", n, out)
+	}
+
+	env.Time = env.Time.Add(30 * time.Minute)
+	d.check(context.Background())
+	if !d.st.LastWorkAt.After(tried) {
+		t.Fatalf("never tried again: %+v\n%s", d.st, out)
+	}
+	waitLog(t, out, "full scan failed: ", 2)
+}
+
+func TestCheckLogsWhyAFullScanIsNeeded(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		changes func() *api.Changes
+		line    string
+	}{
+		{"nobody followed", nil, "full scan started (changes unknown: ebb was not following what changed)\n"},
+		{"events dropped", func() *api.Changes {
+			return &api.Changes{Lost: true, Ready: true, LostWhy: "the kernel dropped events"}
+		}, "full scan started (changes unknown: the kernel dropped events)\n"},
+		{"changes known", func() *api.Changes { return &api.Changes{Folders: 12, Ready: true} }, "update scan started\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a, env, _, root := sandbox(t)
+			out := &logBuf{}
+			d := &daemon{a: a, s: server.New(a, "test", "tok"), dir: sys.StateDir(env), opt: Options{Out: out}, access: func(string) bool { return true }, changes: tc.changes}
+			if _, err := a.Scan(context.Background(), app.ScanOptions{Root: root}, nil); err != nil {
+				t.Fatal(err)
+			}
+			env.Time = env.Time.Add(2 * time.Hour)
+			d.check(context.Background())
+			waitScan(t, a)
+			// A low-space notice can come first on a nearly full disk; only the scan line counts.
+			var started []string
+			for _, l := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+				if strings.Contains(l, " scan started") {
+					started = append(started, l)
+				}
+			}
+			if len(started) != 1 || !strings.HasSuffix(started[0]+"\n", " "+tc.line) {
+				t.Fatalf("logged %q, want one line ending in %q", out.String(), tc.line)
+			}
+		})
+	}
+}
+
+func TestStoppedScanIsNotLoggedAsFailed(t *testing.T) {
+	out := &logBuf{}
+	d := &daemon{opt: Options{Out: out}}
+	d.scanEnded(Full, app.ErrScanStopped)
+	d.scanEnded(Update, nil)
+	if out.String() != "" {
+		t.Fatalf("logged:\n%s", out)
+	}
+	d.scanEnded(Update, errors.New("no space left on device"))
+	if got := out.String(); !strings.HasSuffix(got, " update scan failed: no space left on device\n") {
+		t.Fatalf("logged %q", got)
 	}
 }
 

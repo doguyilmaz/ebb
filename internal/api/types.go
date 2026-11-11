@@ -56,12 +56,14 @@ type Access struct {
 }
 
 // Changes counts folders that changed on disk since the last scan, while ebb
-// watches. Lost means the next scan has to be complete; Ready that the replay
-// of history since the scan is over.
+// watches. Lost means the next scan has to be complete, and LostWhy says why;
+// Ready that no replay of history is running (the one since the scan, or the
+// one that fills the gap after macOS dropped events).
 type Changes struct {
-	Folders int  `json:"folders"`
-	Lost    bool `json:"lost"`
-	Ready   bool `json:"ready"`
+	Folders int    `json:"folders"`
+	Lost    bool   `json:"lost"`
+	Ready   bool   `json:"ready"`
+	LostWhy string `json:"lostWhy,omitempty"`
 }
 
 type ScanRequest struct {

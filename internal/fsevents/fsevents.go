@@ -10,12 +10,13 @@ type Event struct {
 // Flags from FSEvents that change what an event means.
 const (
 	MustScanSubDirs = 0x00000001 // changes below Path were coalesced: list everything under it again
-	UserDropped     = 0x00000002 // events were lost: the next scan must be complete
+	UserDropped     = 0x00000002 // the stream lost events; the history on disk may still have them
 	KernelDropped   = 0x00000004
 	IDsWrapped      = 0x00000008
 	HistoryDone     = 0x00000010 // the replay of past events is over; what follows is live
 	RootChanged     = 0x00000020
 )
 
-// Lost reports whether events were dropped, so incremental updates can no longer be trusted.
+// Lost reports whether events were dropped from the stream. Whether an incremental update can still be
+// trusted depends on which: after UserDropped the history on disk usually has what the stream missed.
 func Lost(flags uint32) bool { return flags&(UserDropped|KernelDropped|IDsWrapped|RootChanged) != 0 }

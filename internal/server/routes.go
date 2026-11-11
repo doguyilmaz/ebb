@@ -115,7 +115,7 @@ func (s *Server) startScan(_ http.ResponseWriter, r *http.Request) (any, error) 
 			return nil, err
 		}
 	}
-	if err := s.StartScan(app.ScanOptions{Root: req.Root, Threads: req.Threads, Gentle: req.Gentle, Full: req.Full}); err != nil {
+	if err := s.StartScan(app.ScanOptions{Root: req.Root, Threads: req.Threads, Gentle: req.Gentle, Full: req.Full}, nil); err != nil {
 		return nil, err
 	}
 	return accepted{s.app.ScanState()}, nil
@@ -123,7 +123,8 @@ func (s *Server) startScan(_ http.ResponseWriter, r *http.Request) (any, error) 
 
 // StartScan runs a scan in the background and tells every open window how it
 // goes, for a click in the window and for the background service alike.
-func (s *Server) StartScan(opt app.ScanOptions) error {
+// done, unless nil, is called once the scan ended, with its error.
+func (s *Server) StartScan(opt app.ScanOptions, done func(error)) error {
 	var mu sync.Mutex
 	var last time.Time
 	return s.app.StartScan(opt,
@@ -136,6 +137,9 @@ func (s *Server) StartScan(opt app.ScanOptions) error {
 			}
 		},
 		func(res *app.ScanResult, err error) {
+			if done != nil {
+				defer done(err)
+			}
 			if err != nil {
 				s.Notify(api.EventScanDone, map[string]any{"error": err.Error(), "stopped": errors.Is(err, app.ErrScanStopped)})
 				return
