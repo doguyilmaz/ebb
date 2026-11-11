@@ -23,6 +23,10 @@ type Conditions struct {
 	Lost     bool // the watcher cannot say what changed (events dropped, or too many)
 	LastScan time.Time
 	LastFull time.Time
+	// LastTry is when the background service last started a scan. It equals
+	// LastScan when that scan finished; when it failed, the saved scan stays
+	// old and only this keeps the next check from starting another one.
+	LastTry time.Time
 }
 
 const (
@@ -36,9 +40,14 @@ const (
 // and while nobody uses the Mac, at most every half hour, an update when
 // something changed and a full scan once a week (or when changes are unknown)
 // to correct any drift. The first scan is always the person's own.
+//
+// A scan that failed waits the same half hour as one that finished, without
+// a longer back-off for repeated failures: what makes it fail (mostly a full
+// disk) can clear at any moment, and at most one gentle scan per half hour
+// while nobody uses the Mac costs little even when every one of them fails.
 func NextWork(c Conditions) Work {
 	switch {
-	case c.LastScan.IsZero(), c.Pending, !c.OnAC, c.Idle < minIdle, c.Now.Sub(c.LastScan) < minGap:
+	case c.LastScan.IsZero(), c.Pending, !c.OnAC, c.Idle < minIdle, c.Now.Sub(c.LastScan) < minGap, c.Now.Sub(c.LastTry) < minGap:
 		return Nothing
 	case c.Lost, c.Now.Sub(c.LastFull) >= fullGap:
 		return Full
