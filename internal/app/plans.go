@@ -123,6 +123,8 @@ func (a *App) Execute(ctx context.Context, id string, fn func(clean.Event)) (cle
 		return clean.Result{}, ErrSearching
 	}
 	a.cleaning = true
+	// Approve can still write the plan while it runs: the executor reads a copy.
+	plan := *e.plan
 	a.mu.Unlock()
 	defer func() {
 		a.mu.Lock()
@@ -134,7 +136,7 @@ func (a *App) Execute(ctx context.Context, id string, fn func(clean.Event)) (cle
 		return clean.Result{}, err
 	}
 	ex := &clean.Executor{Env: a.Env, Log: a.OpLog(), Trash: clean.NewTrasher(a.Env), Guard: a.guard(r), Links: a.Links}
-	res, err := ex.Execute(ctx, e.plan, fn)
+	res, err := ex.Execute(ctx, &plan, fn)
 	if errors.Is(err, clean.ErrNeedsApproval) || errors.Is(err, clean.ErrExpired) {
 		return res, err
 	}

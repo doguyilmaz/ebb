@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -102,6 +103,37 @@ func TestExecuteNeedsApprovalForCaution(t *testing.T) {
 	ops, _ := a.Ops(10)
 	if err := a.Undo(ops[0].ID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The window and `ebb approve` can both say yes to a plan an agent made, and
+// the agent can run it meanwhile.
+func TestApproveWhileThePlanRuns(t *testing.T) {
+	a, _ := cleanApp(t)
+	p, err := a.Plan(clean.Request{FindingIDs: []string{"test.dl"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				a.Approve(p.ID)
+			}
+		}
+	})
+	res, err := a.Execute(context.Background(), p.ID, nil)
+	close(stop)
+	wg.Wait()
+	if err != nil || res.Done != 1 {
+		t.Fatalf("%+v %v", res, err)
 	}
 }
 
