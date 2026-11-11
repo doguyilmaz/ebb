@@ -189,7 +189,7 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 	}
 	r.Findings = kept
 	if len(gone) > 0 {
-		a.packages.scan = ""
+		a.dropPackages()
 	}
 	a.mu.Unlock()
 	a.forgetCopies(gone)

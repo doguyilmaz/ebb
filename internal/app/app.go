@@ -47,6 +47,8 @@ type App struct {
 	packages struct {
 		scan   string
 		result sources.Packages
+		// dropped counts the times the cache was emptied.
+		dropped uint64
 	}
 	dupes struct {
 		running  bool

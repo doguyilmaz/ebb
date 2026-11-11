@@ -15,8 +15,11 @@ import (
 
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/clean"
+	"github.com/doguyilmaz/ebb/internal/sources"
 	"github.com/doguyilmaz/ebb/internal/state"
 	"github.com/doguyilmaz/ebb/internal/sys"
+	"github.com/doguyilmaz/ebb/internal/tree"
+	"github.com/doguyilmaz/ebb/internal/volume"
 	"github.com/doguyilmaz/ebb/internal/walk"
 )
 
@@ -263,6 +266,51 @@ func TestLastShowsCleanupByAnotherProcess(t *testing.T) {
 	}
 	if p, err := a.Packages(); err != nil || p.Projects != 0 {
 		t.Fatalf("packages after %+v %v", p, err)
+	}
+}
+
+// A cleanup keeps the scan's ID: packages worked out on the tree before it
+// must not be kept for the tree after it.
+func TestPackagesFromBeforeCleanupAreNotKept(t *testing.T) {
+	a, home := cleanApp(t)
+	write(t, filepath.Join(home, "proj", "package.json"), 20)
+	write(t, filepath.Join(home, "proj", "node_modules", "lib", "package.json"), 20)
+	write(t, filepath.Join(home, "proj", "node_modules", "lib", "index.js"), 2<<20)
+	if _, err := a.Scan(context.Background(), ScanOptions{Root: home, Full: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	find := findPackages
+	t.Cleanup(func() { findPackages = find })
+	var calls atomic.Int32
+	worked, release := make(chan struct{}), make(chan struct{})
+	findPackages = func(tr *tree.Tree, links volume.Firmlinks, home string, read func(string) ([]byte, error), limit int) sources.Packages {
+		p := find(tr, links, home, read, limit)
+		if calls.Add(1) == 1 {
+			close(worked)
+			<-release
+		}
+		return p
+	}
+	answered := make(chan struct{})
+	go func() {
+		a.Packages()
+		close(answered)
+	}()
+	<-worked
+	p, err := a.Plan(clean.Request{Paths: []string{filepath.Join(home, "proj", "node_modules")}, Source: "cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := a.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	close(release)
+	<-answered
+	if p, err := a.Packages(); err != nil || p.Projects != 0 {
+		t.Fatalf("packages after the cleanup %+v %v", p, err)
 	}
 }
 

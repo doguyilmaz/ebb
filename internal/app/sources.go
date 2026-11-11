@@ -14,6 +14,10 @@ func (a *App) Sources() (sources.Flows, error) {
 	return sources.Build(r.Tree, a.Links, a.Env.Home(), a.View(r).Findings), nil
 }
 
+// findPackages is sources.FindPackages; a variable so a test can hold an
+// answer back until a cleanup is done.
+var findPackages = sources.FindPackages
+
 // Packages groups the node_modules packages of every project and Bun's
 // cache; it reads package.json files, so the answer is kept per scan.
 func (a *App) Packages() (sources.Packages, error) {
@@ -27,10 +31,20 @@ func (a *App) Packages() (sources.Packages, error) {
 		a.mu.Unlock()
 		return p, nil
 	}
+	dropped := a.packages.dropped
 	a.mu.Unlock()
-	p := sources.FindPackages(r.Tree, a.Links, a.Env.Home(), func(p string) ([]byte, error) { return sys.ReadSmall(p, 1<<20) }, 200)
+	p := findPackages(r.Tree, a.Links, a.Env.Home(), func(p string) ([]byte, error) { return sys.ReadSmall(p, 1<<20) }, 200)
 	a.mu.Lock()
-	a.packages.scan, a.packages.result = r.Meta.ID, p
+	// A cleanup that ended meanwhile kept the scan's ID, not these packages.
+	if a.packages.dropped == dropped {
+		a.packages.scan, a.packages.result = r.Meta.ID, p
+	}
 	a.mu.Unlock()
 	return p, nil
+}
+
+// dropPackages forgets the packages of a scan that changed but kept its ID.
+// The caller holds a.mu.
+func (a *App) dropPackages() {
+	a.packages.scan, a.packages.dropped = "", a.packages.dropped+1
 }

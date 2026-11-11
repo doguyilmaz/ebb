@@ -102,7 +102,7 @@ func (a *App) Last() (r *ScanResult, err error) {
 			a.cur, a.curFile, a.curGen = l.r, saved, a.curGen+1
 			// Packages are kept per scan ID, and a cleanup in another
 			// process saves what is left under the same ID.
-			a.packages.scan = ""
+			a.dropPackages()
 			reloaded = true
 		default:
 			// The newer save could not be read, or a scan or cleanup began
