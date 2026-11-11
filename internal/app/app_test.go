@@ -173,6 +173,32 @@ func TestOlderReadDoesNotReplaceNewerScan(t *testing.T) {
 	}
 }
 
+// Every page request re-reads the settings (a CORS check, a paired page's
+// token), so they change under a scan and under other requests all the time.
+func TestSettingsReloadsDoNotRaceWithScans(t *testing.T) {
+	a, root := testApp(t)
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				a.WebOriginAllowed("https://example.com")
+			}
+		}
+	})
+	for range 3 {
+		if _, err := a.Scan(context.Background(), ScanOptions{Root: root, Full: true}, nil); err != nil {
+			t.Error(err)
+		}
+		_ = a.Status("test")
+	}
+	close(stop)
+	wg.Wait()
+}
+
 func TestLastBeforeAnyScan(t *testing.T) {
 	a, _ := testApp(t)
 	if _, err := a.Last(); !errors.Is(err, ErrNeverScanned) {

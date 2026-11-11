@@ -39,7 +39,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 			if len(args) == 1 {
 				asked = args[0]
 			}
-			origin, err := window.Target(cmd.Context(), a.Env, a.Config.Server.WebOrigins, asked)
+			origin, err := window.Target(cmd.Context(), a.Env, a.Config().Server.WebOrigins, asked)
 			if err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 				fmt.Fprintln(out, "ebb now runs in the background and starts at login. Turn it off with: ebb daemon uninstall")
 				return show(st.Port)
 			default:
-				port := a.Config.Server.Port
+				port := a.Config().Server.Port
 				return serveHere(cmd, a, token, port, func(string) {
 					fmt.Fprintln(out, "ebb is running in this terminal. Press Ctrl-C or close the terminal to stop it.")
 					if err := show(port); err != nil {

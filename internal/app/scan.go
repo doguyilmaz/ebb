@@ -62,7 +62,7 @@ func (a *App) scan(ctx context.Context, opt ScanOptions, progress func(walk.Prog
 	}
 	threads := opt.Threads
 	if threads == 0 {
-		threads = a.Config.Scan.Threads
+		threads = a.Config().Scan.Threads
 	}
 	wopt := walk.Options{Root: root, Threads: threads, Gentle: opt.Gentle}
 	if !opt.Full {
@@ -135,10 +135,11 @@ func (a *App) conclude(ctx context.Context, root string, t *tree.Tree, problems 
 	} else {
 		vol.Scanned = rootNode.Unique
 	}
+	cfg := a.Config()
 	var large rules.Size
-	_ = large.UnmarshalText([]byte(a.Config.Scan.LargeFile))
+	_ = large.UnmarshalText([]byte(cfg.Scan.LargeFile))
 	dc := &detect.Context{Tree: t, Volume: vol, Env: a.Env, Rules: a.Rules, History: a.History, Links: a.Links,
-		Now: started, StaleAfter: time.Duration(a.Config.Scan.StaleDays) * 24 * time.Hour, LargeFile: uint64(large)}
+		Now: started, StaleAfter: time.Duration(cfg.Scan.StaleDays) * 24 * time.Hour, LargeFile: uint64(large)}
 	findings, errs := detect.Run(ctx, dc)
 	if err := ctx.Err(); err != nil {
 		return nil, err

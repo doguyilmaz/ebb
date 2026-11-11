@@ -38,7 +38,7 @@ func newServeCmd(g *globals) *cobra.Command {
 				return nil
 			}
 			if port == 0 {
-				port = a.Config.Server.Port
+				port = a.Config().Server.Port
 			}
 			return serveHere(cmd, a, token, port, func(url string) {
 				fmt.Fprintf(cmd.OutOrStdout(), "ebb is running: %s\nPress Ctrl-C or close this terminal to stop it. To keep it running in the background: ebb daemon install\n", url)

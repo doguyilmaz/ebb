@@ -40,11 +40,11 @@ func errInvalidOrigin(o string) error {
 func (a *App) reloadConfig() config.Config {
 	if cfg, err := config.Load(a.Env); err == nil {
 		a.mu.Lock()
-		a.Config = cfg
+		a.cfg = cfg
 		a.mu.Unlock()
 		return cfg
 	}
-	return a.Config
+	return a.Config()
 }
 
 func (a *App) SaveConfig(cfg config.Config) error {
@@ -52,7 +52,7 @@ func (a *App) SaveConfig(cfg config.Config) error {
 		return err
 	}
 	a.mu.Lock()
-	a.Config = cfg
+	a.cfg = cfg
 	a.mu.Unlock()
 	return nil
 }

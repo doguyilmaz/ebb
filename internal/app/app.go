@@ -33,12 +33,14 @@ var (
 
 type App struct {
 	Env     sys.Env
-	Config  config.Config
 	Rules   *rules.Set
 	History *history.Store
 	Links   volume.Firmlinks
 
-	mu       sync.Mutex
+	mu sync.Mutex
+	// cfg is replaced each time config.toml is read again, which page
+	// requests do all the time, so it is read through Config.
+	cfg      config.Config
 	pairMu   sync.Mutex
 	running  bool
 	cleaning bool
@@ -81,19 +83,29 @@ func New(env sys.Env) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{Env: env, Config: cfg, Rules: set, History: history.Open(sys.StateDir(env))}
+	a := &App{Env: env, cfg: cfg, Rules: set, History: history.Open(sys.StateDir(env))}
 	if runtime.GOOS == "darwin" {
 		a.Links = volume.LoadFirmlinks("/usr/share/firmlinks", dataVolume)
 	}
 	return a, nil
 }
 
+// Config is the configuration as last read. A page request can read
+// config.toml again while a scan or another request uses it, so each caller
+// gets its own copy, taken under the lock.
+func (a *App) Config() config.Config {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg
+}
+
 // DefaultRoot is the whole data volume on macOS, the configured root when
 // set, and the sandbox home in a sandboxed session.
 func (a *App) DefaultRoot() string {
+	root := a.Config().Scan.Root
 	switch {
-	case a.Config.Scan.Root != "":
-		return rules.Expand(a.Env, a.Config.Scan.Root)
+	case root != "":
+		return rules.Expand(a.Env, root)
 	case sys.Sandboxed(a.Env):
 		return a.Env.Home()
 	}
