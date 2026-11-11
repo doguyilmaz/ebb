@@ -62,11 +62,14 @@ type changes struct {
 	lostWhy  string // the first reason it was lost
 	ready    bool   // nothing is being replayed: the set is complete (or lost, which is settled too)
 	last     uint64
-	wake     chan struct{} // closed when ready, new for every recovery
+	wake     chan struct{} // closed when ready, new each time the set stops being ready
 
 	phase phase
-	// good is the newest event ID received while the stream was whole: every
-	// event up to it is in the set, so a restart from it misses nothing.
+	// good is the newest event ID received while the stream was whole; a
+	// restart replays everything after it. Events do not always come in ID
+	// order: after a replay drops, events below good still arrive for tens of
+	// milliseconds, and only the old stream, which runs until the restart,
+	// puts them in the set.
 	good             uint64
 	restartAt        uint64
 	restart          chan struct{} // told once per recovery, read by the goroutine that owns the stream
@@ -128,8 +131,8 @@ func (c *changes) recover(e fsevents.Event) {
 		return
 	}
 	from := c.good
-	// Events come in order, so the drop is reported after everything it
-	// follows; if it names an earlier point, go back to just before it.
+	// A drop that names a point at or before the last good event restarts
+	// from just before that point.
 	if e.ID > 0 && e.ID <= from {
 		from = e.ID - 1
 	}
@@ -139,7 +142,11 @@ func (c *changes) recover(e fsevents.Event) {
 	}
 	c.recoveries = append(c.recoveries, now)
 	c.phase, c.restartAt, c.firstDrop, c.lastDrop = restarting, from, now, now
-	c.ready, c.wake = false, make(chan struct{})
+	// A drop during a replay leaves the set not ready: whoever already waits
+	// keeps the channel that closes once this recovery is over.
+	if c.ready {
+		c.ready, c.wake = false, make(chan struct{})
+	}
 	select {
 	case c.restart <- struct{}{}:
 	default:
@@ -182,8 +189,8 @@ func (c *changes) add(evs []fsevents.Event) {
 			c.dropped(e)
 			continue
 		}
-		// What arrives between a drop and the restart is not in line with
-		// what came before; the replay delivers it again.
+		// What arrives between a drop and the restart goes into the set but
+		// does not move good: the stream is no longer whole.
 		if c.phase != restarting {
 			c.good = max(c.good, e.ID)
 		}
@@ -208,19 +215,11 @@ func (c *changes) add(evs []fsevents.Event) {
 type changeSet struct {
 	dirs, subtrees []string
 	last           uint64
-	lost           bool
 }
 
-// take hands over what changed so far and starts collecting afresh.
-func (c *changes) take() changeSet {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.takeLocked()
-}
-
-// takeSettled hands over the set when it is complete. ok is false when only a
-// full scan can be trusted; wait is true when a recovery began meanwhile and
-// the set is not complete yet.
+// takeSettled hands over what changed so far, when it is complete, and starts
+// collecting afresh. ok is false when only a full scan can be trusted; wait is
+// true when a recovery began meanwhile and the set is not complete yet.
 func (c *changes) takeSettled() (s changeSet, ok, wait bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -230,11 +229,7 @@ func (c *changes) takeSettled() (s changeSet, ok, wait bool) {
 	case !c.ready:
 		return changeSet{}, false, true
 	}
-	return c.takeLocked(), true, false
-}
-
-func (c *changes) takeLocked() changeSet {
-	s := changeSet{last: c.last, lost: c.lost}
+	s = changeSet{last: c.last}
 	for p := range c.dirs {
 		s.dirs = append(s.dirs, p)
 	}
@@ -244,7 +239,7 @@ func (c *changes) takeLocked() changeSet {
 	slices.Sort(s.dirs)
 	slices.Sort(s.subtrees)
 	c.dirs, c.subtrees = map[string]bool{}, map[string]bool{}
-	return s
+	return s, true, false
 }
 
 // putBack returns a set an update could not finish, so nothing is missed.

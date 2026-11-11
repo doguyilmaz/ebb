@@ -49,10 +49,13 @@ FSEvents replay after ebb was off: ~3.6 h of changes = 30k folder events in 11 s
 ### dropped FSEvents (2026-11-11)
 
 The live stream drops events (`UserDropped`, flags 0x3, path = the stream root) when a burst of changes outruns it:
-16 in about an hour of builds and e2e runs on this Mac, 11 for 150k folders created in 29 s. The history macOS keeps
-on disk still holds every change (replayed afterwards: all 150k folders, no drop flags). Until now one drop marked the
-change set lost, so every "scan again" and every daemon check read everything (28-85 s instead of ~1.5 s) until the
-next full scan. `KernelDropped`, `IDsWrapped` and `RootChanged` were never seen and still mean a full scan.
+2 in about 40 minutes of builds and e2e runs on this Mac, 11 for 150k folders created in 29 s. The history macOS
+keeps on disk usually still holds every change (replayed afterwards: all 150k folders, no drop flags). Not always: on
+a RAM disk, the history of one burst of 100k new folders lacked 1,495 of them in two replays, without any flag. Their
+parents' events did arrive, and an update walks a changed folder's new subfolders whole, so it still finds them;
+changes inside 100k existing folders were complete in 11 of 11 bursts. Until now one drop marked the change set lost,
+so every "scan again" and every daemon check read everything (28-85 s instead of ~1.5 s) until the next full scan.
+`KernelDropped`, `IDsWrapped` and `RootChanged` were never seen and still mean a full scan.
 
 Now the watcher restarts the stream from the last event it received before the drop and the history fills the gap. The
 set is not handed out while that replay runs. Two things measured on the way:

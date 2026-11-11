@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/fsevents"
@@ -31,9 +32,9 @@ func TestChangesCollectsFoldersUnderTheRoot(t *testing.T) {
 	if r := c.report(); r.Folders != 2 || r.Lost || !r.Ready {
 		t.Fatalf("report %+v", r)
 	}
-	s := c.take()
-	if fmt.Sprint(s.dirs, s.subtrees, s.last) != "[/System/Volumes/Data/Users/me/Downloads] [/System/Volumes/Data/Users/me/node_modules] 15" {
-		t.Fatalf("took %v %v %d", s.dirs, s.subtrees, s.last)
+	s, ok, _ := c.takeSettled()
+	if !ok || fmt.Sprint(s.dirs, s.subtrees, s.last) != "[/System/Volumes/Data/Users/me/Downloads] [/System/Volumes/Data/Users/me/node_modules] 15" {
+		t.Fatalf("took %v %v %d (ok %v)", s.dirs, s.subtrees, s.last, ok)
 	}
 	if r := c.report(); r.Folders != 0 {
 		t.Fatal("taking empties the set")
@@ -86,8 +87,8 @@ func TestUserDroppedIsRecoveredNotLost(t *testing.T) {
 		t.Fatalf("after the replay: ok %v wait %v", ok, wait)
 	}
 	want := []string{"/Users/me/a", "/Users/me/b", "/Users/me/late", "/Users/me/only-in-history"}
-	if !slices.Equal(s.dirs, want) || s.lost {
-		t.Fatalf("took %v lost %v, want %v", s.dirs, s.lost, want)
+	if !slices.Equal(s.dirs, want) {
+		t.Fatalf("took %v, want %v", s.dirs, want)
 	}
 }
 
@@ -148,6 +149,29 @@ func TestDropWhileHistoryReplaysRestartsFromTheProgressMade(t *testing.T) {
 	if s, ok, wait := c.takeSettled(); !ok || wait || !slices.Equal(s.dirs, []string{"/Users/me/a", "/Users/me/b", "/Users/me/c"}) {
 		t.Fatalf("took %v (ok %v wait %v)", s.dirs, ok, wait)
 	}
+}
+
+func TestWaiterWakesWhenADroppedReplayIsRecovered(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := newTestChanges()
+		c.good = 5
+		woke := make(chan bool, 1)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			woke <- c.waitReady(ctx)
+		}()
+		// The waiter holds the channel of the replay since the scan when that replay is dropped.
+		synctest.Wait()
+		c.add([]fsevents.Event{{Path: "/Users/me/a", ID: 10}, userDropped(11)})
+		if _, ok := c.restarted(); !ok {
+			t.Fatal("not restarted")
+		}
+		c.add([]fsevents.Event{{Path: "/Users/me/b", ID: 12}, {Flags: fsevents.HistoryDone}})
+		if !<-woke {
+			t.Fatal("the waiter slept through the end of the recovery until its deadline")
+		}
+	})
 }
 
 func TestRepeatedDropsAreLost(t *testing.T) {
@@ -332,8 +356,8 @@ func TestWatcherRestartsFromTheLastGoodEventAfterADrop(t *testing.T) {
 	}
 	s, ok, wait := w.set.takeSettled()
 	want := []string{"/Users/me/a", "/Users/me/b", "/Users/me/live", "/Users/me/only-in-history"}
-	if !ok || wait || s.lost || !slices.Equal(s.dirs, want) {
-		t.Fatalf("took %v (ok %v wait %v lost %v), want %v", s.dirs, ok, wait, s.lost, want)
+	if !ok || wait || !slices.Equal(s.dirs, want) {
+		t.Fatalf("took %v (ok %v wait %v), want %v", s.dirs, ok, wait, want)
 	}
 }
 
@@ -406,25 +430,6 @@ func TestWatcherLosesTheSetWhenTheDropCannotBeRecovered(t *testing.T) {
 			t.Fatalf("%+v", r)
 		}
 		<-w.ended
-	})
-	t.Run("drops over and over", func(t *testing.T) {
-		var scripts []func(func([]fsevents.Event)) error
-		for i := range maxRecoveries + 2 {
-			id := uint64(10 + 10*i)
-			scripts = append(scripts, func(deliver func([]fsevents.Event)) error {
-				deliver([]fsevents.Event{{Flags: fsevents.HistoryDone}, {Path: "/Users/me/a", ID: id}, userDropped(id + 1)})
-				return nil
-			})
-		}
-		f := &fakeStreams{scripts: scripts}
-		w := startFake(t, f)
-		eventually(t, "lost", func() bool { return w.set.report().Lost })
-		if r := w.set.report(); !r.Ready || !strings.Contains(r.LostWhy, "more than") {
-			t.Fatalf("%+v", r)
-		}
-		if got := f.sinces(); len(got) != maxRecoveries+1 {
-			t.Fatalf("%d streams for %d recoveries: %v", len(got), maxRecoveries, got)
-		}
 	})
 }
 
