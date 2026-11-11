@@ -184,6 +184,42 @@ func TestCheckWaitsAfterAFailedScan(t *testing.T) {
 	waitLog(t, out, "full scan failed: ", 2)
 }
 
+func TestCheckLogsWhyAFullScanIsNeeded(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		changes func() *api.Changes
+		line    string
+	}{
+		{"nobody followed", nil, "full scan started (changes unknown: ebb was not following what changed)\n"},
+		{"events dropped", func() *api.Changes {
+			return &api.Changes{Lost: true, Ready: true, LostWhy: "the kernel dropped events"}
+		}, "full scan started (changes unknown: the kernel dropped events)\n"},
+		{"changes known", func() *api.Changes { return &api.Changes{Folders: 12, Ready: true} }, "update scan started\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a, env, _, root := sandbox(t)
+			out := &logBuf{}
+			d := &daemon{a: a, s: server.New(a, "test", "tok"), dir: sys.StateDir(env), opt: Options{Out: out}, access: func(string) bool { return true }, changes: tc.changes}
+			if _, err := a.Scan(context.Background(), app.ScanOptions{Root: root}, nil); err != nil {
+				t.Fatal(err)
+			}
+			env.Time = env.Time.Add(2 * time.Hour)
+			d.check(context.Background())
+			waitScan(t, a)
+			// A low-space notice can come first on a nearly full disk; only the scan line counts.
+			var started []string
+			for _, l := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+				if strings.Contains(l, " scan started") {
+					started = append(started, l)
+				}
+			}
+			if len(started) != 1 || !strings.HasSuffix(started[0]+"\n", " "+tc.line) {
+				t.Fatalf("logged %q, want one line ending in %q", out.String(), tc.line)
+			}
+		})
+	}
+}
+
 func TestStoppedScanIsNotLoggedAsFailed(t *testing.T) {
 	out := &logBuf{}
 	d := &daemon{opt: Options{Out: out}}

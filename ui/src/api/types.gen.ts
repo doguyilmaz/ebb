@@ -42,6 +42,7 @@ export interface Changes {
   folders: number;
   lost: boolean;
   ready: boolean;
+  lostWhy?: string;
 }
 
 export interface Status {
