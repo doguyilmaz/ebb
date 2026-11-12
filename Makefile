@@ -5,7 +5,10 @@ ui:
 	cd ui && bun install --frozen-lockfile && bun run build
 
 build: ui
-	go build -ldflags "$(LDFLAGS)" -o bin/ebb ./cmd/ebb
+	MACOSX_DEPLOYMENT_TARGET=12.0 \
+	  CGO_CFLAGS="$${CGO_CFLAGS:--O2 -g} -mmacosx-version-min=12.0" \
+	  CGO_LDFLAGS="$${CGO_LDFLAGS:--O2 -g} -mmacosx-version-min=12.0" \
+	  go build -ldflags "$(LDFLAGS)" -o bin/ebb ./cmd/ebb
 
 test:
 	go test ./...
