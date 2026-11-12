@@ -150,7 +150,7 @@ final class EbbClientTests: XCTestCase {
         configuration.protocolClasses = [URLProtocolStub.self]
         let session = URLSession(configuration: configuration)
         return try EbbClient(
-            baseURL: URL(string: "http://127.0.0.1:47340/api/v1/")!,
+            baseURL: URL(string: "http://127.0.0.1:47340/api/v1")!,
             token: "test-token-123",
             session: session
         )

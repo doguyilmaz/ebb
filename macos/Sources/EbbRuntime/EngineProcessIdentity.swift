@@ -15,11 +15,8 @@ enum EngineProcessIdentity {
 
     static func isAlive(pid: Int) -> Bool {
         guard pid > 0, pid <= Int(Int32.max) else { return false }
-        if kill(pid_t(pid), 0) == 0 {
-            return true
-        }
-        // EPERM still proves that a process owns the PID. Let the executable
-        // identity check reject it instead of launching over a live listener.
-        return errno == EPERM
+        // A process owned by another user must not receive this user's token.
+        // Match the Go client's refusal when kill(pid, 0) returns EPERM.
+        return kill(pid_t(pid), 0) == 0
     }
 }
