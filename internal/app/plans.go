@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/apps"
@@ -209,15 +210,21 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 
 func (a *App) Ops(limit int) ([]clean.Op, error) { return a.OpLog().List(limit) }
 
-// Undo puts a trashed item back; the empty op ID means the latest one.
+// Undo puts a trashed item back; the empty op ID means the latest one not
+// put back yet.
 func (a *App) Undo(opID string) error {
 	if opID == "" {
 		ops, err := a.Ops(0)
 		if err != nil {
 			return err
 		}
+		// A put back is logged as an op of its own, newer than the one it undid.
+		undone := map[string]bool{}
 		for _, op := range ops {
-			if op.Action == "trash" && op.Result == "done" {
+			if op.Action == "undo" && op.Result == "done" {
+				undone[strings.TrimPrefix(op.ID, "undo-")] = true
+			}
+			if op.Action == "trash" && op.Result == "done" && !undone[op.ID] {
 				opID = op.ID
 				break
 			}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -134,6 +135,38 @@ func TestApproveWhileThePlanRuns(t *testing.T) {
 	wg.Wait()
 	if err != nil || res.Done != 1 {
 		t.Fatalf("%+v %v", res, err)
+	}
+}
+
+// `ebb undo` without an op, run again, puts back the item trashed before the
+// one it just put back.
+func TestUndoLatestAgainRestoresTheOneBefore(t *testing.T) {
+	a, home := cleanApp(t)
+	dmg := filepath.Join(home, "w", "old.dmg")
+	note := filepath.Join(home, "w", "note.txt")
+	write(t, note, 10)
+	for _, req := range []clean.Request{{FindingIDs: []string{"test.dl"}}, {Paths: []string{note}}} {
+		p, err := a.Plan(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := a.Approve(p.ID); err != nil {
+			t.Fatal(err)
+		}
+		if res, err := a.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 1 {
+			t.Fatalf("%+v %v", res, err)
+		}
+	}
+	for _, want := range []string{note, dmg} {
+		if err := a.Undo(""); err != nil {
+			t.Fatalf("undo for %s: %v", filepath.Base(want), err)
+		}
+		if _, err := os.Lstat(want); err != nil {
+			t.Fatalf("%s is not back: %v", filepath.Base(want), err)
+		}
+	}
+	if err := a.Undo(""); err == nil || !strings.Contains(err.Error(), "nothing to undo") {
+		t.Fatalf("everything is back already: %v", err)
 	}
 }
 
