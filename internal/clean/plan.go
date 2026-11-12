@@ -69,7 +69,7 @@ type Planner struct {
 	Rules       *rules.Set
 	Protect     []string
 	Roots       []string
-	AutoExecute string // "regenerable" (default) | "never"
+	AutoExecute string // "regenerable" (default); any other value ("never") always asks
 }
 
 func newID() string {
@@ -119,7 +119,8 @@ func (p *Planner) Plan(req Request) (*Plan, error) {
 		return nil, ErrEmptyPlan
 	}
 	now := p.Env.Now()
-	plan := &Plan{ID: newID(), Created: now, Expires: now.Add(planLifetime), Source: req.Source, NeedsApproval: p.AutoExecute == "never"}
+	// A value ebb does not know (a typo, "Never") asks, as "never" does.
+	plan := &Plan{ID: newID(), Created: now, Expires: now.Add(planLifetime), Source: req.Source, NeedsApproval: p.AutoExecute != "regenerable"}
 	for i := range items {
 		p.check(&items[i])
 		it := items[i]

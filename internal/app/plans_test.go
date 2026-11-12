@@ -170,6 +170,27 @@ func TestUndoLatestAgainRestoresTheOneBefore(t *testing.T) {
 	}
 }
 
+// Only "regenerable" lets a plan of rebuildable caches skip the approval: a
+// value ebb does not know, such as a capitalized "Never", asks like "never".
+func TestUnknownAutoExecuteAsks(t *testing.T) {
+	a, home := cleanApp(t)
+	for _, v := range []string{"never", "Never", "off", ""} {
+		if err := os.WriteFile(filepath.Join(home, ".config", "ebb", "config.toml"), []byte("[mcp]\nauto_execute = \""+v+"\"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "mcp"})
+		if err != nil || !p.NeedsApproval {
+			t.Errorf("auto_execute = %q: the plan runs without approval (%v)", v, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(home, ".config", "ebb", "config.toml"), []byte("[mcp]\nauto_execute = \"regenerable\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "mcp"}); err != nil || p.NeedsApproval {
+		t.Fatalf("regenerable: %+v %v", p, err)
+	}
+}
+
 func TestPresetSelectsCategories(t *testing.T) {
 	a, _ := cleanApp(t)
 	var dev uint64

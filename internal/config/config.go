@@ -30,7 +30,7 @@ type Clean struct {
 
 type MCP struct {
 	// AutoExecute lets AI agents run plans without a confirmation when every
-	// item is "regenerable"; "never" always asks.
+	// item is "regenerable"; any other value ("never") always asks.
 	AutoExecute string `toml:"auto_execute"`
 }
 
