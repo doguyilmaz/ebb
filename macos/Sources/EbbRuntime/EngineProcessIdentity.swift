@@ -3,7 +3,7 @@ import Foundation
 
 enum EngineProcessIdentity {
     static func isEbb(pid: Int) -> Bool {
-        guard pid > 0 else { return false }
+        guard pid > 0, pid <= Int(Int32.max) else { return false }
         var buffer = [UInt8](repeating: 0, count: 4_096)
         let length = buffer.withUnsafeMutableBytes { bytes in
             proc_pidpath(pid_t(pid), bytes.baseAddress, UInt32(bytes.count))
@@ -14,7 +14,7 @@ enum EngineProcessIdentity {
     }
 
     static func isAlive(pid: Int) -> Bool {
-        guard pid > 0 else { return false }
+        guard pid > 0, pid <= Int(Int32.max) else { return false }
         if kill(pid_t(pid), 0) == 0 {
             return true
         }

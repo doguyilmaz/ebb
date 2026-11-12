@@ -94,7 +94,7 @@ public final class EngineLauncher {
         } catch {
             throw EngineLauncherError.invalidServerRecord
         }
-        guard record.pid > 0, (1...65_535).contains(record.port) else {
+        guard record.pid > 0, record.pid <= Int(Int32.max), (1...65_535).contains(record.port) else {
             throw EngineLauncherError.invalidServerRecord
         }
         guard EngineProcessIdentity.isAlive(pid: record.pid) else {

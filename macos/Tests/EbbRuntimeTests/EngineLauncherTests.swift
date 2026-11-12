@@ -4,6 +4,12 @@ import XCTest
 
 @MainActor
 final class EngineLauncherTests: XCTestCase {
+    func testUnrelatedAndOutOfRangeProcessesAreRejected() {
+        XCTAssertFalse(EngineProcessIdentity.isEbb(pid: Int(ProcessInfo.processInfo.processIdentifier)))
+        XCTAssertFalse(EngineProcessIdentity.isEbb(pid: Int.max))
+        XCTAssertFalse(EngineProcessIdentity.isAlive(pid: Int.max))
+    }
+
     func testMalformedServerRecordFailsBeforeReadingOrLaunching() async throws {
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("ebb-runtime-\(UUID().uuidString)", isDirectory: true)
