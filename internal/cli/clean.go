@@ -2,11 +2,14 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -66,7 +69,12 @@ func runPlan(cmd *cobra.Command, a *app.App, req clean.Request, dry, yes bool) e
 	if _, err := a.Approve(p.ID); err != nil {
 		return err
 	}
-	res, err := a.Execute(cmd.Context(), p.ID, func(e clean.Event) {
+	// Finish and log a file operation before stopping. A second signal still
+	// exits immediately if the operation cannot finish.
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	context.AfterFunc(ctx, stop)
+	res, err := a.Execute(ctx, p.ID, func(e clean.Event) {
 		switch e.State {
 		case "done":
 			fmt.Fprintf(out, "  done     %s\n", units.Printable(e.Path))
