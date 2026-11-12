@@ -104,6 +104,9 @@ Every command takes `--json`.
 make build    # bin/ebb, with the web UI (Go 1.26.11+, Xcode command line tools, Bun)
 make check    # vet, tests, gofmt, UI typecheck and tests
 make e2e      # the window in Chrome against a sandboxed demo home
+make native   # the Swift 6 desktop preview in dist/native/ebb.app
 ```
+
+The [native macOS preview](macos/README.md) has its own SwiftUI window and uses the same Go engine and cleanup protections.
 
 [API](docs/API.md) · [Performance](docs/PERF.md) · [Deploy](docs/DEPLOY.md) · MIT License

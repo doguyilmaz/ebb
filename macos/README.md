@@ -40,3 +40,11 @@ EBB_HOME="$D" EBB_SANDBOX=1 EBB_PORT=47431 dist/native/ebb.app/Contents/MacOS/Eb
 Quit the app before removing the demo directory. The launcher rejects a home override without sandbox mode and requires an explicit port for sandbox launches.
 
 The core transport and DTOs live in `Sources/EbbCore`, process discovery and ownership in `Sources/EbbRuntime`, and SwiftUI screens and application state in `Sources/EbbDesktop`. The native UI uses the same plan/approve/execute API and backend protections as the web client and CLI.
+
+## Recorded validation
+
+On macOS 26.7.1 with Swift 6.3.3 and Go 1.26.11, all 15 Swift tests and the real-engine smoke flow passed. Native GUI checks covered all eight sections, scan, approval-checkbox gating, moving a demo installer to Trash, restoring it from Activity, saving settings, and quitting the app. The restored file and removal of the owned engine's server record were also checked on disk.
+
+GUI verification used a separate QA bundle with its sandbox home and port in `LSEnvironment`; all mutating actions were confined to that fixture. An earlier launch that did not inherit the test environment was closed after its read-only overview appeared.
+
+Both executables in the packaged native app declare a macOS 12.0 minimum, verified with `vtool -show-build`, and the bundle passes strict signature validation. Actual execution on macOS 12 and distribution notarization were not tested. Undo restores files immediately; a new scan refreshes their disk totals and findings.
