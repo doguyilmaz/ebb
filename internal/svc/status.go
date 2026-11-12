@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -36,11 +38,44 @@ func (s Service) Read() api.Daemon {
 // alive asks whether the process exists and is this user's: the service never runs as anyone else.
 func alive(pid int) bool { return syscall.Kill(pid, 0) == nil }
 
-// TrimLog empties the service log once it is past max: launchd only ever
-// appends to it.
+// TrimLog keeps the newest complete lines once the service log is past max.
+// launchd only ever appends to it, so dropping a prefix is safe; retaining a
+// partial first line would make the next append look like a continuation of a
+// message from before the trim.
 func TrimLog(stateDir string, max int64) {
 	p := LogPath(stateDir)
-	if fi, err := os.Stat(p); err == nil && fi.Size() > max {
-		_ = os.Truncate(p, 0)
+	fi, err := os.Stat(p)
+	if err != nil || fi.Size() <= max {
+		return
 	}
+	if max <= 0 {
+		_ = os.Truncate(p, 0)
+		return
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if _, err := f.Seek(-max, io.SeekEnd); err != nil {
+		return
+	}
+	tail := make([]byte, int(max))
+	n, err := io.ReadFull(f, tail)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return
+	}
+	tail = tail[:n]
+	if i := bytes.IndexByte(tail, '\n'); i >= 0 {
+		tail = tail[i+1:]
+	} else {
+		// The last max bytes are one line. Keeping a suffix would corrupt it.
+		tail = nil
+	}
+	out, err := os.OpenFile(p, os.O_WRONLY|os.O_TRUNC, fi.Mode().Perm())
+	if err != nil {
+		return
+	}
+	_, _ = out.Write(tail)
+	_ = out.Close()
 }
