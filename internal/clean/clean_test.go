@@ -362,6 +362,50 @@ func TestExecuteDeleteRechecksAfterRename(t *testing.T) {
 	}
 }
 
+// A delete that cannot remove everything (here a read-only folder inside)
+// leaves the rest under its own name, where the person and the next scan
+// still see it, not under the private name it was moved to.
+func TestExecuteDeleteFailureLeavesTheRestInPlace(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root removes read-only folders")
+	}
+	env, home := sandboxEnv(t)
+	target := filepath.Join(home, "w", "cache")
+	mkfile(t, filepath.Join(target, "ro", "f"), 1<<20)
+	mkfile(t, filepath.Join(target, "rw", "g"), 1<<20)
+	p := planFor(t, env, target, finding.Regenerable)
+	ro := filepath.Join(target, "ro")
+	if err := os.Chmod(ro, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		filepath.WalkDir(filepath.Join(home, "w"), func(p string, d os.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				os.Chmod(p, 0o755)
+			}
+			return nil
+		})
+	})
+	var failed string
+	res, err := executor(env).Execute(context.Background(), p, func(e Event) {
+		if e.State == "failed" {
+			failed = e.Err
+		}
+	})
+	if err != nil || res.Failed != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	des, _ := os.ReadDir(filepath.Join(home, "w"))
+	for _, d := range des {
+		if strings.HasPrefix(d.Name(), ".ebb-delete-") {
+			t.Fatalf("what could not be removed hides in %s", d.Name())
+		}
+	}
+	if !exists(filepath.Join(ro, "f")) || strings.Contains(failed, ".ebb-delete-") || !strings.Contains(failed, "permission denied") {
+		t.Fatalf("the rest stays at %s (%v), failure reads %q", target, exists(filepath.Join(ro, "f")), failed)
+	}
+}
+
 func TestGuardVolumeRootChildren(t *testing.T) {
 	g := Guard{Home: "/Users/h", Roots: []string{"/", "/System/Volumes/Data"}}
 	for _, p := range []string{"/System/Volumes/Data/.DocumentRevisions-V100", "/.Spotlight-V100", "/private", "/private/var",

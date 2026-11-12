@@ -163,7 +163,19 @@ func (e *Executor) run(ctx context.Context, it Item) (string, error) {
 			_ = parent.Rename(tmp, name)
 			return "", refuse("changed while being removed")
 		}
-		return "", parent.RemoveAll(tmp)
+		if err := parent.RemoveAll(tmp); err != nil {
+			// What is left goes back under its own name: under the private one
+			// neither the person nor a rule would find it again.
+			if parent.Rename(tmp, name) != nil {
+				return "", fmt.Errorf("%w (what is left is in %s)", err, filepath.Join(dir, tmp))
+			}
+			var pe *os.PathError
+			if errors.As(err, &pe) {
+				err = pe.Err
+			}
+			return "", fmt.Errorf("could not remove all of it: %w", err)
+		}
+		return "", nil
 	case "trash":
 		if it.Action.Unload {
 			// A loaded launch agent keeps running, and starting, after its file is gone.
