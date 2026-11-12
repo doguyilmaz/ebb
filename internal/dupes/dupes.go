@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -166,12 +167,20 @@ func regroup(ctx context.Context, groups [][]cand, total int, phase string, prog
 	jobs := make(chan job)
 	var mu sync.Mutex
 	done := 0
+	var workerErr error
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Go(func() {
 			for j := range jobs {
 				k, err := key(groups[j.g][j.i])
 				if err != nil {
+					if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						mu.Lock()
+						if workerErr == nil {
+							workerErr = ctx.Err()
+						}
+						mu.Unlock()
+					}
 					k = ""
 				}
 				mu.Lock()
@@ -200,6 +209,12 @@ feed:
 	close(jobs)
 	wg.Wait()
 	if err != nil {
+		return nil, err
+	}
+	if workerErr != nil {
+		return nil, workerErr
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	var out [][]cand
