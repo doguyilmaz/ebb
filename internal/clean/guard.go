@@ -54,9 +54,9 @@ func within(p, root string) bool {
 
 // Check returns why path must not be removed, or nil. APFS ignores case and
 // Unicode normalization, and a symlinked parent sends a path elsewhere, so
-// the check runs on the name as given (case-insensitively), on the path the
-// OS will actually reach, and on the identity (device and inode) of the
-// protected folders that exist.
+// the check runs on the name as given (ignoring case and how letters are
+// composed), on the path the OS will actually reach, and on the identity
+// (device and inode) of the protected folders that exist.
 func (g Guard) Check(path string) error {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return errors.New("not a plain absolute path")
@@ -113,7 +113,7 @@ func (g Guard) protectedLists() (subs, exact, tops []string) {
 }
 
 func (g Guard) checkName(path string) error {
-	lower := strings.ToLower
+	lower := func(s string) string { return strings.ToLower(composed(s)) }
 	p := lower(canonical(path))
 	if !slices.ContainsFunc(g.Roots, func(r string) bool { return within(p, lower(canonical(filepath.Clean(r)))) }) {
 		return errors.New("outside the scanned folders")

@@ -332,6 +332,30 @@ func TestGuardCaseVariants(t *testing.T) {
 	}
 }
 
+// APFS takes a name with composed letters (NFC, as typed) and one with
+// decomposed letters (NFD, as Finder often stores them) for the same name.
+func TestGuardProtectListIgnoresUnicodeNormalization(t *testing.T) {
+	home := t.TempDir()
+	composed, decomposed := "M\u00fcller", "Mu\u0308ller"
+	mkfile(t, filepath.Join(home, "Arbeit", "Kunden", decomposed, "x"), 10)
+	for _, c := range []struct{ protect, path string }{
+		{"~/Arbeit/Kunden/" + composed, "Arbeit/Kunden/" + decomposed},
+		{"~/Arbeit/Kunden/" + composed, "Arbeit/Kunden/" + decomposed + "/x"},
+		{"~/Arbeit/Kunden/" + composed + "/**", "Arbeit/Kunden/" + decomposed + "/x"},
+		{"~/Arbeit/Kunden/" + decomposed, "Arbeit/Kunden/" + composed + "/x"},
+		{"~/Arbeit/Kunden/" + composed + "/Akten", "Arbeit/Kunden/" + decomposed},
+	} {
+		g := Guard{Home: home, Roots: []string{home}, Protect: []string{c.protect}}
+		if err := g.Check(filepath.Join(home, c.path)); err == nil {
+			t.Errorf("protect %+q does not cover %+q", c.protect, c.path)
+		}
+	}
+	g := Guard{Home: home, Roots: []string{home}, Protect: []string{"~/Arbeit/Kunden/" + composed}}
+	if err := g.Check(filepath.Join(home, "Arbeit", "Kunden", "Mueller")); err != nil {
+		t.Fatalf("another name stays allowed: %v", err)
+	}
+}
+
 func TestGuardSymlinkIntoProtected(t *testing.T) {
 	_, home := sandboxEnv(t)
 	keychains := filepath.Join(home, "Library", "Keychains")
