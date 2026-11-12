@@ -59,6 +59,17 @@ final class EbbClientTests: XCTestCase {
         XCTAssertTrue(response.small.isEmpty)
     }
 
+    func testLiteralPlusSurvivesGoQueryDecoding() async throws {
+        let client = try makeClient { request in
+            let components = URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)
+            let encoded = try XCTUnwrap(components?.percentEncodedQuery)
+            let formValue = encoded.replacingOccurrences(of: "+", with: " ").removingPercentEncoding
+            XCTAssertEqual(formValue, "path=/tmp/A+B & notes")
+            return Self.response(for: request, status: 200, body: Data(#"{"path":"/tmp","items":[]}"#.utf8))
+        }
+        let _: ChildrenResponse = try await client.get("/children?path=%2Ftmp%2FA%2BB%20%26%20notes")
+    }
+
     func testNullArraysNormalizeToEmptyAndEmptyResponseAccepts204() async throws {
         let client = try makeClient { request in
             if request.url?.path.hasSuffix("/children") == true {
@@ -109,13 +120,12 @@ final class EbbClientTests: XCTestCase {
         XCTAssertTrue(plan.items.isEmpty)
     }
 
-    func testEventsRequestTicketAndParseMultilineSSE() async throws {
+    func testEventsUseHeaderAuthAndParseMultilineSSE() async throws {
         let client = try makeClient { request in
-            if request.httpMethod == "POST" {
-                let body = #"{"ticket":"one-use-ticket"}"#.data(using: .utf8)!
-                return Self.response(for: request, status: 200, body: body)
-            }
-            XCTAssertEqual(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "one-use-ticket")
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token-123")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/event-stream")
+            XCTAssertNil(request.url?.query)
             let sse = "event: hello\ndata: {\"ok\":true}\n\n: keep-alive\nevent: scan.progress\ndata: {\"dirs\":1,\ndata: \"files\":2,\ndata: \"bytes\":0,\ndata: \"problems\":0,\ndata: \"path\":\"\",\ndata: \"elapsedMs\":0}\n\n"
             return Self.response(for: request, status: 200, body: Data(sse.utf8), contentType: "text/event-stream")
         }

@@ -52,20 +52,19 @@ public actor EbbClient {
         try await perform(path: path, method: "DELETE", body: nil, as: type)
     }
 
-    /// Opens the one-use, short-lived SSE ticket and returns the live event stream.
+    /// Opens an authenticated live event stream using the native client's header.
     /// The returned stream owns the HTTP request and cancels it when its consumer
     /// is cancelled or releases the stream.
     public func events() async throws -> AsyncThrowingStream<EbbEvent, Error> {
-        let ticket: EventTicket = try await post("/events/ticket", as: EventTicket.self)
-        let request = try makeRequest(path: "/events", method: "GET", body: nil, timeout: 0, query: [
-            URLQueryItem(name: "ticket", value: ticket.ticket)
-        ])
+        var request = try makeRequest(path: "/events", method: "GET", body: nil, timeout: 60)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let streamRequest = request
         let session = self.session
 
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let (bytes, response) = try await session.bytes(for: request)
+                    let (bytes, response) = try await session.bytes(for: streamRequest)
                     guard let http = response as? HTTPURLResponse else {
                         throw EbbClientError.invalidResponse
                     }
@@ -124,11 +123,10 @@ public actor EbbClient {
         path: String,
         method: String,
         body: Data?,
-        as type: Response.Type,
-        query: [URLQueryItem] = []
+        as type: Response.Type
     ) async throws -> Response {
         let timeout: TimeInterval = method == "GET" ? 30 : 660
-        let request = try makeRequest(path: path, method: method, body: body, timeout: timeout, query: query)
+        let request = try makeRequest(path: path, method: method, body: body, timeout: timeout)
         let data: Data
         let response: URLResponse
         do {
@@ -161,10 +159,9 @@ public actor EbbClient {
         path: String,
         method: String,
         body: Data?,
-        timeout: TimeInterval,
-        query: [URLQueryItem]
+        timeout: TimeInterval
     ) throws -> URLRequest {
-        guard let url = makeURL(path: path, query: query) else {
+        guard let url = makeURL(path: path) else {
             throw EbbClientError.invalidEndpoint
         }
         var request = URLRequest(url: url)
@@ -179,7 +176,7 @@ public actor EbbClient {
         return request
     }
 
-    private func makeURL(path: String, query: [URLQueryItem]) -> URL? {
+    private func makeURL(path: String) -> URL? {
         guard !path.contains("://"), !path.hasPrefix("//"), !path.contains("#") else {
             return nil
         }
@@ -202,9 +199,9 @@ public actor EbbClient {
         let combined = [basePath, relativePath].filter { !$0.isEmpty }.joined(separator: "/")
         base!.percentEncodedPath = "/" + combined
 
-        var items = relative.queryItems ?? []
-        items.append(contentsOf: query)
-        base!.queryItems = items.isEmpty ? nil : items
+        // Preserve form encoding. Rebuilding queryItems turns %2B into '+' and
+        // Go then reads a different filename because it treats '+' as a space.
+        base!.percentEncodedQuery = relative.percentEncodedQuery
         base!.fragment = nil
         return base!.url
     }
