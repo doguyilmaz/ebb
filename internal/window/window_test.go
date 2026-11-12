@@ -34,10 +34,14 @@ func TestDefaultBrowser(t *testing.T) {
 	if got := httpsHandler([]byte(chrome)); got != "com.google.chrome" || safari(got) {
 		t.Fatalf("chrome: %q", got)
 	}
+	viewer := `{"LSHandlers":[{"LSHandlerURLScheme":"https","LSHandlerRoleViewer":"com.google.chrome"}]}`
+	if got := httpsHandler([]byte(viewer)); got != "com.google.chrome" || safari(got) {
+		t.Fatalf("viewer fallback: %q", got)
+	}
 	if got := httpsHandler([]byte(`{"LSHandlers":[]}`)); !safari(got) {
 		t.Fatalf("no choice made should be Safari: %q", got)
 	}
-	if !safari(httpsHandler([]byte("not json"))) || !safari("com.apple.SafariTechnologyPreview") {
+	if !safari(httpsHandler([]byte("not json"))) || !safari("com.apple.SafariTechnologyPreview") || !safari("com.example.unknown") {
 		t.Fatal("unknown and Safari Technology Preview should get ebb's own window")
 	}
 }
