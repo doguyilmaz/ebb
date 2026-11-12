@@ -69,7 +69,7 @@ type Planner struct {
 	Rules       *rules.Set
 	Protect     []string
 	Roots       []string
-	AutoExecute string // "regenerable" (default) | "never"
+	AutoExecute string // "regenerable" (default); any other value ("never") always asks
 }
 
 func newID() string {
@@ -115,11 +115,23 @@ func (p *Planner) Plan(req Request) (*Plan, error) {
 		items = append(items, its...)
 	}
 	items = outermost(items)
+	// Emptying a Trash goes first, so what this plan moves to the Trash stays
+	// there and can still be put back.
+	var first, rest []Item
+	for _, it := range items {
+		if it.Action.Kind == "empty-trash" {
+			first = append(first, it)
+		} else {
+			rest = append(rest, it)
+		}
+	}
+	items = append(first, rest...)
 	if len(items) == 0 {
 		return nil, ErrEmptyPlan
 	}
 	now := p.Env.Now()
-	plan := &Plan{ID: newID(), Created: now, Expires: now.Add(planLifetime), Source: req.Source, NeedsApproval: p.AutoExecute == "never"}
+	// A value ebb does not know (a typo, "Never") asks, as "never" does.
+	plan := &Plan{ID: newID(), Created: now, Expires: now.Add(planLifetime), Source: req.Source, NeedsApproval: p.AutoExecute != "regenerable"}
 	for i := range items {
 		p.check(&items[i])
 		it := items[i]
@@ -270,9 +282,12 @@ func smallFile(path string) bool {
 	return ok && st.Blocks*512 < 1<<20
 }
 
-// outermost drops items inside another item and duplicates.
+// outermost drops items inside another item and duplicates. In plain byte
+// order "b-c" sorts between "b" and "b/x"; with "/" before every other byte
+// whatever lies inside a folder follows it directly, so comparing with the
+// item kept last is enough.
 func outermost(items []Item) []Item {
-	slices.SortStableFunc(items, func(a, b Item) int { return cmp.Compare(a.Path, b.Path) })
+	slices.SortStableFunc(items, func(a, b Item) int { return comparePaths(a.Path, b.Path) })
 	var out []Item
 	for _, it := range items {
 		if len(out) > 0 && within(it.Path, out[len(out)-1].Path) {
@@ -281,6 +296,23 @@ func outermost(items []Item) []Item {
 		out = append(out, it)
 	}
 	return out
+}
+
+// comparePaths orders paths byte by byte, "/" first.
+func comparePaths(a, b string) int {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		x, y := a[i], b[i]
+		switch {
+		case x == y:
+			continue
+		case x == '/':
+			return -1
+		case y == '/':
+			return 1
+		}
+		return cmp.Compare(x, y)
+	}
+	return cmp.Compare(len(a), len(b))
 }
 
 // check fills Dev/Ino and Blocked from the disk, the guard and running apps.

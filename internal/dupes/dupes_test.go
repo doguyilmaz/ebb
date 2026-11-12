@@ -100,6 +100,44 @@ func TestFindStopsWhenCancelled(t *testing.T) {
 	}
 }
 
+func TestFindStopsWhenCancelledDuringSeveralSizeGroups(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 100; i++ {
+		size := int64(1<<20 + i*4096)
+		for copy := 0; copy < 2; copy++ {
+			p := filepath.Join(root, string(rune('a'+i/26))+string(rune('a'+i%26))+string(rune('0'+copy)))
+			f, err := os.Create(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.Write([]byte{byte(i + copy)}); err != nil {
+				f.Close()
+				t.Fatal(err)
+			}
+			if err := f.Truncate(size); err != nil {
+				f.Close()
+				t.Fatal(err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	scan, err := walk.Scan(context.Background(), walk.Options{Root: root, SmallThreshold: 1}, time.Hour, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if _, err := Find(ctx, scan.Tree, volume.Firmlinks{}, scan.Tree.Root(), 1<<20, func(p Progress) {
+		if p.Done >= 64 {
+			cancel()
+		}
+	}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("a stopped search with several groups returned %v", err)
+	}
+}
+
 func TestDigestStopsMidFile(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "big")
 	write(t, p, content(4, 3<<20))

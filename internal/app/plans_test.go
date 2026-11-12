@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,6 +107,90 @@ func TestExecuteNeedsApprovalForCaution(t *testing.T) {
 	}
 }
 
+// The window and `ebb approve` can both say yes to a plan an agent made, and
+// the agent can run it meanwhile.
+func TestApproveWhileThePlanRuns(t *testing.T) {
+	a, _ := cleanApp(t)
+	p, err := a.Plan(clean.Request{FindingIDs: []string{"test.dl"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Approve(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				a.Approve(p.ID)
+			}
+		}
+	})
+	res, err := a.Execute(context.Background(), p.ID, nil)
+	close(stop)
+	wg.Wait()
+	if err != nil || res.Done != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+}
+
+// `ebb undo` without an op, run again, puts back the item trashed before the
+// one it just put back.
+func TestUndoLatestAgainRestoresTheOneBefore(t *testing.T) {
+	a, home := cleanApp(t)
+	dmg := filepath.Join(home, "w", "old.dmg")
+	note := filepath.Join(home, "w", "note.txt")
+	write(t, note, 10)
+	for _, req := range []clean.Request{{FindingIDs: []string{"test.dl"}}, {Paths: []string{note}}} {
+		p, err := a.Plan(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := a.Approve(p.ID); err != nil {
+			t.Fatal(err)
+		}
+		if res, err := a.Execute(context.Background(), p.ID, nil); err != nil || res.Done != 1 {
+			t.Fatalf("%+v %v", res, err)
+		}
+	}
+	for _, want := range []string{note, dmg} {
+		if err := a.Undo(""); err != nil {
+			t.Fatalf("undo for %s: %v", filepath.Base(want), err)
+		}
+		if _, err := os.Lstat(want); err != nil {
+			t.Fatalf("%s is not back: %v", filepath.Base(want), err)
+		}
+	}
+	if err := a.Undo(""); err == nil || !strings.Contains(err.Error(), "nothing to undo") {
+		t.Fatalf("everything is back already: %v", err)
+	}
+}
+
+// Only "regenerable" lets a plan of rebuildable caches skip the approval: a
+// value ebb does not know, such as a capitalized "Never", asks like "never".
+func TestUnknownAutoExecuteAsks(t *testing.T) {
+	a, home := cleanApp(t)
+	for _, v := range []string{"never", "Never", "off", ""} {
+		if err := os.WriteFile(filepath.Join(home, ".config", "ebb", "config.toml"), []byte("[mcp]\nauto_execute = \""+v+"\"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "mcp"})
+		if err != nil || !p.NeedsApproval {
+			t.Errorf("auto_execute = %q: the plan runs without approval (%v)", v, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(home, ".config", "ebb", "config.toml"), []byte("[mcp]\nauto_execute = \"regenerable\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "mcp"}); err != nil || p.NeedsApproval {
+		t.Fatalf("regenerable: %+v %v", p, err)
+	}
+}
+
 func TestPresetSelectsCategories(t *testing.T) {
 	a, _ := cleanApp(t)
 	var dev uint64
@@ -154,6 +240,24 @@ func TestNotesSurviveRescan(t *testing.T) {
 		if it.Name == "w" && it.Note != "work stuff" {
 			t.Fatalf("%+v", it)
 		}
+	}
+}
+
+// A protection added after the plan was made holds when the plan runs.
+func TestProtectAddedAfterThePlanHolds(t *testing.T) {
+	a, home := cleanApp(t)
+	p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "cli"})
+	if err != nil || p.NeedsApproval || p.Items[0].Blocked != "" {
+		t.Fatalf("%+v %v", p, err)
+	}
+	s := a.Settings()
+	s.Protect = []string{"~/w/cache"}
+	if _, err := a.SaveSettings(s); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.Execute(context.Background(), p.ID, nil)
+	if _, serr := os.Stat(filepath.Join(home, "w", "cache", "blob")); err != nil || res.Refused != 1 || serr != nil {
+		t.Fatalf("%+v %v, still there: %v", res, err, serr)
 	}
 }
 

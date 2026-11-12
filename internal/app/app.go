@@ -33,26 +33,36 @@ var (
 
 type App struct {
 	Env     sys.Env
-	Config  config.Config
 	Rules   *rules.Set
 	History *history.Store
 	Links   volume.Firmlinks
 
-	mu       sync.Mutex
+	mu sync.Mutex
+	// cfg is replaced each time config.toml is read again, which page
+	// requests do all the time, so it is read through Config.
+	cfg config.Config
+	// cfgMu makes changes to config.toml one at a time: each reads the file
+	// and writes all of it back.
+	cfgMu    sync.Mutex
 	pairMu   sync.Mutex
 	running  bool
 	cleaning bool
 	packages struct {
 		scan   string
 		result sources.Packages
+		// dropped counts the times the cache was emptied.
+		dropped uint64
 	}
 	dupes struct {
-		running, loaded bool
-		stopped         bool
-		stop            context.CancelFunc
-		progress        *dupes.Progress
-		last            *dupes.Result
-		err             string
+		running  bool
+		stopped  bool
+		observed bool
+		stop     context.CancelFunc
+		progress *dupes.Progress
+		last     *dupes.Result
+		// file is duplicates.json as it was when last was read from it or saved.
+		file os.FileInfo
+		err  string
 	}
 	stop     context.CancelFunc
 	watch    *watcher
@@ -63,37 +73,83 @@ type App struct {
 	cur      *ScanResult
 	// curGen counts every change of cur, so a read of the saved scan that
 	// started before a newer result was set never puts the older one back.
-	curGen  uint64
+	curGen uint64
+	// curFile is last.json as it was when cur was read from it or saved.
+	curFile os.FileInfo
 	loading *lastLoad
 	plans   map[string]*planEntry
+	// externalReload is called after Last accepts a result saved by another
+	// ebb process. The server uses it to refresh open pages after a terminal
+	// scan or cleanup.
+	externalReload func(*ScanResult)
+	// externalDupesReload is called after Duplicates reads a result saved by
+	// another ebb process. The server uses it to refresh the duplicates page.
+	externalDupesReload func()
 }
 
 func New(env sys.Env) (*App, error) {
-	cfg, err := config.Load(env)
+	cfg, err := loadConfig(env)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", config.Path(env), err)
-	}
-	var large rules.Size
-	if err := large.UnmarshalText([]byte(cfg.Scan.LargeFile)); err != nil || large < 1<<20 {
-		return nil, fmt.Errorf("%s: [scan] large_file = %q is not a size like \"1GiB\"", config.Path(env), cfg.Scan.LargeFile)
+		return nil, err
 	}
 	set, err := rules.Load(env, ebb.Rules)
 	if err != nil {
 		return nil, err
 	}
-	a := &App{Env: env, Config: cfg, Rules: set, History: history.Open(sys.StateDir(env))}
+	a := &App{Env: env, cfg: cfg, Rules: set, History: history.Open(sys.StateDir(env))}
 	if runtime.GOOS == "darwin" {
 		a.Links = volume.LoadFirmlinks("/usr/share/firmlinks", dataVolume)
 	}
 	return a, nil
 }
 
+// loadConfig reads config.toml and refuses a large_file that is no size: a
+// scan would take every file for a large one.
+func loadConfig(env sys.Env) (config.Config, error) {
+	cfg, err := config.Load(env)
+	if err != nil {
+		return cfg, fmt.Errorf("%s: %w", config.Path(env), err)
+	}
+	var large rules.Size
+	if err := large.UnmarshalText([]byte(cfg.Scan.LargeFile)); err != nil || large < 1<<20 {
+		return cfg, fmt.Errorf("%s: [scan] large_file = %q is not a size like \"1GiB\"", config.Path(env), cfg.Scan.LargeFile)
+	}
+	return cfg, nil
+}
+
+// Config is the configuration as last read. A page request can read
+// config.toml again while a scan or another request uses it, so each caller
+// gets its own copy, taken under the lock.
+func (a *App) Config() config.Config {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cfg
+}
+
+// SetExternalReloadHandler installs the notification called after Last loads
+// a scan saved by another process. It is intentionally a callback so app does
+// not depend on the HTTP server package.
+func (a *App) SetExternalReloadHandler(fn func(*ScanResult)) {
+	a.mu.Lock()
+	a.externalReload = fn
+	a.mu.Unlock()
+}
+
+// SetExternalDuplicatesReloadHandler installs the notification called after
+// Duplicates reads a result saved by another process.
+func (a *App) SetExternalDuplicatesReloadHandler(fn func()) {
+	a.mu.Lock()
+	a.externalDupesReload = fn
+	a.mu.Unlock()
+}
+
 // DefaultRoot is the whole data volume on macOS, the configured root when
 // set, and the sandbox home in a sandboxed session.
 func (a *App) DefaultRoot() string {
+	root := a.Config().Scan.Root
 	switch {
-	case a.Config.Scan.Root != "":
-		return rules.Expand(a.Env, a.Config.Scan.Root)
+	case root != "":
+		return rules.Expand(a.Env, root)
 	case sys.Sandboxed(a.Env):
 		return a.Env.Home()
 	}

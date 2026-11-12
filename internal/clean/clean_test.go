@@ -102,7 +102,8 @@ func TestGuardProtectedPaths(t *testing.T) {
 	g := Guard{Home: "/Users/h", Roots: []string{"/"}}
 	for _, p := range []string{"/", "/System", "/System/Library/x", "/Users/h", "/Users/h/Documents", "/Users/h/Library",
 		"/Users/h/Library/Keychains/login.keychain-db", "/usr/bin/ls", "/Applications", "/Users/h/Library/Mobile Documents/x",
-		"/Users/h/Library/CloudStorage/Dropbox/a", "/etc/hosts", "/Volumes/Backup", "relative/x", "/Users/h/a/../../../etc"} {
+		"/Users/h/Library/CloudStorage/Dropbox/a", "/etc/hosts", "/Volumes/Backup", "relative/x", "/Users/h/a/../../../etc",
+		"/Users/h/Dropbox/a", "/Users/h/Google Drive/x", "/Library/Keychains/System.keychain"} {
 		if err := g.Check(p); err == nil {
 			t.Errorf("%s must be protected", p)
 		}
@@ -173,6 +174,101 @@ func TestPlanBlockedWhileRunning(t *testing.T) {
 	p, _ := planner(env, f).Plan(Request{FindingIDs: []string{f.ID}})
 	if !strings.Contains(p.Items[0].Blocked, "Quit Xcode") {
 		t.Fatalf("%+v", p.Items[0])
+	}
+}
+
+// An app opened after the plan was made still holds its files when it runs.
+func TestExecuteRefusesWhileOwnerRuns(t *testing.T) {
+	env, home := sandboxEnv(t)
+	target := filepath.Join(home, "w", "dd")
+	mkfile(t, filepath.Join(target, "f"), 10)
+	busy := false
+	env.RunFn = func(_, name string, args ...string) ([]byte, error) {
+		if name == "pgrep" && busy && args[len(args)-1] == "Xcode" {
+			return []byte("123\n"), nil
+		}
+		return nil, errors.New("no")
+	}
+	f := findingFor(target, finding.Regenerable, finding.Action{Kind: "delete", Quit: []string{"Xcode"}})
+	p, _ := planner(env, f).Plan(Request{FindingIDs: []string{f.ID}})
+	if p.Items[0].Blocked != "" {
+		t.Fatalf("%+v", p.Items[0])
+	}
+	busy = true
+	res, err := executor(env).Execute(context.Background(), p, nil)
+	if err != nil || res.Refused != 1 || !strings.Contains(res.Ops[0].Error, "Quit Xcode") || !exists(filepath.Join(target, "f")) {
+		t.Fatalf("%+v %v", res, err)
+	}
+}
+
+// Emptying a Trash in the plan that also moves things to the Trash must not
+// delete those for good, wherever their paths sort.
+func TestEmptyTrashKeepsWhatThePlanTrashes(t *testing.T) {
+	env, home := sandboxEnv(t)
+	trash := filepath.Join(home, ".Trash")
+	mkfile(t, filepath.Join(trash, "old.bin"), 1<<20)
+	early := filepath.Join(home, ".Archive", "a.zip") // ".A" sorts before ".Trash"
+	late := filepath.Join(home, "w", "b.zip")
+	mkfile(t, early, 10)
+	mkfile(t, late, 10)
+	fs := []finding.Finding{findingFor(trash, finding.Caution, finding.Action{Kind: "empty-trash"}),
+		findingFor(early, finding.Caution, finding.Action{Kind: "trash"}), findingFor(late, finding.Caution, finding.Action{Kind: "trash"})}
+	p, err := planner(env, fs...).Plan(Request{FindingIDs: []string{fs[0].ID, fs[1].ID, fs[2].ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Approved = true
+	ex := executor(env)
+	res, err := ex.Execute(context.Background(), p, nil)
+	if err != nil || res.Done != 3 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	for _, op := range res.Ops {
+		if op.Action == "trash" {
+			if err := Undo(env, ex.Log, op.ID); err != nil {
+				t.Errorf("%s: %v", filepath.Base(op.Path), err)
+			}
+		}
+	}
+	if exists(filepath.Join(trash, "old.bin")) {
+		t.Fatal("the Trash was not emptied")
+	}
+}
+
+// Emptying a Trash removes a symlink in it, never what it points to, and
+// leaves what the person protects.
+func TestEmptyTrashKeepsLinkTargetsAndProtected(t *testing.T) {
+	env, home := sandboxEnv(t)
+	trash := filepath.Join(home, ".Trash")
+	precious := filepath.Join(home, "w", "precious")
+	mkfile(t, filepath.Join(precious, "keep"), 10)
+	mkfile(t, filepath.Join(trash, "old.bin"), 1<<20)
+	mkfile(t, filepath.Join(trash, "kept", "x"), 10)
+	for _, l := range [][2]string{{precious, "dirlink"}, {filepath.Join(precious, "keep"), "filelink"}} {
+		if err := os.Symlink(l[0], filepath.Join(trash, l[1])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := findingFor(trash, finding.Caution, finding.Action{Kind: "empty-trash"})
+	pl := planner(env, f)
+	pl.Protect = []string{"~/.Trash/kept"}
+	p, err := pl.Plan(Request{FindingIDs: []string{f.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Approved = true
+	ex := executor(env)
+	ex.Guard.Protect = pl.Protect
+	if _, err := ex.Execute(context.Background(), p, nil); err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	des, _ := os.ReadDir(trash)
+	for _, d := range des {
+		left = append(left, d.Name())
+	}
+	if strings.Join(left, " ") != "kept" || !exists(filepath.Join(precious, "keep")) {
+		t.Fatalf("left in the Trash %q, link target there: %v", left, exists(filepath.Join(precious, "keep")))
 	}
 }
 
@@ -278,6 +374,42 @@ func TestNestedItemsDeduped(t *testing.T) {
 	}
 }
 
+// Sorted by bytes, "b-c" and "b.d" fall between "b" and "b/x": the folder's
+// contents are not next to it, yet they go with it.
+func TestNestedItemsDedupedPastSiblings(t *testing.T) {
+	env, home := sandboxEnv(t)
+	w := filepath.Join(home, "w")
+	for _, d := range []string{"b/x", "b-c", "b.d"} {
+		mkfile(t, filepath.Join(w, d, "f"), 10)
+	}
+	var fs []finding.Finding
+	var ids []string
+	for _, rel := range []string{"b/x", "b", "b-c", "b.d", "b"} {
+		f := findingFor(filepath.Join(w, rel), finding.Regenerable, finding.Action{Kind: "delete"})
+		f.ID = rel
+		if slices.Contains(ids, rel) {
+			f.ID = rel + " again"
+		}
+		fs, ids = append(fs, f), append(ids, f.ID)
+	}
+	p, err := planner(env, fs...).Plan(Request{FindingIDs: ids})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, it := range p.Items {
+		rel, _ := filepath.Rel(w, it.Path)
+		got = append(got, rel)
+	}
+	if strings.Join(got, " ") != "b b-c b.d" || p.Bytes != 3<<20 || p.Items[0].FindingID != "b" {
+		t.Fatalf("items %q, %d bytes: b/x goes with b and counts once, the first b wins", got, p.Bytes)
+	}
+	res, err := executor(env).Execute(context.Background(), p, nil)
+	if err != nil || res.Done != 3 || res.Refused != 0 || res.Freed != 3<<20 {
+		t.Fatalf("%+v %v", res, err)
+	}
+}
+
 func TestPlanArbitraryPathIsCautiousTrash(t *testing.T) {
 	env, home := sandboxEnv(t)
 	mkfile(t, filepath.Join(home, "w", "stuff", "f"), 10)
@@ -293,6 +425,30 @@ func TestGuardCaseVariants(t *testing.T) {
 		if err := g.Check(p); err == nil {
 			t.Errorf("APFS ignores case, so %s is protected too", p)
 		}
+	}
+}
+
+// APFS takes a name with composed letters (NFC, as typed) and one with
+// decomposed letters (NFD, as Finder often stores them) for the same name.
+func TestGuardProtectListIgnoresUnicodeNormalization(t *testing.T) {
+	home := t.TempDir()
+	composed, decomposed := "M\u00fcller", "Mu\u0308ller"
+	mkfile(t, filepath.Join(home, "Arbeit", "Kunden", decomposed, "x"), 10)
+	for _, c := range []struct{ protect, path string }{
+		{"~/Arbeit/Kunden/" + composed, "Arbeit/Kunden/" + decomposed},
+		{"~/Arbeit/Kunden/" + composed, "Arbeit/Kunden/" + decomposed + "/x"},
+		{"~/Arbeit/Kunden/" + composed + "/**", "Arbeit/Kunden/" + decomposed + "/x"},
+		{"~/Arbeit/Kunden/" + decomposed, "Arbeit/Kunden/" + composed + "/x"},
+		{"~/Arbeit/Kunden/" + composed + "/Akten", "Arbeit/Kunden/" + decomposed},
+	} {
+		g := Guard{Home: home, Roots: []string{home}, Protect: []string{c.protect}}
+		if err := g.Check(filepath.Join(home, c.path)); err == nil {
+			t.Errorf("protect %+q does not cover %+q", c.protect, c.path)
+		}
+	}
+	g := Guard{Home: home, Roots: []string{home}, Protect: []string{"~/Arbeit/Kunden/" + composed}}
+	if err := g.Check(filepath.Join(home, "Arbeit", "Kunden", "Mueller")); err != nil {
+		t.Fatalf("another name stays allowed: %v", err)
 	}
 }
 
@@ -323,6 +479,50 @@ func TestExecuteDeleteRechecksAfterRename(t *testing.T) {
 		if strings.HasPrefix(d.Name(), ".ebb-delete-") {
 			t.Fatal("temporary name left behind")
 		}
+	}
+}
+
+// A delete that cannot remove everything (here a read-only folder inside)
+// leaves the rest under its own name, where the person and the next scan
+// still see it, not under the private name it was moved to.
+func TestExecuteDeleteFailureLeavesTheRestInPlace(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root removes read-only folders")
+	}
+	env, home := sandboxEnv(t)
+	target := filepath.Join(home, "w", "cache")
+	mkfile(t, filepath.Join(target, "ro", "f"), 1<<20)
+	mkfile(t, filepath.Join(target, "rw", "g"), 1<<20)
+	p := planFor(t, env, target, finding.Regenerable)
+	ro := filepath.Join(target, "ro")
+	if err := os.Chmod(ro, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		filepath.WalkDir(filepath.Join(home, "w"), func(p string, d os.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				os.Chmod(p, 0o755)
+			}
+			return nil
+		})
+	})
+	var failed string
+	res, err := executor(env).Execute(context.Background(), p, func(e Event) {
+		if e.State == "failed" {
+			failed = e.Err
+		}
+	})
+	if err != nil || res.Failed != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	des, _ := os.ReadDir(filepath.Join(home, "w"))
+	for _, d := range des {
+		if strings.HasPrefix(d.Name(), ".ebb-delete-") {
+			t.Fatalf("what could not be removed hides in %s", d.Name())
+		}
+	}
+	if !exists(filepath.Join(ro, "f")) || strings.Contains(failed, ".ebb-delete-") || !strings.Contains(failed, "permission denied") {
+		t.Fatalf("the rest stays at %s (%v), failure reads %q", target, exists(filepath.Join(ro, "f")), failed)
 	}
 }
 

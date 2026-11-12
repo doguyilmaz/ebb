@@ -25,6 +25,10 @@ export function listen(qc: QueryClient): () => void {
       case "plan.progress":
         live.addPlanEvent(data as PlanEvent);
         break;
+      case "plan.done":
+        resultKeys.forEach((k) => qc.invalidateQueries({ queryKey: k }));
+        qc.invalidateQueries({ queryKey: ["ops"] });
+        break;
       case "duplicates.done":
         qc.invalidateQueries({ queryKey: ["duplicates"] });
         break;

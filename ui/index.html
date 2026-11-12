@@ -22,6 +22,8 @@
       /* A start that takes a while says so; a quick one is over before this appears. Reduced motion shows it at once
          (app.css). */
       .splash-note { font-size: 12.5px; line-height: 1.5; color: var(--text-3); opacity: 0; animation: splash-note 400ms ease-out 900ms forwards; }
+      .splash-recovery { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0 24px; text-align: center; font-size: 13px; color: var(--text-3); }
+      .splash-recovery[hidden] { display: none; }
       @keyframes splash-note { to { opacity: 1; } }
     </style>
   </head>
@@ -32,6 +34,10 @@
       <img src="/favicon.svg" width="64" height="64" alt="" />
       <span class="splash-name" aria-hidden="true">ebb</span>
       <span class="splash-note">Opening ebb…</span>
+      <div id="splash-recovery" class="splash-recovery" hidden>
+        <span>ebb is taking longer than usual. You can reload this window.</span>
+        <button id="splash-reload" class="btn small" type="button">Reload window</button>
+      </div>
     </div>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>

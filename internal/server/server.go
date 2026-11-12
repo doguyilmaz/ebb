@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/app"
 	"github.com/doguyilmaz/ebb/internal/server/assets"
 	"github.com/doguyilmaz/ebb/internal/state"
@@ -32,6 +33,14 @@ type Server struct {
 
 func New(a *app.App, version, token string) *Server {
 	s := &Server{app: a, token: token, version: version, hub: newHub(), mux: http.NewServeMux(), spa: assets.Handler("/api/")}
+	a.SetExternalReloadHandler(func(r *app.ScanResult) {
+		s.Notify(api.EventScanDone, r.Meta)
+		s.Notify(api.EventFindingsChanged, nil)
+		s.Notify(api.EventHistoryChanged, nil)
+	})
+	a.SetExternalDuplicatesReloadHandler(func() {
+		s.Notify(api.EventDupesDone, map[string]any{"error": ""})
+	})
 	s.routes()
 	return s
 }
@@ -203,17 +212,26 @@ func Serve(ctx context.Context, s *Server, addr string, ready func(url string)) 
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second,
+		BaseContext: func(net.Listener) context.Context { return ctx }}
 	if ready != nil {
 		ready("http://" + ln.Addr().String() + "/#token=" + s.token)
 	}
+	served, stopped := make(chan struct{}), make(chan struct{})
 	go func() {
-		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdown)
+		defer close(stopped)
+		select {
+		case <-ctx.Done():
+			// Requests see cancellation, so streams end and plans stop before
+			// the next item. The operation in hand must finish and be logged.
+			_ = srv.Shutdown(context.Background())
+		case <-served:
+		}
 	}()
-	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	err = srv.Serve(ln)
+	close(served)
+	<-stopped
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil

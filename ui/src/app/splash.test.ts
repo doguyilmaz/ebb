@@ -16,7 +16,7 @@ test("every script comes from a file, as the content security policy only allows
 test("the splash is painted before any script runs and stays outside what React replaces", () => {
   const splash = body.match(/<div id="splash"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
   expect(splash).not.toBe("");
-  expect(splash).not.toMatch(/\shidden\b/);
+  expect(splash.split(">")[0]).not.toMatch(/\shidden\b/);
   expect(splash).toMatch(/role="status"/);
   expect(splash).toMatch(/<img [^>]*alt=""/);
   expect(splash).toContain("ebb");

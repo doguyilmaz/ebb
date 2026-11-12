@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/apps"
@@ -123,6 +124,8 @@ func (a *App) Execute(ctx context.Context, id string, fn func(clean.Event)) (cle
 		return clean.Result{}, ErrSearching
 	}
 	a.cleaning = true
+	// Approve can still write the plan while it runs: the executor reads a copy.
+	plan := *e.plan
 	a.mu.Unlock()
 	defer func() {
 		a.mu.Lock()
@@ -134,7 +137,7 @@ func (a *App) Execute(ctx context.Context, id string, fn func(clean.Event)) (cle
 		return clean.Result{}, err
 	}
 	ex := &clean.Executor{Env: a.Env, Log: a.OpLog(), Trash: clean.NewTrasher(a.Env), Guard: a.guard(r), Links: a.Links}
-	res, err := ex.Execute(ctx, e.plan, fn)
+	res, err := ex.Execute(ctx, &plan, fn)
 	if errors.Is(err, clean.ErrNeedsApproval) || errors.Is(err, clean.ErrExpired) {
 		return res, err
 	}
@@ -189,25 +192,39 @@ func (a *App) afterClean(r *ScanResult, res clean.Result) error {
 	}
 	r.Findings = kept
 	if len(gone) > 0 {
-		a.packages.scan = ""
+		a.dropPackages()
 	}
 	a.mu.Unlock()
 	a.forgetCopies(gone)
 	r.Tree.Compact()
-	return a.saveLast(r)
+	saved, err := a.saveLast(r)
+	if err != nil {
+		return err
+	}
+	// r is the result in memory: Last reloads nothing while a cleanup runs.
+	a.mu.Lock()
+	a.curFile = saved
+	a.mu.Unlock()
+	return nil
 }
 
 func (a *App) Ops(limit int) ([]clean.Op, error) { return a.OpLog().List(limit) }
 
-// Undo puts a trashed item back; the empty op ID means the latest one.
+// Undo puts a trashed item back; the empty op ID means the latest one not
+// put back yet.
 func (a *App) Undo(opID string) error {
 	if opID == "" {
 		ops, err := a.Ops(0)
 		if err != nil {
 			return err
 		}
+		// A put back is logged as an op of its own, newer than the one it undid.
+		undone := map[string]bool{}
 		for _, op := range ops {
-			if op.Action == "trash" && op.Result == "done" {
+			if op.Action == "undo" && op.Result == "done" {
+				undone[strings.TrimPrefix(op.ID, "undo-")] = true
+			}
+			if op.Action == "trash" && op.Result == "done" && !undone[op.ID] {
 				opID = op.ID
 				break
 			}

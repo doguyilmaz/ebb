@@ -74,6 +74,9 @@ func (s *Server) dataRoutes() {
 		if errors.Is(err, sys.ErrSandbox) {
 			return nil, coded(http.StatusConflict, "sandboxed", "the folder chooser is off in the sandbox; type the path instead")
 		}
+		if errors.Is(err, app.ErrBadChoosePurpose) {
+			return nil, badRequest(err.Error())
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +108,12 @@ func intParam(r *http.Request, name string, def, lo, hi int) int {
 }
 
 func (s *Server) status(_ http.ResponseWriter, _ *http.Request) (any, error) {
-	return s.app.Status(s.version), nil
+	status := s.app.Status(s.version)
+	// The status poll is already the page's cross-process heartbeat. Let the
+	// duplicate cache use that heartbeat too, so a terminal search can refresh
+	// an open duplicates page without a second polling loop.
+	s.app.RefreshExternalDuplicates()
+	return status, nil
 }
 
 func (s *Server) startScan(_ http.ResponseWriter, r *http.Request) (any, error) {

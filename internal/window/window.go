@@ -76,6 +76,7 @@ func httpsHandler(raw []byte) string {
 		LSHandlers []struct {
 			Scheme string `json:"LSHandlerURLScheme"`
 			App    string `json:"LSHandlerRoleAll"`
+			Viewer string `json:"LSHandlerRoleViewer"`
 		}
 	}
 	if json.Unmarshal(raw, &ls) != nil {
@@ -83,7 +84,10 @@ func httpsHandler(raw []byte) string {
 	}
 	for _, h := range ls.LSHandlers {
 		if h.Scheme == "https" {
-			return h.App
+			if h.App != "" {
+				return h.App
+			}
+			return h.Viewer
 		}
 	}
 	// Nobody picked another browser.
@@ -92,5 +96,25 @@ func httpsHandler(raw []byte) string {
 
 // safari counts an unknown browser too: ebb's own window works in every browser.
 func safari(bundleID string) bool {
-	return bundleID == "" || strings.HasPrefix(strings.ToLower(bundleID), "com.apple.safari")
+	id := strings.ToLower(strings.TrimSpace(bundleID))
+	if id == "" || strings.HasPrefix(id, "com.apple.safari") {
+		return true
+	}
+	// Only known browsers are safe to open a hosted page in. LaunchServices
+	// can report a new or third-party handler that ebb has not vetted; using
+	// the local window keeps the one-time token on this Mac in that case.
+	for _, known := range []string{
+		"com.google.chrome",
+		"com.microsoft.edgemac",
+		"org.mozilla.firefox",
+		"com.brave.browser",
+		"com.operasoftware.opera",
+		"com.vivaldi.vivaldi",
+		"company.thebrowser.browser",
+	} {
+		if id == known || strings.HasPrefix(id, known+".") {
+			return false
+		}
+	}
+	return true
 }

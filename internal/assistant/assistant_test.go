@@ -75,3 +75,30 @@ func TestInstallDryRunChangesNothing(t *testing.T) {
 		t.Fatalf("dry run wrote %v", entries)
 	}
 }
+
+func TestInstallDoesNotOverwriteAnEditedSkill(t *testing.T) {
+	env, _ := fake(t, map[string]string{"claude": "/bin/claude"})
+	path := filepath.Join(env.Home(), ".claude", "skills", "ebb", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const edited = "# My local ebb instructions\n"
+	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	steps, err := Install(context.Background(), env, "/opt/ebb", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != edited {
+		t.Fatalf("edited skill was overwritten with %q", got)
+	}
+	if !strings.Contains(strings.Join(steps, "\n"), "edited; not overwritten") {
+		t.Fatalf("install did not explain the preserved edit: %q", steps)
+	}
+}

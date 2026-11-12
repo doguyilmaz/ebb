@@ -36,15 +36,16 @@ func errInvalidOrigin(o string) error {
 }
 
 // reloadConfig re-reads config.toml so a grant made by the CLI reaches a
-// server that is already running.
+// server that is already running. A file that does not parse, or that New
+// would refuse, leaves the settings as they were.
 func (a *App) reloadConfig() config.Config {
-	if cfg, err := config.Load(a.Env); err == nil {
+	if cfg, err := loadConfig(a.Env); err == nil {
 		a.mu.Lock()
-		a.Config = cfg
+		a.cfg = cfg
 		a.mu.Unlock()
 		return cfg
 	}
-	return a.Config
+	return a.Config()
 }
 
 func (a *App) SaveConfig(cfg config.Config) error {
@@ -52,7 +53,7 @@ func (a *App) SaveConfig(cfg config.Config) error {
 		return err
 	}
 	a.mu.Lock()
-	a.Config = cfg
+	a.cfg = cfg
 	a.mu.Unlock()
 	return nil
 }
@@ -85,6 +86,8 @@ func (a *App) AllowWebOrigin(origin string) (api.WebAccess, error) {
 	if !ok {
 		return api.WebAccess{}, errInvalidOrigin(origin)
 	}
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	cfg := a.reloadConfig()
 	if !slices.Contains(cfg.Server.WebOrigins, norm) {
 		cfg.Server.WebOrigins = append(slices.Clone(cfg.Server.WebOrigins), norm)
@@ -102,6 +105,8 @@ func (a *App) DenyWebOrigin(origin string) (api.WebAccess, error) {
 	if !ok {
 		return api.WebAccess{}, errInvalidOrigin(origin)
 	}
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	cfg := a.reloadConfig()
 	before := len(cfg.Server.WebOrigins)
 	cfg.Server.WebOrigins = slices.DeleteFunc(slices.Clone(cfg.Server.WebOrigins), func(o string) bool { return o == norm })

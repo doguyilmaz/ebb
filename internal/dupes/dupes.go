@@ -202,6 +202,9 @@ feed:
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var out [][]cand
 	for g, cs := range groups {
 		by := map[string][]cand{}

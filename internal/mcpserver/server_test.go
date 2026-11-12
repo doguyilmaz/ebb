@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	"github.com/doguyilmaz/ebb/internal/app"
+	"github.com/doguyilmaz/ebb/internal/remote"
+	"github.com/doguyilmaz/ebb/internal/server"
 	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
@@ -174,7 +177,7 @@ func TestExecuteNeedsApproval(t *testing.T) {
 
 	id := planID(t, s, "installers")
 	got := session(t, s, call(1, "ebb_cleanup_execute", `{"planId":"`+id+`"}`))
-	if !got[1].Result.IsError || !strings.Contains(got[1].Result.Content[0].Text, "approval") {
+	if !got[1].Result.IsError || !strings.Contains(got[1].Result.Content[0].Text, "no ebb is running") {
 		t.Fatalf("an installer plan must wait for the person: %+v", got[1])
 	}
 	if _, err := os.Stat(filepath.Join(home, "Downloads", "Setup.dmg")); err != nil {
@@ -193,6 +196,42 @@ func TestExecuteNeedsApproval(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, ".testcache", "pkgs")); !os.IsNotExist(err) {
 		t.Fatalf("cache still there: %v", err)
+	}
+}
+
+// Through a running ebb, a plan that needs the person waits for them: the MCP
+// server says how they approve it before asking ebb to run it, and no tool
+// approves.
+func TestRemoteExecuteWaitsForApproval(t *testing.T) {
+	a, home := sandbox(t)
+	if _, err := a.Scan(context.Background(), app.ScanOptions{Root: home}, nil); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(server.New(a, "test", "secret"))
+	t.Cleanup(srv.Close)
+	s := New(Remote(&remote.Client{Base: srv.URL, Token: "secret", HTTP: srv.Client()}), "test")
+	for _, tl := range s.tools {
+		if strings.Contains(tl.Name, "approve") {
+			t.Fatalf("an agent must not approve: %s", tl.Name)
+		}
+	}
+	dmg := filepath.Join(home, "Downloads", "Setup.dmg")
+	id := planID(t, s, "installers")
+	got := session(t, s, call(1, "ebb_cleanup_execute", `{"planId":"`+id+`"}`))
+	if !got[1].Result.IsError || !strings.Contains(got[1].Result.Content[0].Text, "ebb approve "+id) {
+		t.Fatalf("the agent learns how the person approves it: %+v", got[1])
+	}
+	if _, err := os.Stat(dmg); err != nil {
+		t.Fatal("nothing may be touched before approval")
+	}
+	if _, err := a.Approve(id); err != nil {
+		t.Fatal(err)
+	}
+	if got := session(t, s, call(1, "ebb_cleanup_execute", `{"planId":"`+id+`"}`)); got[1].Result.IsError {
+		t.Fatalf("approved by the person, it runs: %+v", got[1])
+	}
+	if _, err := os.Stat(dmg); !os.IsNotExist(err) {
+		t.Fatalf("still in Downloads: %v", err)
 	}
 }
 

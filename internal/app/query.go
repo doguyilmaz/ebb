@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	ErrOutsideRoot = errors.New("path is outside the scanned folder")
-	ErrNotInScan   = errors.New("path is not in the last scan")
+	ErrOutsideRoot      = errors.New("path is outside the scanned folder")
+	ErrNotInScan        = errors.New("path is not in the last scan")
+	ErrBadChoosePurpose = errors.New("unknown folder chooser purpose")
 )
 
 func within(p, root string) bool {
@@ -262,7 +263,7 @@ var choosePrompts = map[string]string{"scan": "Choose a folder for ebb to scan",
 func (a *App) ChooseFolder(ctx context.Context, purpose string) (string, error) {
 	prompt, ok := choosePrompts[purpose]
 	if !ok {
-		return "", fmt.Errorf("unknown purpose %q", purpose)
+		return "", fmt.Errorf("%w %q", ErrBadChoosePurpose, purpose)
 	}
 	out, err := a.Env.Run(ctx, "", "osascript", "-e", "activate", "-e", `POSIX path of (choose folder with prompt "`+prompt+`")`)
 	var exit *exec.ExitError

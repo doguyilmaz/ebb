@@ -10,6 +10,9 @@ builds:
     binary: ebb
     env:
       - CGO_ENABLED=1
+      - MACOSX_DEPLOYMENT_TARGET=12.0
+      - CGO_CFLAGS=-O2 -g -mmacosx-version-min=12.0
+      - CGO_LDFLAGS=-O2 -g -mmacosx-version-min=12.0
     goos: [darwin]
     goarch: [arm64, amd64]
     flags: [-trimpath]

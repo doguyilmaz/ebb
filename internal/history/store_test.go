@@ -2,6 +2,8 @@ package history
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -49,6 +51,29 @@ func TestSameSecondDoesNotOverwrite(t *testing.T) {
 	s.Save(snap(at.Add(100 * time.Millisecond)))
 	if metas, _ := s.List(); len(metas) != 2 || metas[0].ID == metas[1].ID {
 		t.Fatalf("%+v", metas)
+	}
+}
+
+func TestLoadRejectsCorruptSnapshot(t *testing.T) {
+	s := Open(t.TempDir())
+	at := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	if err := s.Save(snap(at, Dir{Path: "/r/a", Alloc: 5})); err != nil {
+		t.Fatal(err)
+	}
+	metas, err := s.List()
+	if err != nil || len(metas) != 1 {
+		t.Fatalf("list: %v %+v", err, metas)
+	}
+	p := filepath.Join(s.dir, metas[0].ID+".snap")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, b[:len(b)/2], 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Load(metas[0].ID); err == nil {
+		t.Fatal("a truncated snapshot must fail to load")
 	}
 }
 

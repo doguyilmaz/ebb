@@ -4,10 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/app"
+	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
 func cleanClient(t *testing.T) (*client, string) {
@@ -63,6 +66,49 @@ func TestPlanApproveExecuteOverAPI(t *testing.T) {
 	}
 	if code, out := c.post("/api/v1/plans/nope/execute", "", true, ""); code != 404 {
 		t.Fatalf("%d %v", code, out)
+	}
+}
+
+// clock is a test Env whose time moves while the server answers.
+type clock struct {
+	*sys.Fake
+	now atomic.Int64
+}
+
+func (c *clock) Now() time.Time { return time.Unix(0, c.now.Load()) }
+
+// The server refuses a plan nobody approved and one that expired, whatever a
+// client (an agent's MCP server) checked before asking.
+func TestUnapprovedAndExpiredPlansRefusedOverAPI(t *testing.T) {
+	c, home := cleanClient(t)
+	env := &clock{Fake: c.app.Env.(*sys.Fake)}
+	env.now.Store(env.Fake.Now().UnixNano())
+	a, err := app.New(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Scan(context.Background(), app.ScanOptions{Root: home}, nil); err != nil {
+		t.Fatal(err)
+	}
+	c.app, c.s.app = a, a
+	file := filepath.Join(home, "w", "cache", "b")
+	code, plan := c.post("/api/v1/plans", "", true, `{"paths":["`+file+`"],"source":"mcp"}`)
+	if code != 200 || plan["needsApproval"] != true {
+		t.Fatalf("%d %v", code, plan)
+	}
+	if code, out := c.post("/api/v1/plans/"+plan["id"].(string)+"/execute", "", true, ""); code != 409 || out["code"] != "needs-approval" {
+		t.Fatalf("unapproved: %d %v", code, out)
+	}
+	code, plan = c.post("/api/v1/plans", "", true, `{"findingIds":["t.cache"],"source":"mcp"}`)
+	if code != 200 || plan["needsApproval"] != false {
+		t.Fatalf("%d %v", code, plan)
+	}
+	env.now.Add(int64(11 * time.Minute))
+	if code, out := c.post("/api/v1/plans/"+plan["id"].(string)+"/execute", "", true, ""); code != 410 || out["code"] != "plan-expired" {
+		t.Fatalf("expired: %d %v", code, out)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("nothing may be touched: %v", err)
 	}
 }
 

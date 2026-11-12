@@ -24,14 +24,15 @@ func TestTSGenShapes(t *testing.T) {
 		N int `json:"n"`
 	}
 	type sample struct {
-		Name    string            `json:"name"`
-		Opt     string            `json:"opt,omitempty"`
-		Skip    string            `json:"-"`
-		When    time.Time         `json:"when"`
-		List    []inner           `json:"list"`
-		Ptr     *inner            `json:"ptr"`
-		Map     map[string]uint64 `json:"map"`
-		Any     any               `json:"any"`
+		Name string            `json:"name"`
+		Opt  string            `json:"opt,omitempty"`
+		Skip string            `json:"-"`
+		When time.Time         `json:"when"`
+		List []inner           `json:"list"`
+		Ptr  *inner            `json:"ptr"`
+		Map  map[string]uint64 `json:"map"`
+		Any  any               `json:"any"`
+		//lint:ignore U1000 tests that unexported fields are omitted from TypeScript
 		private int
 		inner
 	}

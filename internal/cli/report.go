@@ -17,6 +17,9 @@ func newReportCmd(g *globals) *cobra.Command {
 		Short: "Full report of the last scan as text, JSON, CSV or HTML",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if g.json && !cmd.Flags().Changed("format") {
+				format = "json"
+			}
 			a, err := g.app()
 			if err != nil {
 				return err

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,8 +68,39 @@ func TestCloneUniqueBytes(t *testing.T) {
 	}
 }
 
+func TestSparseFileUsesAllocatedBlocks(t *testing.T) {
+	root := t.TempDir()
+	f, err := os.Create(filepath.Join(root, "sparse"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const logical = 64 << 20
+	if err := f.Truncate(logical); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if _, err := f.WriteAt([]byte{1}, logical-1); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, reader := range []string{"generic", ""} {
+		res := scan(t, root, Options{Reader: reader})
+		n := res.Tree.Node(res.Tree.Root())
+		if n.Logical != logical || n.Alloc >= 1<<20 || n.Files != 1 {
+			t.Fatalf("reader %q: logical=%d allocated=%d files=%d", reader, n.Logical, n.Alloc, n.Files)
+		}
+	}
+}
+
 func TestDuMatches(t *testing.T) {
-	root := runtime.GOROOT()
+	goroot, err := exec.Command("go", "env", "GOROOT").Output()
+	if err != nil {
+		t.Skip("go unavailable")
+	}
+	root := strings.TrimSpace(string(goroot))
 	out, err := exec.Command("du", "-skx", root).Output()
 	if err != nil {
 		t.Skip("du unavailable")

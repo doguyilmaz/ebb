@@ -80,7 +80,7 @@ func Run(ctx context.Context, a *app.App, opt Options) error {
 	}
 	port := opt.Port
 	if port == 0 {
-		port = a.Config.Server.Port
+		port = a.Config().Server.Port
 	}
 	d.s = server.New(a, opt.Version, token)
 	served := make(chan error, 1)
@@ -142,7 +142,7 @@ func (d *daemon) check(ctx context.Context) {
 	env := d.a.Env
 	cfg, err := config.Load(env)
 	if err != nil {
-		cfg = d.a.Config
+		cfg = d.a.Config()
 	}
 	now := env.Now()
 	d.st.LastCheck = now
@@ -251,7 +251,7 @@ func OpenWindow(ctx context.Context, a *app.App) error {
 	}
 	cfg, err := config.Load(a.Env)
 	if err != nil {
-		cfg = a.Config
+		cfg = a.Config()
 	}
 	origin, err := window.Target(ctx, a.Env, cfg.Server.WebOrigins, "")
 	if err != nil {
