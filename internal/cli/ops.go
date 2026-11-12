@@ -95,6 +95,9 @@ func newUndoCmd(g *globals) *cobra.Command {
 			if err := a.Undo(id); err != nil {
 				return err
 			}
+			if g.json {
+				return emitJSON(cmd.OutOrStdout(), map[string]bool{"restored": true})
+			}
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), "restored; run ebb scan to refresh the numbers")
 			return err
 		},
@@ -126,7 +129,13 @@ func newNoteCmd(g *globals) *cobra.Command {
 			if len(args) == 2 && !rm {
 				text = args[1]
 			}
-			return a.SetNote(key, text)
+			if err := a.SetNote(key, text); err != nil {
+				return err
+			}
+			if g.json {
+				return emitJSON(cmd.OutOrStdout(), a.Notes())
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&rm, "rm", false, "remove the note")
@@ -145,9 +154,16 @@ func newIgnoreCmd(g *globals) *cobra.Command {
 				return err
 			}
 			if undo {
-				return a.Unignore(args[0])
+				if err := a.Unignore(args[0]); err != nil {
+					return err
+				}
+			} else if err := a.Ignore(args[0]); err != nil {
+				return err
 			}
-			return a.Ignore(args[0])
+			if g.json {
+				return emitJSON(cmd.OutOrStdout(), a.Ignores())
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&undo, "undo", false, "show it again")
@@ -170,8 +186,14 @@ func newProtectCmd(g *globals) *cobra.Command {
 			} else {
 				s.Protect = slices.DeleteFunc(s.Protect, func(p string) bool { return p == args[0] })
 			}
-			_, err = a.SaveSettings(s)
-			return err
+			updated, err := a.SaveSettings(s)
+			if err != nil {
+				return err
+			}
+			if g.json {
+				return emitJSON(cmd.OutOrStdout(), updated.Protect)
+			}
+			return nil
 		}
 	}
 	cmd.AddCommand(
@@ -182,7 +204,11 @@ func newProtectCmd(g *globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for _, p := range a.Settings().Protect {
+			protect := a.Settings().Protect
+			if g.json {
+				return emitJSON(cmd.OutOrStdout(), protect)
+			}
+			for _, p := range protect {
 				fmt.Fprintln(cmd.OutOrStdout(), p)
 			}
 			return nil
