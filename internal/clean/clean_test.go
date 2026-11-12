@@ -278,6 +278,42 @@ func TestNestedItemsDeduped(t *testing.T) {
 	}
 }
 
+// Sorted by bytes, "b-c" and "b.d" fall between "b" and "b/x": the folder's
+// contents are not next to it, yet they go with it.
+func TestNestedItemsDedupedPastSiblings(t *testing.T) {
+	env, home := sandboxEnv(t)
+	w := filepath.Join(home, "w")
+	for _, d := range []string{"b/x", "b-c", "b.d"} {
+		mkfile(t, filepath.Join(w, d, "f"), 10)
+	}
+	var fs []finding.Finding
+	var ids []string
+	for _, rel := range []string{"b/x", "b", "b-c", "b.d", "b"} {
+		f := findingFor(filepath.Join(w, rel), finding.Regenerable, finding.Action{Kind: "delete"})
+		f.ID = rel
+		if slices.Contains(ids, rel) {
+			f.ID = rel + " again"
+		}
+		fs, ids = append(fs, f), append(ids, f.ID)
+	}
+	p, err := planner(env, fs...).Plan(Request{FindingIDs: ids})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, it := range p.Items {
+		rel, _ := filepath.Rel(w, it.Path)
+		got = append(got, rel)
+	}
+	if strings.Join(got, " ") != "b b-c b.d" || p.Bytes != 3<<20 || p.Items[0].FindingID != "b" {
+		t.Fatalf("items %q, %d bytes: b/x goes with b and counts once, the first b wins", got, p.Bytes)
+	}
+	res, err := executor(env).Execute(context.Background(), p, nil)
+	if err != nil || res.Done != 3 || res.Refused != 0 || res.Freed != 3<<20 {
+		t.Fatalf("%+v %v", res, err)
+	}
+}
+
 func TestPlanArbitraryPathIsCautiousTrash(t *testing.T) {
 	env, home := sandboxEnv(t)
 	mkfile(t, filepath.Join(home, "w", "stuff", "f"), 10)
