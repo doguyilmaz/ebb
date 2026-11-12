@@ -101,7 +101,7 @@ Every command takes `--json`.
 ## Build
 
 ```sh
-make build    # bin/ebb, with the web UI (Go 1.26, Xcode command line tools, Bun)
+make build    # bin/ebb, with the web UI (Go 1.26.11+, Xcode command line tools, Bun)
 make check    # vet, tests, gofmt, UI typecheck and tests
 make e2e      # the window in Chrome against a sandboxed demo home
 ```

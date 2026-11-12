@@ -1,6 +1,6 @@
 module github.com/doguyilmaz/ebb
 
-go 1.26
+go 1.26.11
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
