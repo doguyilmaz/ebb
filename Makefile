@@ -18,6 +18,7 @@ check:
 	go test ./...
 	@out=$$(gofmt -l $$(find . -name '*.go' -not -path './ui/*')); test -z "$$out" || (echo "$$out"; exit 1)
 	cd ui && bun run typecheck && bun test
+	@if [ -f macos/Package.swift ]; then swift test --package-path macos; fi
 
 e2e:
 	scripts/e2e.sh
@@ -25,4 +26,13 @@ e2e:
 bench:
 	go test -run '^$$' -bench . -benchmem ./internal/walk ./internal/tree
 
-.PHONY: ui build test check e2e bench
+native: ui
+	scripts/native-app.sh
+
+native-check:
+	swift test --package-path macos
+
+native-smoke:
+	scripts/native-smoke.sh
+
+.PHONY: ui build test check e2e bench native native-check native-smoke

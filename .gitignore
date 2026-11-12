@@ -13,3 +13,5 @@ internal/server/assets/dist/*
 /web/.wrangler/
 /site/.cloudflare/
 /site/.wrangler/
+/macos/.build/
+/macos/.swiftpm/
