@@ -20,7 +20,7 @@ cp "$home/Movies/trip.mov" "$home/Desktop/old/trip copy.mov"
 app="$home/Applications/Sketchpad.app"
 mk "$app/Contents/MacOS/Sketchpad" $((8 << 20))
 cat >"$app/Contents/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.example.Sketchpad</string><key>CFBundleName</key><string>Sketchpad</string><key>CFBundleExecutable</key><string>Sketchpad</string><key>CFBundleShortVersionString</key><string>3.1</string></dict></plist>
+<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>com.example.Sketchpad</string><key>CFBundleName</key><string>Sketchpad</string><key>CFBundleExecutable</key><string>Sketchpad</string><key>CFBundleShortVersionString</key><string>3.1.0</string></dict></plist>
 PLIST
 mk "$home/Library/Containers/com.example.Sketchpad/Data/Library/brushes.db" $((5 << 20))
 mk "$home/Library/Preferences/com.example.Sketchpad.plist" 900
