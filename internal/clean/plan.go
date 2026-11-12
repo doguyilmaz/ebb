@@ -115,6 +115,17 @@ func (p *Planner) Plan(req Request) (*Plan, error) {
 		items = append(items, its...)
 	}
 	items = outermost(items)
+	// Emptying a Trash goes first, so what this plan moves to the Trash stays
+	// there and can still be put back.
+	var first, rest []Item
+	for _, it := range items {
+		if it.Action.Kind == "empty-trash" {
+			first = append(first, it)
+		} else {
+			rest = append(rest, it)
+		}
+	}
+	items = append(first, rest...)
 	if len(items) == 0 {
 		return nil, ErrEmptyPlan
 	}

@@ -201,6 +201,40 @@ func TestExecuteRefusesWhileOwnerRuns(t *testing.T) {
 	}
 }
 
+// Emptying a Trash in the plan that also moves things to the Trash must not
+// delete those for good, wherever their paths sort.
+func TestEmptyTrashKeepsWhatThePlanTrashes(t *testing.T) {
+	env, home := sandboxEnv(t)
+	trash := filepath.Join(home, ".Trash")
+	mkfile(t, filepath.Join(trash, "old.bin"), 1<<20)
+	early := filepath.Join(home, ".Archive", "a.zip") // ".A" sorts before ".Trash"
+	late := filepath.Join(home, "w", "b.zip")
+	mkfile(t, early, 10)
+	mkfile(t, late, 10)
+	fs := []finding.Finding{findingFor(trash, finding.Caution, finding.Action{Kind: "empty-trash"}),
+		findingFor(early, finding.Caution, finding.Action{Kind: "trash"}), findingFor(late, finding.Caution, finding.Action{Kind: "trash"})}
+	p, err := planner(env, fs...).Plan(Request{FindingIDs: []string{fs[0].ID, fs[1].ID, fs[2].ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Approved = true
+	ex := executor(env)
+	res, err := ex.Execute(context.Background(), p, nil)
+	if err != nil || res.Done != 3 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	for _, op := range res.Ops {
+		if op.Action == "trash" {
+			if err := Undo(env, ex.Log, op.ID); err != nil {
+				t.Errorf("%s: %v", filepath.Base(op.Path), err)
+			}
+		}
+	}
+	if exists(filepath.Join(trash, "old.bin")) {
+		t.Fatal("the Trash was not emptied")
+	}
+}
+
 // Emptying a Trash removes a symlink in it, never what it points to, and
 // leaves what the person protects.
 func TestEmptyTrashKeepsLinkTargetsAndProtected(t *testing.T) {
