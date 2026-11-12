@@ -74,6 +74,9 @@ func (s *Server) dataRoutes() {
 		if errors.Is(err, sys.ErrSandbox) {
 			return nil, coded(http.StatusConflict, "sandboxed", "the folder chooser is off in the sandbox; type the path instead")
 		}
+		if errors.Is(err, app.ErrBadChoosePurpose) {
+			return nil, badRequest(err.Error())
+		}
 		if err != nil {
 			return nil, err
 		}

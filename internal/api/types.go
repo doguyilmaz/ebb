@@ -92,7 +92,8 @@ type AgesResponse struct {
 	Buckets []AgeBucket `json:"buckets"`
 }
 
-// ChooseRequest asks ebb to show the macOS folder chooser; Purpose is "scan" or "protect".
+// ChooseRequest asks ebb to show the macOS folder chooser; Purpose is
+// "scan", "protect" or "duplicates".
 type ChooseRequest struct {
 	Purpose string `json:"purpose"`
 }
