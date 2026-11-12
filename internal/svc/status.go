@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/doguyilmaz/ebb/internal/api"
@@ -27,7 +30,7 @@ func (s Service) Read() api.Daemon {
 	}
 	st.Supported = s.Env.OS() == "darwin"
 	st.Installed = s.Installed()
-	st.Running = st.PID > 0 && alive(st.PID)
+	st.Running = st.PID > 0 && alive(st.PID, st.Exe)
 	if !st.Running {
 		st.Waiting = false
 	}
@@ -35,8 +38,25 @@ func (s Service) Read() api.Daemon {
 	return st
 }
 
-// alive asks whether the process exists and is this user's: the service never runs as anyone else.
-func alive(pid int) bool { return syscall.Kill(pid, 0) == nil }
+// alive asks whether the process exists and is the program that wrote the
+// status. A stale status file can otherwise report an unrelated process after
+// launchd reuses the old PID.
+func alive(pid int, expected string) bool {
+	if syscall.Kill(pid, 0) != nil {
+		return false
+	}
+	// Status files written by older versions did not include Exe. Preserve the
+	// old liveness check for those files while new ones get the identity check.
+	if expected == "" {
+		return true
+	}
+	out, err := exec.Command("ps", "-o", "comm=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return false
+	}
+	actual := filepath.Base(strings.TrimSpace(string(out)))
+	return actual == filepath.Base(expected)
+}
 
 // TrimLog keeps the newest complete lines once the service log is past max.
 // launchd only ever appends to it, so dropping a prefix is safe; retaining a

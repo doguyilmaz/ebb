@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/doguyilmaz/ebb/internal/api"
+	"github.com/doguyilmaz/ebb/internal/sys"
 )
 
 func TestTrimLogKeepsNewestCompleteLines(t *testing.T) {
@@ -25,5 +28,18 @@ func TestTrimLogKeepsNewestCompleteLines(t *testing.T) {
 	}
 	if int64(len(got)) > 13 {
 		t.Fatalf("trimmed log is %d bytes, want at most 13", len(got))
+	}
+}
+
+func TestReadRejectsAReusedPIDForAnotherProgram(t *testing.T) {
+	home := t.TempDir()
+	env := &sys.Fake{HomeDir: home, GOOS: "darwin", Envs: map[string]string{sys.HomeEnv: home}}
+	dir := t.TempDir()
+	if err := WriteStatus(dir, api.Daemon{PID: os.Getpid(), Exe: "/usr/bin/definitely-not-ebb"}); err != nil {
+		t.Fatal(err)
+	}
+	s := Service{Env: env, StateDir: dir, Exe: "/usr/bin/ebb"}
+	if got := s.Read(); got.Running {
+		t.Fatalf("reused PID was reported as running: %+v", got)
 	}
 }
