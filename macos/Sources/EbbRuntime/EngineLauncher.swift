@@ -21,11 +21,23 @@ public final class EngineLauncher {
     }
 
     public func connect() async throws -> EbbClient {
-        if let connection {
-            return connection
+        let paths = try EnginePaths.resolve(environment: environment, fileManager: fileManager)
+
+        if let handle = launchHandle {
+            if handle.process.isRunning {
+                // Reconnect to our child without relabelling it as an
+                // existing daemon. This also handles a server.json write that
+                // is still catching up after the process became healthy.
+                try await waitForHealth(port: paths.port, process: handle.process)
+                let token = try readToken(at: paths.token)
+                let client = try EbbClient(baseURL: Self.baseURL(port: paths.port), token: token)
+                connection = client
+                ownership = .launchedByApp
+                return client
+            }
+            finish(handle)
         }
 
-        let paths = try EnginePaths.resolve(environment: environment, fileManager: fileManager)
         if let existing = try await connectToExisting(paths: paths) {
             connection = existing
             ownership = .reusedExisting
@@ -192,7 +204,7 @@ public final class EngineLauncher {
         let details: String?
         if let handle = launchHandle {
             try? handle.stderrHandle.synchronize()
-            if let data = try? Data(contentsOf: handle.stderrURL), !data.isEmpty {
+            if let data = readStderrTail(from: handle.stderrURL), !data.isEmpty {
                 let text = String(decoding: data.suffix(4_096), as: UTF8.self)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 details = text.isEmpty ? nil : text
@@ -203,6 +215,19 @@ public final class EngineLauncher {
             details = nil
         }
         return .processExited(process.terminationStatus, details)
+    }
+
+    private func readStderrTail(from url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        do {
+            let end = try handle.seekToEnd()
+            let start = end > 4_096 ? end - 4_096 : 0
+            try handle.seek(toOffset: start)
+            return try handle.readToEnd() ?? Data()
+        } catch {
+            return nil
+        }
     }
 
     private func finish(_ handle: EngineLaunchHandle) {
