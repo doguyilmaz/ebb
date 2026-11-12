@@ -5,13 +5,27 @@
  * first page (main.tsx); both happen before the next paint, so it never shares a frame with what takes its place.
  */
 const splash = () => document.getElementById("splash");
+let waiting: ReturnType<typeof setTimeout> | undefined;
 
 export function showSplash(on: boolean) {
+  clearTimeout(waiting);
   const el = splash();
-  if (el) el.hidden = !on;
+  if (!el) return;
+  el.hidden = !on;
+  el.setAttribute("aria-busy", "true");
+  const recovery = document.getElementById("splash-recovery");
+  if (recovery) recovery.hidden = true;
+  if (!on) return;
+  const reload = document.getElementById("splash-reload");
+  if (reload) reload.onclick = () => location.reload();
+  waiting = setTimeout(() => {
+    if (recovery) recovery.hidden = false;
+    el.setAttribute("aria-busy", "false");
+  }, 15_000);
 }
 
 /** The first page is on screen: the splash is never needed again, not even on a later page change. */
 export function endSplash() {
+  clearTimeout(waiting);
   splash()?.remove();
 }

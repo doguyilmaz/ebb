@@ -155,6 +155,28 @@ await scenario("a new window shows ebb's mark from its first paint until the pag
   }
 });
 
+await scenario("a stalled opening offers a reload and recovers when ebb answers", async () => {
+  const ctx = await browser.newContext();
+  let release;
+  const blocked = new Promise((resolve) => (release = resolve));
+  try {
+    await ctx.route("**/api/v1/history**", async (route) => {
+      await blocked;
+      await route.continue().catch(() => {});
+    });
+    const win = await ctx.newPage();
+    await win.goto(`${BASE}/#token=${TOKEN}`);
+    await win.getByRole("button", { name: "Reload window" }).waitFor({ timeout: 18000 });
+    check(await win.locator("#splash").isVisible(), "the waiting screen still explains the delay");
+    release();
+    await win.locator(".page > *").first().waitFor({ timeout: 8000 });
+    check((await win.locator("#splash").count()) === 0, "the window recovers without a reload");
+  } finally {
+    release();
+    await ctx.close();
+  }
+});
+
 await scenario("a page change shows the whole page at once", async () => {
   // A real disk answers slower than the demo: with latency a page that renders before its data shows "Loading…".
   const cdp = await page.context().newCDPSession(page);
