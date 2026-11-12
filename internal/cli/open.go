@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,8 +108,7 @@ func newOpenCmd(g *globals) *cobra.Command {
 // refreshService restarts a background ebb older than this one, or one an
 // older definition started, so an upgrade takes over without a separate step.
 func refreshService(cmd *cobra.Command, env sys.Env, s svc.Service, st server.Status) server.Status {
-	older := Version != "dev" && st.Version != Version
-	if !st.Daemon || sys.Sandboxed(env) || (!older && s.Current()) {
+	if !st.Daemon || sys.Sandboxed(env) || !needsRefresh(st.Version, Version, s.Current()) {
 		return st
 	}
 	if _, err := s.Restart(cmd.Context()); err != nil {
@@ -119,6 +119,43 @@ func refreshService(cmd *cobra.Command, env sys.Env, s svc.Service, st server.St
 		return nst
 	}
 	return st
+}
+
+// needsRefresh prevents an older binary from restarting a newer service. The
+// definition check is kept for upgrades where both processes report the same
+// version but launchd still has the previous plist loaded.
+func needsRefresh(running, current string, definitionCurrent bool) bool {
+	if current == "dev" {
+		return !definitionCurrent
+	}
+	rv, rok := releaseVersion(running)
+	cv, cok := releaseVersion(current)
+	if !rok || !cok {
+		return running == current && !definitionCurrent
+	}
+	for i := range rv {
+		if rv[i] != cv[i] {
+			return rv[i] < cv[i]
+		}
+	}
+	return !definitionCurrent
+}
+
+func releaseVersion(v string) ([3]int, bool) {
+	var out [3]int
+	v = strings.TrimPrefix(v, "v")
+	parts := strings.Split(v, ".")
+	if len(parts) != len(out) {
+		return out, false
+	}
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return out, false
+		}
+		out[i] = n
+	}
+	return out, true
 }
 
 func startService(ctx context.Context, env sys.Env, s svc.Service) (server.Status, error) {
