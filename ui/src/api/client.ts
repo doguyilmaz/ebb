@@ -158,8 +158,10 @@ export async function claim(): Promise<"none" | "claimed" | "refused"> {
 
 /** Drops a token ebb no longer accepts, so the page asks for a new link instead of trying it again. */
 export function forgetToken() {
+  const rejected = tok;
   tok = "";
-  store("local")?.removeItem(TOKEN_KEY);
+  const storage = store("local");
+  if (storage?.getItem(TOKEN_KEY) === rejected) storage.removeItem(TOKEN_KEY);
 }
 
 /** Calls f when another tab of this page stores a token, so a tab still waiting connects at once. */
@@ -174,12 +176,13 @@ const rejected = new Set<() => void>();
 export const onAuthRejected = (f: () => void) => (rejected.add(f), () => void rejected.delete(f));
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const sentToken = tok;
   const res = await fetch(`${apiBase()}/api/v1${path}`, {
     method,
-    headers: { Authorization: `Bearer ${tok}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    headers: { Authorization: `Bearer ${sentToken}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) rejected.forEach((f) => f());
+  if (res.status === 401 && tok === sentToken) rejected.forEach((f) => f());
   if (res.status === 204) return undefined as T;
   const text = await res.text();
   let data: unknown = null;

@@ -4,8 +4,16 @@ type Call = { url: string; init?: RequestInit };
 let calls: Call[] = [];
 let responses: Response[] = [];
 const realFetch = globalThis.fetch;
+let savedStorage: PropertyDescriptor | undefined;
 
 beforeEach(() => {
+  savedStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => void values.set(key, value),
+    removeItem: (key: string) => void values.delete(key),
+  } });
   calls = [];
   responses = [];
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -15,11 +23,69 @@ beforeEach(() => {
 });
 afterEach(() => {
   globalThis.fetch = realFetch;
+  if (savedStorage) Object.defineProperty(globalThis, "localStorage", savedStorage);
+  else Reflect.deleteProperty(globalThis, "localStorage");
 });
 
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
 
 describe("api client", () => {
+  test("a late rejection of an older token keeps the new connection", async () => {
+    const c = await import("./client.ts");
+    let reply!: (res: Response) => void;
+    globalThis.fetch = (() => new Promise<Response>((resolve) => (reply = resolve))) as typeof fetch;
+    c.setTokenForTests("old");
+    let rejected = false;
+    const off = c.onAuthRejected(() => {
+      rejected = true;
+      c.forgetToken();
+    });
+    try {
+      const request = c.api.get("/status").catch((e) => e);
+      c.setTokenForTests("new");
+      localStorage.setItem("ebb.token", "new");
+      reply(json({ error: "unauthorized" }, 401));
+      expect(await request).toBeInstanceOf(c.ApiError);
+      expect(rejected).toBe(false);
+      expect(c.token()).toBe("new");
+      expect(localStorage.getItem("ebb.token")).toBe("new");
+    } finally {
+      off();
+      localStorage.removeItem("ebb.token");
+    }
+  });
+
+  test("rejecting this tab's token preserves a newer token stored by another tab", async () => {
+    const c = await import("./client.ts");
+    c.setTokenForTests("old");
+    localStorage.setItem("ebb.token", "new");
+    const off = c.onAuthRejected(() => c.forgetToken());
+    try {
+      responses.push(json({ error: "unauthorized" }, 401));
+      expect(await c.api.get("/status").catch((e) => e)).toBeInstanceOf(c.ApiError);
+      expect(c.token()).toBe("");
+      expect(localStorage.getItem("ebb.token")).toBe("new");
+    } finally {
+      off();
+      localStorage.removeItem("ebb.token");
+    }
+  });
+
+  test("a rejected current token is forgotten", async () => {
+    const c = await import("./client.ts");
+    c.setTokenForTests("rejected");
+    localStorage.setItem("ebb.token", "rejected");
+    const off = c.onAuthRejected(() => c.forgetToken());
+    try {
+      responses.push(json({ error: "unauthorized" }, 401));
+      expect(await c.api.get("/status").catch((e) => e)).toBeInstanceOf(c.ApiError);
+      expect(c.token()).toBe("");
+      expect(localStorage.getItem("ebb.token")).toBeNull();
+    } finally {
+      off();
+    }
+  });
+
   test("sends the bearer token and decodes errors", async () => {
     const c = await import("./client.ts");
     c.setTokenForTests("t0k");
