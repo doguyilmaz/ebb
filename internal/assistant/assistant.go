@@ -6,8 +6,10 @@
 package assistant
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +26,16 @@ var Skill []byte
 func Install(ctx context.Context, env sys.Env, exe string, dryRun bool) ([]string, error) {
 	var steps []string
 	write := func(path string) error {
+		if existing, err := os.ReadFile(path); err == nil {
+			if bytes.Equal(existing, Skill) {
+				steps = append(steps, "keep "+path+" (already installed)")
+			} else {
+				steps = append(steps, "keep "+path+" (edited; not overwritten)")
+			}
+			return nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 		steps = append(steps, "write "+path)
 		if dryRun {
 			return nil
