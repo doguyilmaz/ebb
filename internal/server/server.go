@@ -203,17 +203,26 @@ func Serve(ctx context.Context, s *Server, addr string, ready func(url string)) 
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second,
+		BaseContext: func(net.Listener) context.Context { return ctx }}
 	if ready != nil {
 		ready("http://" + ln.Addr().String() + "/#token=" + s.token)
 	}
+	served, stopped := make(chan struct{}), make(chan struct{})
 	go func() {
-		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdown)
+		defer close(stopped)
+		select {
+		case <-ctx.Done():
+			// Requests see cancellation, so streams end and plans stop before
+			// the next item. The operation in hand must finish and be logged.
+			_ = srv.Shutdown(context.Background())
+		case <-served:
+		}
 	}()
-	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	err = srv.Serve(ln)
+	close(served)
+	<-stopped
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -57,6 +58,7 @@ func newServeCmd(g *globals) *cobra.Command {
 func serveHere(cmd *cobra.Command, a *app.App, token string, port int, ready func(url string)) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	context.AfterFunc(ctx, stop)
 	s := server.New(a, Version, token)
 	defer server.RemoveStatus(a.Env)
 	go a.Watch(ctx)
