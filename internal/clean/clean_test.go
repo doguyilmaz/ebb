@@ -102,7 +102,8 @@ func TestGuardProtectedPaths(t *testing.T) {
 	g := Guard{Home: "/Users/h", Roots: []string{"/"}}
 	for _, p := range []string{"/", "/System", "/System/Library/x", "/Users/h", "/Users/h/Documents", "/Users/h/Library",
 		"/Users/h/Library/Keychains/login.keychain-db", "/usr/bin/ls", "/Applications", "/Users/h/Library/Mobile Documents/x",
-		"/Users/h/Library/CloudStorage/Dropbox/a", "/etc/hosts", "/Volumes/Backup", "relative/x", "/Users/h/a/../../../etc"} {
+		"/Users/h/Library/CloudStorage/Dropbox/a", "/etc/hosts", "/Volumes/Backup", "relative/x", "/Users/h/a/../../../etc",
+		"/Users/h/Dropbox/a", "/Users/h/Google Drive/x", "/Library/Keychains/System.keychain"} {
 		if err := g.Check(p); err == nil {
 			t.Errorf("%s must be protected", p)
 		}
@@ -173,6 +174,67 @@ func TestPlanBlockedWhileRunning(t *testing.T) {
 	p, _ := planner(env, f).Plan(Request{FindingIDs: []string{f.ID}})
 	if !strings.Contains(p.Items[0].Blocked, "Quit Xcode") {
 		t.Fatalf("%+v", p.Items[0])
+	}
+}
+
+// An app opened after the plan was made still holds its files when it runs.
+func TestExecuteRefusesWhileOwnerRuns(t *testing.T) {
+	env, home := sandboxEnv(t)
+	target := filepath.Join(home, "w", "dd")
+	mkfile(t, filepath.Join(target, "f"), 10)
+	busy := false
+	env.RunFn = func(_, name string, args ...string) ([]byte, error) {
+		if name == "pgrep" && busy && args[len(args)-1] == "Xcode" {
+			return []byte("123\n"), nil
+		}
+		return nil, errors.New("no")
+	}
+	f := findingFor(target, finding.Regenerable, finding.Action{Kind: "delete", Quit: []string{"Xcode"}})
+	p, _ := planner(env, f).Plan(Request{FindingIDs: []string{f.ID}})
+	if p.Items[0].Blocked != "" {
+		t.Fatalf("%+v", p.Items[0])
+	}
+	busy = true
+	res, err := executor(env).Execute(context.Background(), p, nil)
+	if err != nil || res.Refused != 1 || !strings.Contains(res.Ops[0].Error, "Quit Xcode") || !exists(filepath.Join(target, "f")) {
+		t.Fatalf("%+v %v", res, err)
+	}
+}
+
+// Emptying a Trash removes a symlink in it, never what it points to, and
+// leaves what the person protects.
+func TestEmptyTrashKeepsLinkTargetsAndProtected(t *testing.T) {
+	env, home := sandboxEnv(t)
+	trash := filepath.Join(home, ".Trash")
+	precious := filepath.Join(home, "w", "precious")
+	mkfile(t, filepath.Join(precious, "keep"), 10)
+	mkfile(t, filepath.Join(trash, "old.bin"), 1<<20)
+	mkfile(t, filepath.Join(trash, "kept", "x"), 10)
+	for _, l := range [][2]string{{precious, "dirlink"}, {filepath.Join(precious, "keep"), "filelink"}} {
+		if err := os.Symlink(l[0], filepath.Join(trash, l[1])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := findingFor(trash, finding.Caution, finding.Action{Kind: "empty-trash"})
+	pl := planner(env, f)
+	pl.Protect = []string{"~/.Trash/kept"}
+	p, err := pl.Plan(Request{FindingIDs: []string{f.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Approved = true
+	ex := executor(env)
+	ex.Guard.Protect = pl.Protect
+	if _, err := ex.Execute(context.Background(), p, nil); err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	des, _ := os.ReadDir(trash)
+	for _, d := range des {
+		left = append(left, d.Name())
+	}
+	if strings.Join(left, " ") != "kept" || !exists(filepath.Join(precious, "keep")) {
+		t.Fatalf("left in the Trash %q, link target there: %v", left, exists(filepath.Join(precious, "keep")))
 	}
 }
 

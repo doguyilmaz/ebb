@@ -243,6 +243,24 @@ func TestNotesSurviveRescan(t *testing.T) {
 	}
 }
 
+// A protection added after the plan was made holds when the plan runs.
+func TestProtectAddedAfterThePlanHolds(t *testing.T) {
+	a, home := cleanApp(t)
+	p, err := a.Plan(clean.Request{FindingIDs: []string{"test.cache"}, Source: "cli"})
+	if err != nil || p.NeedsApproval || p.Items[0].Blocked != "" {
+		t.Fatalf("%+v %v", p, err)
+	}
+	s := a.Settings()
+	s.Protect = []string{"~/w/cache"}
+	if _, err := a.SaveSettings(s); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.Execute(context.Background(), p.ID, nil)
+	if _, serr := os.Stat(filepath.Join(home, "w", "cache", "blob")); err != nil || res.Refused != 1 || serr != nil {
+		t.Fatalf("%+v %v, still there: %v", res, err, serr)
+	}
+}
+
 func TestProtectBlocksPlan(t *testing.T) {
 	a, home := cleanApp(t)
 	s := a.Settings()
