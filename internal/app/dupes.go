@@ -134,27 +134,49 @@ func (a *App) StopDuplicates() bool {
 // last result (also from before a restart).
 func (a *App) Duplicates() api.DuplicatesState {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	return api.DuplicatesState{Running: a.dupes.running, Stopped: a.dupes.stopped, Progress: a.dupes.progress, Result: a.lastDupes(), Error: a.dupes.err}
+	a.dupes.observed = true
+	last, reloaded := a.lastDupes()
+	state := api.DuplicatesState{Running: a.dupes.running, Stopped: a.dupes.stopped, Progress: a.dupes.progress, Result: last, Error: a.dupes.err}
+	notify := a.externalDupesReload
+	a.mu.Unlock()
+	if reloaded && notify != nil {
+		notify()
+	}
+	return state
+}
+
+// RefreshExternalDuplicates checks for a duplicate result saved by another
+// process, but only after this app has requested duplicate state once. The
+// server's regular status poll can then refresh an open duplicates page
+// without loading duplicates.json for every user who never opens that page.
+func (a *App) RefreshExternalDuplicates() {
+	a.mu.Lock()
+	observed := a.dupes.observed
+	a.mu.Unlock()
+	if observed {
+		_ = a.Duplicates()
+	}
 }
 
 // lastDupes is the last search: the one in memory, or the one in
 // duplicates.json when that is another save, from before a restart or from a
 // search or cleanup in a terminal. Not while a search runs here, which saves
 // a newer one. The caller holds a.mu.
-func (a *App) lastDupes() *dupes.Result {
+func (a *App) lastDupes() (*dupes.Result, bool) {
 	path := a.statePath("duplicates.json")
 	fi := fileNow(path)
 	if fi == nil || a.dupes.running || sameSave(fi, a.dupes.file) {
-		return a.dupes.last
+		return a.dupes.last, false
 	}
+	known := a.dupes.observed
 	// Once per save, so a file that cannot be read is not read on every request.
 	a.dupes.file = fi
 	var res dupes.Result
 	if state.LoadJSON(path, &res) == nil {
 		a.dupes.last = &res
+		return a.dupes.last, known
 	}
-	return a.dupes.last
+	return a.dupes.last, false
 }
 
 // forgetCopies drops copies a cleanup removed, and groups left with one.
@@ -162,10 +184,11 @@ func (a *App) lastDupes() *dupes.Result {
 func (a *App) forgetCopies(gone []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if len(gone) == 0 || a.lastDupes() == nil {
+	last, _ := a.lastDupes()
+	if len(gone) == 0 || last == nil {
 		return
 	}
-	res := *a.dupes.last
+	res := *last
 	res.Groups, res.Wasted = nil, 0
 	for _, g := range a.dupes.last.Groups {
 		g.Copies = slices.DeleteFunc(slices.Clone(g.Copies), func(c dupes.Copy) bool {

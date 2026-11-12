@@ -56,6 +56,7 @@ type App struct {
 	dupes struct {
 		running  bool
 		stopped  bool
+		observed bool
 		stop     context.CancelFunc
 		progress *dupes.Progress
 		last     *dupes.Result
@@ -77,6 +78,13 @@ type App struct {
 	curFile os.FileInfo
 	loading *lastLoad
 	plans   map[string]*planEntry
+	// externalReload is called after Last accepts a result saved by another
+	// ebb process. The server uses it to refresh open pages after a terminal
+	// scan or cleanup.
+	externalReload func(*ScanResult)
+	// externalDupesReload is called after Duplicates reads a result saved by
+	// another ebb process. The server uses it to refresh the duplicates page.
+	externalDupesReload func()
 }
 
 func New(env sys.Env) (*App, error) {
@@ -116,6 +124,23 @@ func (a *App) Config() config.Config {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.cfg
+}
+
+// SetExternalReloadHandler installs the notification called after Last loads
+// a scan saved by another process. It is intentionally a callback so app does
+// not depend on the HTTP server package.
+func (a *App) SetExternalReloadHandler(fn func(*ScanResult)) {
+	a.mu.Lock()
+	a.externalReload = fn
+	a.mu.Unlock()
+}
+
+// SetExternalDuplicatesReloadHandler installs the notification called after
+// Duplicates reads a result saved by another process.
+func (a *App) SetExternalDuplicatesReloadHandler(fn func()) {
+	a.mu.Lock()
+	a.externalDupesReload = fn
+	a.mu.Unlock()
 }
 
 // DefaultRoot is the whole data volume on macOS, the configured root when

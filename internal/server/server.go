@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doguyilmaz/ebb/internal/api"
 	"github.com/doguyilmaz/ebb/internal/app"
 	"github.com/doguyilmaz/ebb/internal/server/assets"
 	"github.com/doguyilmaz/ebb/internal/state"
@@ -32,6 +33,14 @@ type Server struct {
 
 func New(a *app.App, version, token string) *Server {
 	s := &Server{app: a, token: token, version: version, hub: newHub(), mux: http.NewServeMux(), spa: assets.Handler("/api/")}
+	a.SetExternalReloadHandler(func(r *app.ScanResult) {
+		s.Notify(api.EventScanDone, r.Meta)
+		s.Notify(api.EventFindingsChanged, nil)
+		s.Notify(api.EventHistoryChanged, nil)
+	})
+	a.SetExternalDuplicatesReloadHandler(func() {
+		s.Notify(api.EventDupesDone, map[string]any{"error": ""})
+	})
 	s.routes()
 	return s
 }

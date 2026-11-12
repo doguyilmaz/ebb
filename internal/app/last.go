@@ -116,6 +116,12 @@ func (a *App) Last() (r *ScanResult, err error) {
 			// Follow changes from where the new scan left off, as a server
 			// started now would.
 			a.rewatch(l.r)
+			a.mu.Lock()
+			notify := a.externalReload
+			a.mu.Unlock()
+			if notify != nil {
+				notify(l.r)
+			}
 		}
 	}()
 	l.r, l.err = readLast(a)
